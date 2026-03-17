@@ -1,0 +1,14 @@
+parameters:
+    - name: publishVersion
+      type: string
+
+steps:
+    - script: npm version ${{ parameters.publishVersion }} --no-git-tag-version
+      displayName: 'Update version in package.json'
+      workingDirectory: $(working_directory)
+      condition: succeeded()
+
+    - script: npx @vscode/vsce package
+      displayName: 'Package VSIX'
+      workingDirectory: $(working_directory)
+      condition: succeeded()

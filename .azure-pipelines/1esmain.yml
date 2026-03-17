@@ -1,0 +1,88 @@
+# Official Build Pipeline for Logic Apps Migration Assistant
+# Uses 1ES MicroBuild template for compliance, signing, and artifact staging
+trigger: none
+pr: none
+
+resources:
+    repositories:
+        - repository: 1esPipelines
+          type: git
+          name: 1ESPipelineTemplates/MicroBuildTemplate
+          ref: refs/tags/release
+        - repository: azExtTemplates
+          type: github
+          name: microsoft/vscode-azuretools
+          ref: main
+          endpoint: GitHub-AzureTools
+
+parameters:
+    - name: dryRun
+      displayName: Dry run
+      type: boolean
+      default: true
+
+    - name: enableSigning
+      displayName: Enable signing
+      type: boolean
+      default: true
+
+    - name: publishVersion
+      displayName: Version to publish
+      type: string
+
+    - name: environmentName
+      type: string
+      default: VSCodeDeployMigrationAssistant
+
+variables:
+    - name: TeamName
+      value: 'Azure Logic Apps Migration Assistant'
+    - name: working_directory
+      value: '.'
+
+extends:
+    template: azure-pipelines/MicroBuild.1ES.Official.yml@1esPipelines
+    parameters:
+        sdl:
+            credscan:
+                suppressionsFile: $(Build.SourcesDirectory)/.azure-pipelines/compliance/CredScanSuppressions.json
+            codeql:
+                language: javascript
+        pool:
+            name: VSEngSS-MicroBuild2022-1ES
+            image: server2022-microbuildVS2022-1es
+            os: windows
+        stages:
+            - stage: Build
+              displayName: Build extension
+              jobs:
+                  - job: Build
+                    templateContext:
+                        mb:
+                            signing:
+                                enabled: ${{ parameters.enableSigning }}
+                                signType: real
+                                signWithProd: true
+                                zipSources: false
+                                azureSubscription: 'MicroBuild Signing Task (DevDiv)'
+                        outputs:
+                            - output: pipelineArtifact
+                              targetPath: $(build.artifactstagingdirectory)/build/Root
+                              artifactName: Build Root
+                    steps:
+                        - script: git checkout v${{ parameters.publishVersion }}
+                          displayName: 'Checkout release tag'
+
+                        - template: .azure-pipelines/templates/setup.yml
+
+                        - template: .azure-pipelines/templates/build.yml
+
+                        - template: .azure-pipelines/templates/package.yml
+                          parameters:
+                              publishVersion: ${{ parameters.publishVersion }}
+
+                        - template: .azure-pipelines/templates/sign.yml
+
+                        - template: .azure-pipelines/templates/stage-artifacts.yml
+                          parameters:
+                              publishVersion: ${{ parameters.publishVersion }}

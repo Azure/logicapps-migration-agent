@@ -1,0 +1,10 @@
+steps:
+    - script: npm run lint
+      displayName: 'Lint'
+      workingDirectory: $(working_directory)
+      condition: succeeded()
+
+    - script: npm run build
+      displayName: 'Build'
+      workingDirectory: $(working_directory)
+      condition: succeeded()

@@ -1,0 +1,11 @@
+steps:
+    - task: NodeTool@0
+      displayName: 'Setup Node.js'
+      inputs:
+          versionSpec: '20.x'
+      condition: succeeded()
+
+    - script: npm install
+      displayName: 'Install dependencies'
+      workingDirectory: $(working_directory)
+      condition: succeeded()

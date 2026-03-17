@@ -1,0 +1,47 @@
+steps:
+    # Check if the SignExtension.signproj file exists
+    - powershell: |
+          $fileExists = Test-Path -Path "$(Build.SourcesDirectory)/.azure-pipelines/SignExtension.signproj"
+          Write-Output "##vso[task.setvariable variable=signprojExists]$fileExists"
+
+          if ($fileExists) {
+              Write-Output "SignExtension.signproj file found. Signing extension."
+          } else {
+              Write-Output "SignExtension.signproj file not found. Skipping signing."
+          }
+      displayName: 'Check for SignExtension.signproj'
+
+    # Get extension info from package.json
+    - pwsh: |
+          Write-Output "##vso[task.setvariable variable=name;isOutput=true]$((Get-Content -Raw -Path package.json | ConvertFrom-Json).name)"
+          Write-Output "##vso[task.setvariable variable=version;isOutput=true]$((Get-Content -Raw -Path package.json | ConvertFrom-Json).version)"
+      condition: eq(variables['signprojExists'], True)
+      name: package
+      displayName: 'Get extension info from package.json'
+
+    # Generate VSIX manifest for signing
+    - script: npx @vscode/vsce generate-manifest -i $(package.name)-$(package.version).vsix -o $(Build.SourcesDirectory)/extension.manifest
+      condition: eq(variables['signprojExists'], True)
+      displayName: 'Generate extension manifest'
+
+    # Sign the extension
+    - task: DotNetCoreCLI@2
+      condition: eq(variables['signprojExists'], True)
+      displayName: 'Sign with MSBuild'
+      inputs:
+          command: 'build'
+          projects: $(Build.SourcesDirectory)/.azure-pipelines/SignExtension.signproj
+
+    # Verify signature file was created
+    - pwsh: |
+          $filePath = "extension.signature.p7s"
+
+          if (-Not (Test-Path $filePath)) {
+              Write-Error "The file '$filePath' does not exist."
+              exit 1
+          }
+
+          Write-Output "The file '$filePath' exists."
+          exit 0
+      displayName: 'Verify extension.signature.p7s'
+      condition: eq(variables['signprojExists'], True)

@@ -1,0 +1,22 @@
+parameters:
+    - name: publishVersion
+      type: string
+
+steps:
+    - task: CopyFiles@2
+      displayName: 'Copy packages and signing artifacts to staging'
+      inputs:
+          Contents: |
+              package.json
+              extension.manifest
+              extension.signature.p7s
+          TargetFolder: '$(build.artifactstagingdirectory)/build/Root'
+      condition: succeeded()
+
+    - task: CopyFiles@2
+      displayName: 'Copy VSIX to staging'
+      inputs:
+          SourceFolder: '$(working_directory)'
+          Contents: '*.vsix'
+          TargetFolder: '$(build.artifactstagingdirectory)/build/Root'
+      condition: succeeded()
