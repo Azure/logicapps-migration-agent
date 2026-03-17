@@ -24,9 +24,7 @@
             "script": "watch",
             "problemMatcher": {
                 "owner": "esbuild",
-                "fileLocation": [
-                    "absolute"
-                ],
+                "fileLocation": ["absolute"],
                 "pattern": {
                     "regexp": "^\\s*(.+):(\\d+):(\\d+):\\s*$",
                     "file": 1,

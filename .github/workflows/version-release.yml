@@ -1,0 +1,218 @@
+name: Version and Release
+run-name: Version and Release - [ ${{ github.ref_name }} ] - ${{ github.event.inputs.release_type }}
+
+on:
+    workflow_dispatch:
+        inputs:
+            release_type:
+                description: 'Release type'
+                required: true
+                default: 'minor'
+                type: choice
+                options:
+                    - major
+                    - minor
+                    - patch
+
+permissions:
+    contents: write
+
+jobs:
+    validation:
+        runs-on: ubuntu-latest
+        steps:
+            - name: 'Check branch and release type'
+              id: validate
+              run: |
+                  BRANCH_NAME="${{ github.ref_name }}"
+                  RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+                  echo "Branch: $BRANCH_NAME"
+                  echo "Release Type: $RELEASE_TYPE"
+
+                  if [[ "$BRANCH_NAME" == "main" && "$RELEASE_TYPE" == "patch" ]]; then
+                    echo "::error::Patch releases are not allowed on the main branch. Use a hotfix branch."
+                    exit 1
+                  fi
+
+                  if [[ "$BRANCH_NAME" == hotfix/* && "$RELEASE_TYPE" != "patch" ]]; then
+                    echo "::error::Only patch releases are allowed on hotfix branches."
+                    exit 1
+                  fi
+
+    create-release:
+        needs: validation
+        runs-on: ubuntu-latest
+        outputs:
+            new_version: ${{ steps.version.outputs.new_version }}
+            tag_name: ${{ steps.version.outputs.tag_name }}
+        permissions:
+            contents: write
+        steps:
+            - name: 'Checkout'
+              uses: actions/checkout@v4
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  fetch-depth: 0
+
+            - name: 'Set up Node.js'
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+
+            - name: 'Calculate Next Version'
+              id: version
+              run: |
+                  RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+                  CURRENT_VERSION=$(node -p "require('./package.json').version")
+                  echo "Current version: $CURRENT_VERSION"
+
+                  IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+                  case "$RELEASE_TYPE" in
+                    major)
+                      MAJOR=$((MAJOR + 1))
+                      MINOR=0
+                      PATCH=0
+                      ;;
+                    minor)
+                      MINOR=$((MINOR + 1))
+                      PATCH=0
+                      ;;
+                    patch)
+                      PATCH=$((PATCH + 1))
+                      ;;
+                  esac
+
+                  NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+                  TAG_NAME="v${NEW_VERSION}"
+
+                  echo "New version: $NEW_VERSION"
+                  echo "Tag name: $TAG_NAME"
+
+                  echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+                  echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+            - name: 'Update package.json version'
+              run: |
+                  npm version ${{ steps.version.outputs.new_version }} --no-git-tag-version
+                  echo "Updated package.json to version ${{ steps.version.outputs.new_version }}"
+
+            - name: 'Configure Git'
+              run: |
+                  git config --global user.name "release-automation-${{ github.actor }}"
+                  git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+
+            - name: 'Commit Version Bump'
+              run: |
+                  git add package.json
+                  git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
+                  git push origin ${{ github.ref_name }}
+
+            - name: 'Create and Push Tag'
+              run: |
+                  git tag -a ${{ steps.version.outputs.tag_name }} -m "Release ${{ steps.version.outputs.tag_name }}"
+                  git push origin ${{ steps.version.outputs.tag_name }}
+
+            - name: 'Generate Release Notes'
+              id: release-notes
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  # Get the previous tag
+                  PREV_TAG=$(git describe --tags --abbrev=0 ${{ steps.version.outputs.tag_name }}^ 2>/dev/null || echo "")
+
+                  if [ -z "$PREV_TAG" ]; then
+                    echo "No previous tag found, this is the first release"
+                    RELEASE_NOTES="## Initial Release"
+                  else
+                    echo "Previous tag: $PREV_TAG"
+                    echo "Current tag: ${{ steps.version.outputs.tag_name }}"
+
+                    # Generate release notes using GitHub API
+                    API_RESPONSE=$(gh api \
+                      --method POST \
+                      -H "Accept: application/vnd.github+json" \
+                      -H "X-GitHub-Api-Version: 2022-11-28" \
+                      /repos/${{ github.repository }}/releases/generate-notes \
+                      -f tag_name="${{ steps.version.outputs.tag_name }}" \
+                      -f target_commitish="${{ github.ref_name }}" \
+                      -f previous_tag_name="$PREV_TAG" 2>/dev/null || echo '{"body": null}')
+
+                    RELEASE_NOTES=$(echo "$API_RESPONSE" | jq -r '.body // empty')
+
+                    # If the API didn't return meaningful notes, generate our own
+                    if [ -z "$RELEASE_NOTES" ] || [ "$RELEASE_NOTES" = "null" ]; then
+                      echo "API returned empty/null body, generating custom release notes"
+
+                      COMMITS=$(git log $PREV_TAG..${{ steps.version.outputs.tag_name }} --oneline --pretty=format:"* %s (%h)" 2>/dev/null || echo "")
+
+                      if [ -n "$COMMITS" ]; then
+                        RELEASE_NOTES="## What's Changed
+
+                  $COMMITS
+
+                  **Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ steps.version.outputs.tag_name }}"
+                      else
+                        RELEASE_NOTES="## Release ${{ steps.version.outputs.tag_name }}
+
+                  This release includes updates and improvements.
+
+                  **Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ steps.version.outputs.tag_name }}"
+                      fi
+                    fi
+                  fi
+
+                  echo "Final release notes:"
+                  echo "$RELEASE_NOTES"
+
+                  # Save to file to handle multi-line content
+                  echo "$RELEASE_NOTES" > release-notes.md
+
+            - name: 'Create GitHub Release'
+              id: create-release
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  gh release create ${{ steps.version.outputs.tag_name }} \
+                    --title "Release ${{ steps.version.outputs.tag_name }}" \
+                    --notes-file release-notes.md \
+                    --target ${{ github.ref_name }}
+
+    build-and-publish:
+        needs: create-release
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: 'Checkout'
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ needs.create-release.outputs.tag_name }}
+                  fetch-depth: 0
+
+            - name: 'Set up Node.js'
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+
+            - name: 'Install dependencies'
+              run: npm ci
+
+            - name: 'Lint'
+              run: npm run lint
+
+            - name: 'Build VSIX'
+              run: npx @vscode/vsce package
+              # vsce:prepublish runs automatically (builds catalog + production bundle)
+
+            - name: 'Archive VSIX'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: vscode-extension
+                  path: '*.vsix'
+
+            - name: 'Upload VSIX to Release'
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  gh release upload ${{ needs.create-release.outputs.tag_name }} *.vsix --clobber
