@@ -1,0 +1,50 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Get_File_Content_(V2)": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "filePath": "@downloadFilePath"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Ftp",
+            "operationId": "getFtpFileContentV2",
+            "serviceProviderId": "/serviceProviders/Ftp"
+          }
+        },
+        "runAfter": {}
+      },
+      "Upload_File_Content": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "filePath": "@uploadFilePath",
+            "fileContent": "@body('Get_File_Content_(V2)')"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Ftp",
+            "operationId": "createFile",
+            "serviceProviderId": "/serviceProviders/Ftp"
+          }
+        },
+        "runAfter": {
+          "Get_File_Content_(V2)": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

@@ -1,0 +1,16 @@
+{
+  "managedApiConnections": {},
+  "serviceProviderConnections": {
+    "confluentKafka": {
+      "parameterValues": {
+        "brokerList": "@appsetting('kafka_brokerList')",
+        "username": "@appsetting('kafka_username')",
+        "password": "@appsetting('kafka_password')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/confluentKafka"
+      },
+      "displayName": "kafkaconnection01"
+    }
+  }
+}

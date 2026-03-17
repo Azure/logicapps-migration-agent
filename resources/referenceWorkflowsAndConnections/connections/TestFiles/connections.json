@@ -1,0 +1,82 @@
+{
+  "serviceProviderConnections": {
+    "Postgres": {
+      "parameterValues": {
+        "url": "@PostgresJdbcConnectionUrl",
+        "userId": "@PostgresUserId",
+        "password": "@PostgresPassword"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/Jdbc"
+      },
+      "displayName": "Postgres"
+    },
+    "MySql": {
+      "parameterValues": {
+        "url": "@MySqlJdbcConnectionUrl",
+        "userId": "@MySqlUserId",
+        "password": "@MySqlPassword"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/Jdbc"
+      },
+      "displayName": "MySql"
+    },
+    "MsSql": {
+      "parameterValues": {
+        "url": "@MsSqlJdbcConnectionUrl",
+        "userId": "@MsSqlUserId",
+        "password": "@MsSqlPassword"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/Jdbc"
+      },
+      "displayName": "MsSql"
+    },
+    "HanaDb": {
+      "parameterValues": {
+        "url": "@HanaDbJdbcConnectionUrl",
+        "userId": "@HanaDbUserId",
+        "password": "@HanaDbPassword"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/Jdbc"
+      },
+      "displayName": "HanaDb"
+    },
+    "Snowflake": {
+      "displayName": "Snowflake",
+      "parameterValues": {
+        "url": "jdbc:snowflake://InvalidDomainName.snowflakecomputing.com?warehouse=COMPUTE_WH&db=JDBCTESTS&schema=PUBLIC",
+        "userId": "IncorrectUser",
+        "password": "IncorrectPassowrd"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/Jdbc"
+      }
+    },
+    "As400": {
+      "displayName": "As400",
+      "parameterValues": {
+        "url": "jdbc:as400://InvalidDomainName.ibm.com",
+        "userId": "user",
+        "password": "IncorrectPassowrd"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/Jdbc"
+      }
+    },
+    "InvalidConnectionUrl": {
+      "parameterValues": {
+        "url": "@MsSqlJdbcConnectionUrl",
+        "userId": "@MsSqlUserId",
+        "password": "IncorrectPassowrd"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/Jdbc"
+      },
+      "displayName": "MsSql"
+    }
+  },
+  "managedApiConnections": {}
+}

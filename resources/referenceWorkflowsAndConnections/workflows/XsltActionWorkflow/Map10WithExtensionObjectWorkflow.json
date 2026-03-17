@@ -1,0 +1,42 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Transform_XML": {
+                "type": "Xslt",
+              "inputs": {
+                "content": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n  <SampleInput xmlns=\"http://tvh.demos\">\r\n    <Field1>Test1</Field1>\r\n    <Field2>Test2</Field2>\r\n</SampleInput>",
+                "map": {
+                  "name": "Map10WithExtensionObject.xslt",
+                  "source" : "##source##"
+                },
+                "xmlExtensionObject": "<ExtensionObjects>\r\n    <ExtensionObject Namespace=\"http://tvh.demos.sharedFunctions\" AssemblyName=\"TVH.Sample, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null\" ClassName=\"TVH.Sample.Common\" />\r\n</ExtensionObjects>\r\n"
+              },
+                "runAfter": {}
+            },
+            "Response": {
+                "type": "Response",
+                "kind": "http",
+                "inputs": {
+                    "statusCode": 200,
+                    "body": "@outputs('Transform_XML')?['body']"
+                },
+                "runAfter": {
+                    "Transform_XML": [
+                        "Succeeded"
+                    ]
+                }
+            }
+        },
+        "triggers": {
+            "manual": {
+                "type": "Request",
+                "kind": "Http",
+                "inputs": {}
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {}
+    },
+    "kind": "Stateful"
+}

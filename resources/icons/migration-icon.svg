@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" opacity="0.8">
+  <!-- Gear (top-left) -->
+  <circle cx="7.5" cy="7.5" r="3.5" stroke-width="1.4"/>
+  <line x1="7.5" y1="2.5" x2="7.5" y2="4" stroke-width="1.4"/>
+  <line x1="7.5" y1="11" x2="7.5" y2="12.5" stroke-width="1.4"/>
+  <line x1="2.5" y1="7.5" x2="4" y2="7.5" stroke-width="1.4"/>
+  <line x1="11" y1="7.5" x2="12.5" y2="7.5" stroke-width="1.4"/>
+  <line x1="4" y1="4" x2="5.1" y2="5.1" stroke-width="1.4"/>
+  <line x1="9.9" y1="9.9" x2="11" y2="11" stroke-width="1.4"/>
+  <line x1="11" y1="4" x2="9.9" y2="5.1" stroke-width="1.4"/>
+  <line x1="5.1" y1="9.9" x2="4" y2="11" stroke-width="1.4"/>
+
+  <!-- Gear (bottom-right) -->
+  <circle cx="20.5" cy="20.5" r="3.5" stroke-width="1.4"/>
+  <line x1="20.5" y1="15.5" x2="20.5" y2="17" stroke-width="1.4"/>
+  <line x1="20.5" y1="24" x2="20.5" y2="25.5" stroke-width="1.4"/>
+  <line x1="15.5" y1="20.5" x2="17" y2="20.5" stroke-width="1.4"/>
+  <line x1="24" y1="20.5" x2="25.5" y2="20.5" stroke-width="1.4"/>
+  <line x1="17" y1="17" x2="18.1" y2="18.1" stroke-width="1.4"/>
+  <line x1="22.9" y1="22.9" x2="24" y2="24" stroke-width="1.4"/>
+  <line x1="24" y1="17" x2="22.9" y2="18.1" stroke-width="1.4"/>
+  <line x1="18.1" y1="22.9" x2="17" y2="24" stroke-width="1.4"/>
+
+  <!-- Bold arrow (center, diagonal, longer) -->
+  <line x1="8" y1="20" x2="20" y2="8" stroke-width="1.8"/>
+  <polyline points="14,7.5 20.5,7.5 20.5,14" stroke-width="1.8" fill="none"/>
+</svg>

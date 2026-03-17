@@ -1,0 +1,66 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Read_Blob": {
+        "inputs": {
+          "parameters": {
+            "containerName": "azurelogicappscontainer",
+            "blobName": "sample_document.pdf"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "blobStorageConnection",
+            "operationId": "readBlob",
+            "serviceProviderId": "/serviceProviders/AzureBlob"
+          }
+        },
+        "runAfter": {},
+        "type": "ServiceProvider"
+      },
+      "Get_Markdown": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "modelId": "prebuilt-layout",
+            "modelIdInputs": {
+              "content": "@body('Read_Blob')?['content']",
+              "outputContentType": "markdown"
+            }
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "docIntelligence",
+            "operationId": "analyzeDocument",
+            "serviceProviderId": "/serviceProviders/documentIntelligence"
+          }
+        },
+        "runAfter": {
+          "Read_Blob": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Response": {
+        "inputs": {
+          "body": "@body('Get_Markdown')",
+          "statusCode": 200
+        },
+        "kind": "http",
+        "runAfter": {
+          "Get_Markdown": [
+            "Succeeded"
+          ]
+        },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "kind": "http",
+        "type": "request"
+      }
+    }
+  },
+  "kind": "Stateless"
+}

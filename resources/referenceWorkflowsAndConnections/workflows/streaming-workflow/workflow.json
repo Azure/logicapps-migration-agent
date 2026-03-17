@@ -1,0 +1,119 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Agent_Loop": {
+        "type": "Agent",
+        "inputs": {
+          "parameters": {
+            "deploymentId": "OPENAI_DEPLOYMENTID_PLACEHOLDER",
+            "agentModelType": "AzureOpenAI",
+            "messages": [
+              {
+                "role": "System",
+                "content": "You help users answer questions about the weather. check weather in Seattle and notify me the results. when you notified, let me know the returned x-ms-workflow-run-id"
+              }
+            ],
+            "agentModelSettings": {
+              "deploymentModelProperties": {
+                "name": "gpt-4.1"
+              },
+              "agentChatCompletionSettings": {
+                "maxTokens": 3000,
+                "frequencyPenalty": 0.1,
+                "presencePenalty": 0.1,
+                "temperature": 0.1,
+                "topP": 0.1
+              }
+            }
+          },
+          "modelConfigurations": {
+            "model1": {
+              "referenceName": "agentConnection1"
+            }
+          }
+        },
+        "tools": {
+          "get_weather": {
+            "description": "gets the weather",
+            "agentParameterSchema": {
+              "type": "object",
+              "properties": {
+                "Get_current_weather-location": {
+                  "type": "string",
+                  "description": "The location to get the weather for",
+                  "required": true
+                }
+              }
+            },
+            "actions": {
+              "Get_current_weather": {
+                "type": "ApiConnection",
+                "inputs": {
+                  "host": {
+                    "connection": {
+                      "referenceName": "msnweather"
+                    }
+                  },
+                  "method": "get",
+                  "path": "/current/@{encodeURIComponent(agentparameters('Get_current_weather-location'))}",
+                  "queries": {
+                    "units": "I"
+                  }
+                }
+              },
+              "Compose_action": {
+                "type": "Compose",
+                "inputs": "@outputs('Get_current_weather')",
+                "runAfter": {
+                  "Get_current_weather": [
+                    "Succeeded"
+                  ]
+                }
+              }
+            }
+          },
+          "notify": {
+            "description": "notify",
+            "agentParameterSchema": {
+              "type": "object",
+              "properties": {
+                "send_note-body": {
+                  "type": "string",
+                  "description": "The note to send",
+                  "required": true
+                }
+              }
+            },
+            "actions": {
+              "send_note": {
+                "type": "Http",
+                "inputs": {
+                  "uri": "@parameters('notify-url')",
+                  "method": "POST",
+                  "body": {
+                    "report": "@agentparameters('send_note-body')"
+                  }
+                },
+                "runtimeConfiguration": {
+                  "contentTransfer": {
+                    "transferMode": "Chunked"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "When_a_HTTP_request_is_received": {
+        "type": "Request",
+        "kind": "Agent"
+      }
+    }
+  },
+  "kind": "Agent"
+}

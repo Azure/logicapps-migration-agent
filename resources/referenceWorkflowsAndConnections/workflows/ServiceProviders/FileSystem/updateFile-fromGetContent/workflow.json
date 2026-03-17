@@ -1,0 +1,65 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Get_File_Content": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "filePath": "/LogicAppStandardTests/inputfile.txt"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "FileSystem",
+            "operationId": "getFileContent",
+            "serviceProviderId": "/serviceProviders/FileSystem"
+          }
+        },
+        "runAfter": {}
+      },
+      "Upload_File": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "body": "@body('Get_File_Content')",
+            "filePath": "LogicAppStandardTests/testfolder/inputfile.txt"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "FileSystem",
+            "operationId": "updateFile",
+            "serviceProviderId": "/serviceProviders/FileSystem"
+          }
+        },
+        "runAfter": {
+          "Get_File_Content": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "body": {
+            "content": "@body('Upload_File')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": {
+          "Upload_File": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    }
+  },
+  "kind": "Stateful"
+}

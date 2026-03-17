@@ -1,0 +1,196 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Compose": {
+                "type": "Compose",
+                "inputs": "@addProperty(removeProperty(removeProperty(removeProperty(removeProperty(removeProperty(removeProperty(body('Parse_JSON'), 'Product'), 'POamount'), 'Quantity'),'ApprovalStatus'),'ApproverName'), 'OrderPriority'),'Priority', body('Parse_JSON')['OrderPriority'])",
+                "runAfter": {
+                    "Parse_JSON": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Delay_2": {
+                "type": "Wait",
+                "inputs": {
+                    "interval": {
+                        "count": 1,
+                        "unit": "Second"
+                    }
+                },
+                "runAfter": {
+                    "Parse_JSON_2": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Parse_JSON": {
+                "type": "ParseJson",
+                "inputs": {
+                    "content": "@triggerBody()",
+                    "schema": {
+                        "$schema": "http://json-schema.org/draft-04/schema#",
+                        "properties": {
+                            "Address": {
+                                "properties": {
+                                    "City": {
+                                        "type": "string"
+                                    },
+                                    "Name": {
+                                        "type": "string"
+                                    },
+                                    "State": {
+                                        "type": "string"
+                                    },
+                                    "Street": {
+                                        "type": "string"
+                                    },
+                                    "Zip": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "Name",
+                                    "Street",
+                                    "City",
+                                    "State",
+                                    "Zip"
+                                ],
+                                "type": "object"
+                            },
+                            "ApprovalStatus": {
+                                "type": "string"
+                            },
+                            "ApproverName": {
+                                "type": "string"
+                            },
+                            "OrderNumber": {
+                                "type": "integer"
+                            },
+                            "OrderPriority": {
+                                "type": "integer"
+                            },
+                            "POamount": {
+                                "type": "number"
+                            },
+                            "Product": {
+                                "type": "string"
+                            },
+                            "Quantity": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "OrderNumber",
+                            "Product",
+                            "Quantity",
+                            "Address",
+                            "POamount",
+                            "ApprovalStatus",
+                            "ApproverName",
+                            "OrderPriority"
+                        ],
+                        "type": "object"
+                    }
+                },
+                "runAfter": {}
+            },
+            "Parse_JSON_2": {
+                "type": "ParseJson",
+                "inputs": {
+                    "content": "@outputs('Compose')",
+                    "schema": {
+                        "$schema": "http://json-schema.org/draft-04/schema#",
+                        "properties": {
+                            "Address": {
+                                "properties": {
+                                    "City": {
+                                        "type": "string"
+                                    },
+                                    "Name": {
+                                        "type": "string"
+                                    },
+                                    "State": {
+                                        "type": "string"
+                                    },
+                                    "Street": {
+                                        "type": "string"
+                                    },
+                                    "Zip": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "Name",
+                                    "Street",
+                                    "City",
+                                    "State",
+                                    "Zip"
+                                ],
+                                "type": "object"
+                            },
+                            "OrderNumber": {
+                                "type": "integer"
+                            },
+                            "OrderPriority": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Compose": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Compose_2": {
+                "type": "Compose",
+                "inputs": "@setProperty(body('Parse_JSON_2'),'TrackingID', concat('Track-', body('Parse_JSON_2').OrderNumber, '-', 'shipment'))",
+                "runAfter": {
+                    "Delay_2": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Response": {
+                "type": "Response",
+                "kind": "Http",
+                "inputs": {
+                    "statusCode": 200
+                },
+                "runAfter": {
+                    "Invoke_a_workflow_in_this_workflow_app": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "Invoke_a_workflow_in_this_workflow_app": {
+                "type": "Workflow",
+                "inputs": {
+                    "host": {
+                        "workflow": {
+                            "id": "Shipping"
+                        }
+                    },
+                    "body": "@outputs('Compose_2')"
+                },
+                "runAfter": {
+                    "Compose_2": [
+                        "Succeeded"
+                    ]
+                }
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "triggers": {
+            "When_a_HTTP_request_is_received": {
+                "type": "Request",
+                "kind": "Http"
+            }
+        }
+    },
+    "kind": "Stateful"
+}

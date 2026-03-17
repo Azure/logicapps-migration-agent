@@ -1,0 +1,48 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "ComposeSomething": {
+        "type": "Compose",
+        "inputs": { "body": "Hello from a compose action" },
+        "runAfter": {}
+      },
+      "CallGoogle": {
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "http://www.google.com"
+        },
+        "runAfter": {
+          "ComposeSomething": [
+            "Succeeded"
+          ]
+        }
+      },
+      "CallGmail": {
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "http://www.gmail.com"
+        },
+        "runAfter": {
+          "ComposeSomething": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

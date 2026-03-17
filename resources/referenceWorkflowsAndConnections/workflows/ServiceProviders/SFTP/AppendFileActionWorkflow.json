@@ -1,0 +1,74 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Append_file": {
+        "inputs": {
+          "parameters": {
+            "content": "@triggerBody()?['appendData']",
+            "fetchMetadata": "@triggerBody()?['readAllMetadata']",
+            "filePath": "@triggerBody()?['path']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Sftp",
+            "operationId": "appendFile",
+            "serviceProviderId": "/serviceProviders/Sftp"
+          }
+        },
+        "runAfter": {
+          "Upload_file_content": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "ServiceProvider"
+      },
+      "Upload_file_content": {
+        "inputs": {
+          "parameters": {
+            "content": "@triggerBody()?['uploadData']",
+            "filePath": "@triggerBody()?['path']",
+            "overWriteFileIfExists": "@triggerBody()?['overwrite']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Sftp",
+            "operationId": "uploadFileContent",
+            "serviceProviderId": "/serviceProviders/Sftp"
+          }
+        },
+        "runAfter": {},
+        "type": "ServiceProvider"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {
+            "properties": {
+              "appendData": {
+                "type": "object"
+              },
+              "overwrite": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "readAllMetadata": {
+                "type": "boolean"
+              },
+              "uploadData": {
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

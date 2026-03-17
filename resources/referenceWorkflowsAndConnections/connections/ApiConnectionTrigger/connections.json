@@ -1,0 +1,18 @@
+{
+  "managedApiConnections": {
+    "servicebus": {
+      "api": {
+        "id": "/subscriptions/f34b22a3-2202-4fb1-b040-1332bd928c84/providers/Microsoft.Web/locations/brazilsouth/managedApis/servicebus"
+      },
+      "connection": {
+        "id": "/subscriptions/f34b22a3-2202-4fb1-b040-1332bd928c84/resourceGroups/FlowUnitTestCIT/providers/Microsoft.Web/connections/servicebus-1"
+      },
+      "connectionRuntimeUrl": "https://a9ab15f5a12185bf.07.common.logic-df.azure-apihub.net/apim/servicebus/a7ab5fe163844793ac6e34a8d0c2f652/",
+      "authentication": {
+        "type": "Raw",
+        "scheme": "Key",
+        "parameter": "@appsetting('servicebus-connectionKey')"
+      }
+    }
+  }
+}

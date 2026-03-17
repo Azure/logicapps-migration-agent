@@ -1,0 +1,41 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Sap_Action": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {{parameters}},
+          "serviceProviderConfiguration": {
+            "connectionName": "{{connectionName}}",
+            "operationId": "{{operationId}}",
+            "serviceProviderId": "/serviceProviders/Sap"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@body('Sap_Action').content"
+        },
+        "runAfter": {
+          "Sap_Action": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0"
+  },
+  "kind": "Stateful"
+}

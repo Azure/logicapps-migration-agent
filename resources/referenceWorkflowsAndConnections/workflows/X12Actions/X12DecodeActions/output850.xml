@@ -1,0 +1,22 @@
+<ns0:X12_00401_850 xmlns:ns0="http://schemas.microsoft.com/BizTalk/EDI/X12/2006">
+    <ST>
+        <ST01>850</ST01>
+        <ST02>3313</ST02>
+    </ST>
+    <ns0:BEG>
+        <BEG01>01</BEG01>
+        <BEG02>AB</BEG02>
+        <BEG03>CDEFGH</BEG03>
+        <BEG04>XYZ</BEG04>
+        <BEG05>45670129</BEG05>
+    </ns0:BEG>
+    <ns0:PO1Loop1>
+        <ns0:PO1>
+            <PO101>A</PO101>
+        </ns0:PO1>
+    </ns0:PO1Loop1>
+    <SE>
+        <SE01>4</SE01>
+        <SE02>3313</SE02>
+    </SE>
+</ns0:X12_00401_850>

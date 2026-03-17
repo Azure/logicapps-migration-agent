@@ -1,0 +1,47 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Execute_NonQuery": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "statement": "DB2Workflow_Query",
+            "sqlParameters": DB2Workflow_Parameters
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "DB2ConnectionString",
+            "operationId": "executeNonQuery",
+            "serviceProviderId": "/serviceProviders/DB2"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@body('Execute_NonQuery')"
+        },
+        "runAfter": {
+          "Execute_NonQuery": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {}
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

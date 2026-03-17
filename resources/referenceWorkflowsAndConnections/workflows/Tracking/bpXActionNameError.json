@@ -1,0 +1,26 @@
+﻿{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2024-03-31/trackingdefinitionschema.json#",
+    "businessProcess": {
+        "name": "bpX",
+        "version": "00000000-0000-0000-0000-000000000000",
+        "correlationPropertyName": "BP2ID"
+    },
+    "trackingDefinitions": {
+        "wf11": {
+            "events": {
+                "stage1": {
+                    "statuses": {
+                        "success": {
+                            "operationType": "action",
+                            "operationName": "Add_to_time_2",
+                            "properties": {
+                                "BP2ID": "@body('Add_to_time')",
+                                "PPP1": "@body('Add_to_time_22')"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,119 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Close_a_queue_session": {
+        "inputs": {
+          "parameters": {
+            "queueName": "ServiceBuscit",
+            "sessionId": "@triggerBody()?['sessionId']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "closeQueueSession",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Renew_a_queue_session": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "ServiceProvider"
+      },
+      "Complete_the_message": {
+        "inputs": {
+          "parameters": {
+            "messageId": "@triggerBody()?['messageId']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "completeMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {},
+        "type": "ServiceProvider"
+      },
+      "Complete_the_message_1": {
+        "inputs": {
+          "parameters": {
+            "messageId": "@body('Get_messages_from_a_queue_session')?[0]['messageId']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "completeMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Get_messages_from_a_queue_session": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "ServiceProvider"
+      },
+      "Get_messages_from_a_queue_session": {
+        "inputs": {
+          "parameters": {
+            "queueName": "ServiceBuscit",
+            "sessionId": "@triggerBody()?['sessionId']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "getMessagesFromQueueSession",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Complete_the_message": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "ServiceProvider"
+      },
+      "Renew_a_queue_session": {
+        "inputs": {
+          "parameters": {
+            "queueName": "ServiceBuscit",
+            "sessionId": "@triggerBody()?['sessionId']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "renewQueueSession",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Complete_the_message_1": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "ServiceProvider"
+      }
+    },
+    "triggers": {
+      "On_single_new_message_from_queue_session": {
+        "type": "ServiceProvider",
+        "kind": "Polling",
+        "recurrence": {
+          "frequency": "Second",
+          "interval": 1
+        },
+        "inputs": {
+          "parameters": {
+            "queueName": "ServiceBuscit"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "onSingleNewMessageFromQueueSession",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "stateKindPlaceholder"
+}

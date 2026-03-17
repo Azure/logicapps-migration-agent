@@ -1,0 +1,42 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "Some Response Action."
+          },
+          "statusCode": 200
+        },
+        "runAfter": {},
+        "type": "Response",
+        "kind": "http"
+      },
+      "Terminate": {
+        "inputs": {
+          "runStatus": "Failed"
+        },
+        "runAfter": {
+          "Response": [
+            "Succeeded"
+          ]
+        },
+        "type": "Terminate"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateless"
+}

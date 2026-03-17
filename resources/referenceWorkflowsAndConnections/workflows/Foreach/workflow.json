@@ -1,0 +1,64 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Response": {
+        "inputs": {
+          "statusCode": 200,
+          "body": "@result('For_each')"
+        },
+          "runAfter": {
+            "For_each": [
+              "Succeeded",
+              "FAILED"
+            ]
+          },
+          "type": "Response"
+        },
+      "For_each": {
+        "actions": {
+          "HTTP": {
+            "inputs": {
+              "method": "GET",
+              "uri": "https://ganla.azurewebsites.net/"
+            },
+            "runAfter": {},
+            "type": "Compose"
+          }
+        },
+        "foreach": "@variables('arr')",
+        "runAfter": {
+          "Initialize_variable": [
+            "Succeeded"
+          ]
+        },
+        "type": "Foreach"
+      },
+      "Initialize_variable": {
+        "inputs": {
+          "variables": [
+            {
+              "name": "arr",
+              "type": "array",
+              "value": [
+                1
+              ]
+            }
+          ]
+        },
+        "runAfter": {},
+        "type": "InitializeVariable"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "inputs": {},
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

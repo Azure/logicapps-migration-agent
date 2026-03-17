@@ -1,0 +1,53 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Send_Multiple_Messages": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "TopicName": "topic_0011",
+            "Message": "@triggerBody()"
+          },
+          "serviceProviderConfiguration": {
+            "serviceProviderId": "/serviceProviders/confluentKafka",
+            "operationId": "SendMessage",
+            "connectionName": "confluentKafka"
+          }
+        },
+        "runAfter": {}
+      },
+      "Compose": {
+        "type": "compose",
+        "runAfter": {
+          "Send_Multiple_Messages": [
+            "Succeeded"
+          ]
+        },
+        "inputs": "@body('Send_Multiple_Messages')"
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('compose')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "Compose": [ "Succeeded" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "compose": {
+        "type": "compose",
+        "inputs": {
+          "zipCode": "98074"
+        },
+        "runAfter": {}
+      },
+      "InvokeFunction": {
+        "type": "CSharpScriptCode",
+        "inputs": {
+          "CodeFile": "***scriptFile***"
+        },
+        "runAfter": { "compose": ["Succeeded"] }
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('InvokeFunction')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "InvokeFunction": [ "Succeeded" ] },
+        "type": "Response"
+      }
+    }, 
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

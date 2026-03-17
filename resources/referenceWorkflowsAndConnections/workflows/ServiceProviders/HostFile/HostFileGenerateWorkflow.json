@@ -1,0 +1,46 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Generate_Host_File_Contents": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "hidx": "@triggerBody()?['hidx']",
+            "schema": "@triggerBody()?['schema']",
+            "rows": "@triggerBody()?['rows']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "hostfile",
+            "operationId": "generateFileContents",
+            "serviceProviderId": "/serviceProviders/hostfile"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@outputs('Generate_Host_File_Contents')?['body']?['contents']"
+        },
+        "runAfter": {
+          "Generate_Host_File_Contents": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

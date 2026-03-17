@@ -1,0 +1,30 @@
+{
+  "managedApiConnections": {
+    "outlook": {
+      "api": {
+        "id": "/subscriptions/80d4fe69-c95b-4dd2-a938-9250f1c8ab03/providers/Microsoft.Web/locations/eastus/managedApis/outlook"
+      },
+      "authentication": {
+        "type": "Raw",
+        "scheme": "Key",
+        "parameter": "@appsetting('outlook-connectionKey')"
+      },
+      "connection": {
+        "id": "/subscriptions/80d4fe69-c95b-4dd2-a938-9250f1c8ab03/resourceGroups/aeldridge-sp-test-rg/providers/Microsoft.Web/connections/outlook"
+      },
+      "connectionRuntimeUrl": "https://9d51d1ffc9f77572.00.common.logic-eastus.azure-apihub.net/apim/outlook/0234e49c7ea24255b0e697f4d3c79642"
+    }
+  },
+  "serviceProviderConnections": {
+    "eventHub": {
+      "displayName": "test-eventhubs-conn",
+      "parameterSetName": "connectionString",
+      "parameterValues": {
+        "connectionString": "@appsetting('eventHub_connectionString')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/eventHub"
+      }
+    }
+  }
+}

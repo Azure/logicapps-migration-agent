@@ -1,0 +1,289 @@
+{{
+    "definition": {{
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {{
+            "Response": {{
+                "inputs": {{
+                    "body": {{
+                        "upsertNew": "@outputs('Create_Or_Update_Entity')",
+                        "createExisting": "@outputs('Create_Or_Update_Entity_2')",
+                        "getFirst": "@outputs('Get_Entity')",
+                        "createNew": "@outputs('Create_Or_Update_Entity_3')",
+                        "getSeccond": "@outputs('Get_Entity_2')",
+                        "updateFirst": "@outputs('Update_Entity')",
+                        "getFirstUpdated": "@outputs('Get_Entity_3')",
+                        "updateSeccond": "@outputs('Update_Entity_2')",
+                        "getSeccondUpdated": "@outputs('Get_Entity_4')",
+                        "updateNonExistant": "@outputs('Update_Entity_3')",
+                        "getWithSelect": "@outputs('Get_Entity_5')"
+                    }},
+                    "statusCode": 200
+                }},
+                "kind": "http",
+              "runAfter": {{
+                  "Get_Entity_5": [
+                    "Succeeded",
+                    "Failed",
+                    "Skipped"
+                  ]
+                }},
+                "type": "Response"
+            }},
+            "Create_Or_Update_Entity": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "entity": {{
+                            "RowKey": "row1",
+                            "PartitionKey": "partition1",
+                            "a": "value 1"
+                        }}
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "upsertEntity",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{}},
+                "type": "ServiceProvider"
+            }},
+            "Create_Or_Update_Entity_2": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "entity": {{
+                            "RowKey": "row1",
+                            "PartitionKey": "partition1",
+                            "f": "trying to create an entity that already exists"
+                        }},
+                        "failIfEntityExists": true
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "upsertEntity",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "Create_Or_Update_Entity": [
+                        "Succeeded"
+                    ]
+                }},
+                "type": "ServiceProvider"
+            }},
+            "Get_Entity": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "rowKey": "row1",
+                        "partitionKey": "partition1",
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "getEntity",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "Create_Or_Update_Entity": [
+                        "Succeeded"
+                    ]
+                }},
+                "type": "ServiceProvider"
+            }},
+            "Create_Or_Update_Entity_3": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "entity": {{
+                            "RowKey": "row2",
+                            "PartitionKey": "partition2",
+                            "n": 1
+                        }},
+                        "failIfEntityExists": true
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "upsertEntity",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "Get_Entity": [
+                        "Succeeded"
+                    ],
+                    "Create_Or_Update_Entity_2" : [
+                        "Failed"
+                    ]
+                }},
+                "type": "ServiceProvider"
+            }},
+            "Get_Entity_2": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "rowKey": "row2",
+                        "partitionKey": "partition2",
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "getEntity",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "Create_Or_Update_Entity_3": [
+                        "Succeeded"
+                    ]
+                }},
+                "type": "ServiceProvider"
+            }},
+            "Update_Entity": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "entity": {{
+                            "RowKey": "row1",
+                            "PartitionKey": "partition1",
+                            "b": 2
+                        }},
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "updateEntity",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "Get_Entity_2": [
+                        "Succeeded"
+                    ]
+                }},
+                "type": "ServiceProvider"
+            }},
+            "Get_Entity_3": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "rowKey": "row1",
+                        "partitionKey": "partition1",
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "getEntity",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "Update_Entity": [
+                        "Succeeded"
+                    ]
+                }},
+                "type": "ServiceProvider"
+            }},
+            "Update_Entity_2": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "entity": {{
+                            "RowKey": "row2",
+                            "PartitionKey": "partition2", 
+                            "CustomerCode@odata.type":"Edm.Guid",  
+                            "CustomerCode":"c9da6455-213d-42c9-9a79-3e9149a57833",  
+                            "CustomerSince@odata.type":"Edm.DateTime",  
+                            "CustomerSince":"2008-07-10T00:00:00Z",  
+                            "IsActive":true,  
+                        }},
+                        "updateMode": "Replace"
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "updateEntity",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "Get_Entity_3": [
+                        "Succeeded"
+                    ]
+                }},
+                "type": "ServiceProvider"
+            }},
+            "Get_Entity_4": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "rowKey": "row2",
+                        "partitionKey": "partition2",
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "getEntity",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "Update_Entity_2": [
+                        "Succeeded"
+                    ]
+                }},
+                "type": "ServiceProvider"
+            }},
+            "Update_Entity_3": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "entity": {{
+                            "RowKey": "row3",
+                            "PartitionKey": "partition2",
+                            "m": "trying to update a non existant entity" 
+                        }},
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "updateEntity",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "Get_Entity_4": [
+                        "Succeeded"
+                    ]
+                }},
+                "type": "ServiceProvider"
+            }},
+            "Get_Entity_5": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "rowKey": "row2",
+                        "partitionKey": "partition2",
+                        "select": [ "IsActive" ]
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "getEntity",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "Update_Entity_3": [
+                      "Succeeded",
+                      "Failed"
+                    ]
+                }},
+                "type": "ServiceProvider"
+            }}
+        }},
+        "contentVersion": "1.0.0.0",
+        "outputs": {{}},
+        "triggers": {{
+            "manual": {{
+                "kind": "http",
+                "type": "request"
+            }}
+        }}
+    }},
+    "kind": "Stateful"
+}}

@@ -1,0 +1,66 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Compose": {
+        "type": "compose",
+        "runAfter": {},
+        "inputs": {
+          "body": {
+            "responseStringKey": "responseStringValue",
+            "responseNumberKey": 10
+          }
+        }
+      },
+      "Response": {
+        "inputs": {
+          "schema": {
+            "type": "object",
+            "description": "The response JSON body",
+            "properties": {
+              "responseStringKey": {
+                "type": "string",
+                "description": "The response string key"
+              },
+              "responseNumberKey": {
+                "type": "integer",
+                "description": "The response number key"
+              }
+            }
+          },
+          "body": {
+            "value": "@body('compose')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "Compose": [ "Succeeded" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {
+            "type": "object",
+            "description": "The request JSON body",
+            "properties": {
+              "requestStringKey": {
+                "type": "string",
+                "description": "The request string key"
+              },
+              "requestNumberKey": {
+                "type": "integer",
+                "description": "The request number key"
+              }
+            }
+          }
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

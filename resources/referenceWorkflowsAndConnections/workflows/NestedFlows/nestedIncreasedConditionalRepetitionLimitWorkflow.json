@@ -1,0 +1,196 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Condition": {
+        "type": "If",
+        "expression": {
+          "and": [
+            {
+              "equals": [
+                "a",
+                "a"
+              ]
+            }
+          ]
+        },
+        "actions": {
+          "Condition_2": {
+            "type": "If",
+            "expression": {
+              "and": [
+                {
+                  "equals": [
+                    "a",
+                    "a"
+                  ]
+                }
+              ]
+            },
+            "actions": {
+              "Condition_3": {
+                "type": "If",
+                "expression": {
+                  "and": [
+                    {
+                      "equals": [
+                        "a",
+                        "a"
+                      ]
+                    }
+                  ]
+                },
+                "actions": {
+                  "Condition_4": {
+                    "type": "If",
+                    "expression": {
+                      "and": [
+                        {
+                          "equals": [
+                            "a",
+                            "a"
+                          ]
+                        }
+                      ]
+                    },
+                    "actions": {
+                      "Condition_5": {
+                        "type": "If",
+                        "expression": {
+                          "and": [
+                            {
+                              "equals": [
+                                1,
+                                1
+                              ]
+                            }
+                          ]
+                        },
+                        "actions": {
+                          "Condition_6": {
+                            "type": "If",
+                            "expression": {
+                              "and": [
+                                {
+                                  "equals": [
+                                    "a",
+                                    "a"
+                                  ]
+                                }
+                              ]
+                            },
+                            "actions": {
+                              "Condition_7": {
+                                "type": "If",
+                                "expression": {
+                                  "and": [
+                                    {
+                                      "equals": [
+                                        1,
+                                        1
+                                      ]
+                                    }
+                                  ]
+                                },
+                                "actions": {
+                                  "Condition_8": {
+                                    "type": "If",
+                                    "expression": {
+                                      "and": [
+                                        {
+                                          "equals": [
+                                            1,
+                                            1
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "actions": {
+                                      "For_each_1": {
+                                        "foreach": "@triggerBody()",
+                                        "actions": {},
+                                        "type": "Foreach"
+                                      }
+                                    },
+                                    "else": {
+                                      "actions": {}
+                                    }
+                                  }
+                                },
+                                "else": {
+                                  "actions": {}
+                                }
+                              }
+                            },
+                            "else": {
+                              "actions": {}
+                            }
+                          }
+                        },
+                        "else": {
+                          "actions": {}
+                        }
+                      }
+                    },
+                    "else": {
+                      "actions": {}
+                    }
+                  }
+                },
+                "else": {
+                  "actions": {}
+                }
+              }
+            },
+            "else": {
+              "actions": {}
+            }
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {}
+      },
+      "Condition_1": {
+        "type": "If",
+        "expression": {
+          "and": [
+            {
+              "equals": [
+                "a",
+                "a"
+              ]
+            }
+          ]
+        },
+        "actions": {},
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 200
+        },
+        "runAfter": {
+          "Condition": [
+            "SUCCEEDED"
+          ]
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

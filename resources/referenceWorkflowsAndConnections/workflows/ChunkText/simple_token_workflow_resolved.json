@@ -1,0 +1,43 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "ChunkText": {
+        "type": "ChunkText",
+        "inputs": {
+          "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Potenti nullam ac tortor vitae purus. Tincidunt praesent semper feugiat nibh sed. In nisl nisi scelerisque eu ultrices vitae auctor eu augue.",
+          "chunkingStrategy": "tokenSize",
+          "tokenSize": 100,
+          "encodingModel": "cl100k_base",
+          "pageOverlapLength": "10"
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@body('ChunkText')"
+        },
+        "runAfter": {
+          "ChunkText": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

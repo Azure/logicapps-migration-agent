@@ -1,0 +1,40 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "XmlValidation": {
+        "type": "xmlValidation",
+        "runAfter": {},
+        "inputs": {
+          "content": {
+            "$content": "###content###",
+            "$content-type": "application/xml; charset=utf-8"
+          },
+          "schema": { "name": "###schema###" }
+        }
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('XmlValidation')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "XmlValidation": [ "Succeeded", "Failed" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

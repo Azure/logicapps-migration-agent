@@ -1,0 +1,12 @@
+{
+  "serviceProviderConnections": {
+    "ACASessionConnection": {
+      "parameterValues": {
+        "poolManagementEndpoint": "<poolManagementEndpoint>"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/acasession"
+      }
+    }
+  }
+}

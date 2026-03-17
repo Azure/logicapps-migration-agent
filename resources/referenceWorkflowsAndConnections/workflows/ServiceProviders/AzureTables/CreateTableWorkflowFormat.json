@@ -1,0 +1,44 @@
+{{
+    "definition": {{
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {{
+            "Response": {{
+                "inputs": {{
+                    "body": "@outputs('Create_Table')",
+                        "statusCode": 200
+                }},
+                "kind": "http",
+                "runAfter": {{
+                    "Create_Table": [
+                        "Succeeded",
+                        "Failed"
+                    ]
+                }},
+                "type": "Response"
+            }},
+            "Create_Table": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}"
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "createTable",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{}},
+                "type": "ServiceProvider"
+            }}
+        }},
+        "contentVersion": "1.0.0.0",
+        "outputs": {{}},
+        "triggers": {{
+            "manual": {{
+                "kind": "http",
+                "type": "request"
+            }}
+        }}
+    }},
+    "kind": "Stateful"
+}}

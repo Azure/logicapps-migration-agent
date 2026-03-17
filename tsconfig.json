@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "outDir": "out",
+    "rootDir": "src",
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": true,
+    "resolveJsonModule": true,
+    "baseUrl": "./src",
+    "paths": {
+      "@services/*": ["services/*"],
+      "@parsers/*": ["tools/parsers/*"],
+      "@generators/*": ["tools/generators/*"],
+      "@validators/*": ["tools/validators/*"],
+      "@ui/*": ["ui/*"],
+      "@types/*": ["types/*"],
+      "@utils/*": ["utils/*"],
+      "@commands/*": ["commands/*"],
+      "@errors/*": ["errors/*"],
+      "@ir/*": ["ir/*"],
+      "@copilot/*": ["copilot/*"],
+      "@stateMachine/*": ["stateMachine/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "out", ".vscode-test"]
+}

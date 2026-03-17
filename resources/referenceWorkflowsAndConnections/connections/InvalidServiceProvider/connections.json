@@ -1,0 +1,46 @@
+{
+  "managedApiConnections": {
+    "servicebus": {
+      "api": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/providers/Microsoft.Web/locations/@{appsetting('WORKFLOWS_LOCATION_NAME')}/managedApis/servicebus"
+      },
+      "connection": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.Web/connections/servicebus"
+      },
+      "connectionRuntimeUrl": "@parameters('servicebus-ConnectionRuntimeUrl')",
+      "authentication": "@parameters('servicebus-Authentication')"
+    },
+    "msnweather": {
+      "api": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/providers/Microsoft.Web/locations/@{appsetting('WORKFLOWS_LOCATION_NAME')}/managedApis/msnweather"
+      },
+      "connection": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.Web/connections/msnweather"
+      },
+      "connectionRuntimeUrl": "@parameters('msnweather-ConnectionRuntimeUrl')",
+      "authentication": "@parameters('msnweather-Authentication')"
+    }
+  },
+  "serviceProviderConnections": {
+    "serviceBus-1": {
+      "parameterValues": {
+        "connectionString": "@appsetting('serviceBus_11_connectionString')"
+      },
+      "parameterSetName": "connectionString",
+      "serviceProvider": {
+        "id": "/serviceProviders/serviceBus"
+      },
+      "displayName": "rmg-demo-sb"
+    },
+    "AzureBlob": {
+      "parameterValues": {
+        "connectionString": "@appsetting('AzureBlob_connectionString')"
+      },
+      "parameterSetName": "connectionString",
+      "serviceProvider": {
+        "id": "/serviceProviders/AzureBlob"
+      },
+      "displayName": "connInAppStor"
+    }
+  }
+}

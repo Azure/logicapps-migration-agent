@@ -1,0 +1,30 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {},
+    "triggers": {
+      "When_a_file_is_added_or_updated": {
+        "type": "ServiceProvider",
+        "kind": "Polling",
+        "inputs": {
+          "parameters": {
+            "folderPath": "/LogicAppTests/trigger-test-folder",
+            "maxFileCount": 4
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "FileSystem",
+            "operationId": "whenFilesAreAddedOrModified",
+            "serviceProviderId": "/serviceProviders/FileSystem"
+          }
+        },
+        "recurrence": {
+          "frequency": "Second",
+          "interval": 20
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

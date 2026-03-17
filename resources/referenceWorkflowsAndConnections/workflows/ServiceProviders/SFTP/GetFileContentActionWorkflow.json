@@ -1,0 +1,31 @@
+{{
+  "definition": {{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {{
+      "Get_File_Content": {{
+        "type": "ServiceProvider",
+        "inputs": {{
+          "parameters": {{
+            "filePath": "unit_test_files/{0}"
+          }},
+          "serviceProviderConfiguration": {{
+            "connectionName": "Sftp",
+            "operationId": "getFileContent",
+            "serviceProviderId": "/serviceProviders/Sftp"
+          }}
+        }},
+        "runAfter": {{ }}
+      }}
+    }},
+    "triggers": {{
+      "manual": {{
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {{}}
+      }}
+    }},
+    "contentVersion": "1.0.0.0",
+    "outputs": {{}}
+  }},
+  "kind": "Stateful"
+}}

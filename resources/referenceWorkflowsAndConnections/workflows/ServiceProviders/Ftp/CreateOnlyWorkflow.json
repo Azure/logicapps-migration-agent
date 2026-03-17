@@ -1,0 +1,45 @@
+{{
+  "definition": {{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {{
+      "Create_File": {{
+        "inputs": {{
+          "parameters": {{
+            "fileContent": "Hey, new file!!",
+            "filePath": "{0}"
+          }},
+          "serviceProviderConfiguration": {{
+            "connectionName": "Ftp",
+            "operationId": "createFile",
+            "serviceProviderId": "/serviceProviders/Ftp"
+          }}
+        }},
+        "runAfter": {{}},
+        "type": "ServiceProvider"
+      }},
+      "Response": {{
+        "inputs": {{
+          "body": {{}},
+          "statusCode": 200
+        }},
+        "kind": "http",
+        "runAfter": {{
+          "Create_File": [
+            "Succeeded"
+          ]
+        }},
+        "type": "Response"
+      }}
+    }},
+    "contentVersion": "1.0.0.0",
+    "outputs": {{}},
+    "triggers": {{
+      "manual": {{
+        "inputs": {{}},
+        "kind": "Http",
+        "type": "Request"
+      }}
+    }}
+  }},
+  "kind": "Stateful"
+}}

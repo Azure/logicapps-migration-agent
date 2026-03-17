@@ -1,0 +1,53 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Send_Email": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "from": "smtp_username",
+            "to": "smtp_username",
+            "cc": "smtp_username",
+            "subject": "Test Email",
+            "body": "Testing Send Emailv3 Built-in. Read receipt may be disabled by smtp server",
+            "importance": "High",
+            "readReceipt": "smtp_username",
+            "deliveryReceipt": "smtp_username"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Smtp",
+            "operationId": "sendEmail",
+            "serviceProviderId": "/serviceProviders/Smtp"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": {
+            "content": "Hello World"
+          }
+        },
+        "runAfter": {
+          "Send_Email": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateless"
+}

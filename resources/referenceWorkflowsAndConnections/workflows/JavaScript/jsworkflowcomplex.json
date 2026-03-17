@@ -1,0 +1,52 @@
+﻿{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Run_in-line_JavaScript": {
+                "type": "JavaScriptCode",
+                "inputs": {
+                    "code": "var x = workflowContext.actions.Compose.outputs;\r\nfunction isInRange(value) {\r\n    if (typeof value !== 'number') {\r\n        return false;\r\n    }\r\n    return value >= this.lower && value <= this.upper;\r\n}\r\n\r\nlet range = {\r\n    lower: 2,\r\n    upper: 3\r\n};\r\n\r\nreturn x.filter(isInRange, range);"
+                },
+                "runAfter": {
+                    "Compose": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Response": {
+                "type": "Response",
+                "kind": "http",
+                "inputs": {
+                    "statusCode": 200,
+                    "body": "@outputs('Run_in-line_JavaScript')"
+                },
+                "runAfter": {
+                    "Run_in-line_JavaScript": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Compose": {
+                "type": "Compose",
+                "inputs": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                ],
+                "runAfter": {}
+            }
+        },
+        "triggers": {
+            "manual": {
+                "type": "Request",
+                "kind": "Http",
+                "inputs": {}
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {}
+    },
+    "kind": "Stateful"
+}

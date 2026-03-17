@@ -1,0 +1,54 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Response": {
+                "type": "Response",
+                "kind": "Http",
+                "inputs": {
+                    "statusCode": 200
+                },
+                "runAfter":{
+                    "Send_Messages_To_Kafka_Topic": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Send_Messages_To_Kafka_Topic": {
+                "type": "ServiceProvider",
+                "inputs": {
+                    "parameters": {
+                        "TopicName": "topic_avro1",
+                        "Message": {
+                        "my_field1": "256",
+                        "my_field2": "Test messgae 001",
+                        "my_field3": "This is test avro message.",
+                        "my_field4": "This is new field."
+                        },
+                        "SchemaSubjectName": "topic_avro1-value",
+                        "Headers": {
+                            "X-Custom-Header": "HeaderValue01",
+                            "Authorization": "token-value01"
+                        }
+                    },
+                    "serviceProviderConfiguration": {
+                        "serviceProviderId": "/serviceProviders/confluentKafka",
+                        "connectionName": "confluentKafka",
+                        "operationId": "SendMessage"
+                    }
+                },
+                "runAfter": {}
+            }
+        },
+        "triggers": {
+            "manual": {
+                "type": "Request",
+                "kind": "Http",
+                "inputs": {}
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {}
+    },
+    "kind": "Stateful"
+}

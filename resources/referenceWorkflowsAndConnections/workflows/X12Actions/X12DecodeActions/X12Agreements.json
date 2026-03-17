@@ -1,0 +1,234 @@
+{
+  "value": [
+    {
+      "properties": {
+        "hostPartner": "Contoso",
+        "guestPartner": "Fabrikam",
+        "hostIdentity": {
+          "qualifier": "ZZ",
+          "value": "7654321"
+        },
+        "guestIdentity": {
+          "qualifier": "ZZ",
+          "value": "1234567"
+        },
+        "agreementType": "X12",
+        "content": {
+          "x12": {
+            "receiveAgreement": {
+              "protocolSettings": {
+                "validationSettings": {
+                  "validateCharacterSet": false,
+                  "checkDuplicateInterchangeControlNumber": false,
+                  "interchangeControlNumberValidityDays": 30,
+                  "checkDuplicateGroupControlNumber": false,
+                  "checkDuplicateTransactionSetControlNumber": false,
+                  "validateEDITypes": true,
+                  "validateXSDTypes": false,
+                  "allowLeadingAndTrailingSpacesAndZeroes": true,
+                  "trimLeadingAndTrailingSpacesAndZeroes": false,
+                  "trailingSeparatorPolicy": "NotAllowed"
+                },
+                "framingSettings": {
+                  "dataElementSeparator": 42,
+                  "componentSeparator": 58,
+                  "replaceSeparatorsInPayload": false,
+                  "replaceCharacter": 36,
+                  "segmentTerminator": 126,
+                  "characterSet": "UTF8",
+                  "segmentTerminatorSuffix": "None"
+                },
+                "envelopeSettings": {
+                  "controlStandardsId": 85,
+                  "useControlStandardsIdAsRepetitionCharacter": false,
+                  "senderApplicationId": "123",
+                  "receiverApplicationId": "456",
+                  "controlVersionNumber": "00401",
+                  "interchangeControlNumberLowerBound": 1,
+                  "interchangeControlNumberUpperBound": 999999999,
+                  "rolloverInterchangeControlNumber": true,
+                  "enableDefaultGroupHeaders": true,
+                  "groupControlNumberLowerBound": 5,
+                  "groupControlNumberUpperBound": 999999999,
+                  "rolloverGroupControlNumber": true,
+                  "groupHeaderAgencyCode": "T",
+                  "groupHeaderVersion": "004010",
+                  "transactionSetControlNumberLowerBound": 1,
+                  "transactionSetControlNumberUpperBound": 999999999,
+                  "rolloverTransactionSetControlNumber": true,
+                  "overwriteExistingTransactionSetControlNumber": true,
+                  "groupHeaderDateFormat": "YYMMDD",
+                  "groupHeaderTimeFormat": "HHMM",
+                  "usageIndicator": "Production"
+                },
+                "acknowledgementSettings": {
+                  "needTechnicalAcknowledgement": false,
+                  "batchTechnicalAcknowledgements": true,
+                  "needFunctionalAcknowledgement": true,
+                  "functionalAcknowledgementVersion": "00401",
+                  "batchFunctionalAcknowledgements": true,
+                  "needImplementationAcknowledgement": false,
+                  "batchImplementationAcknowledgements": false,
+                  "needLoopForValidMessages": true,
+                  "sendSynchronousAcknowledgement": true,
+                  "acknowledgementControlNumberLowerBound": 1,
+                  "acknowledgementControlNumberUpperBound": 999999999,
+                  "rolloverAcknowledgementControlNumber": true
+                },
+                "messageFilter": {
+                  "messageFilterType": "Exclude"
+                },
+                "securitySettings": {
+                  "authorizationQualifier": "00",
+                  "securityQualifier": "00"
+                },
+                "processingSettings": {
+                  "maskSecurityInfo": true,
+                  "convertImpliedDecimal": false,
+                  "preserveInterchange": false,
+                  "suspendInterchangeOnError": false,
+                  "createEmptyXmlTagsForTrailingSeparators": true,
+                  "useDotAsDecimalSeparator": false
+                },
+                "envelopeOverrides": [
+                ],
+                "validationOverrides": [
+                ],
+                "messageFilterList": [],
+                "schemaReferences": [
+                  {
+                    "messageId": "810",
+                    "schemaVersion": "00401",
+                    "schemaName": "testschema",
+                    "senderApplicationId": "11111",
+                    "targetNameSpace": "http://MSIT.EPS.ICOE.Zones.X12810.MSLI.Schemas.AP.X1200401810"
+                  },
+                  {
+                    "messageId": "850",
+                    "schemaVersion": "00401",
+                    "schemaName": "testschema2",
+                    "targetNameSpace": "http://schemas.microsoft.com/BizTalk/EDI/X12/2006"
+                  }
+                ],
+                "x12DelimiterOverrides": []
+              },
+              "senderBusinessIdentity": {
+                "qualifier": "ZZ",
+                "value": "7654321"
+              },
+              "receiverBusinessIdentity": {
+                "qualifier": "ZZ",
+                "value": "1234567"
+              }
+            },
+            "sendAgreement": {
+              "protocolSettings": {
+                "validationSettings": {
+                  "validateCharacterSet": false,
+                  "checkDuplicateInterchangeControlNumber": false,
+                  "interchangeControlNumberValidityDays": 30,
+                  "checkDuplicateGroupControlNumber": false,
+                  "checkDuplicateTransactionSetControlNumber": false,
+                  "validateEDITypes": true,
+                  "validateXSDTypes": false,
+                  "allowLeadingAndTrailingSpacesAndZeroes": true,
+                  "trimLeadingAndTrailingSpacesAndZeroes": true,
+                  "trailingSeparatorPolicy": "NotAllowed"
+                },
+                "framingSettings": {
+                  "dataElementSeparator": 43,
+                  "componentSeparator": 58,
+                  "replaceSeparatorsInPayload": true,
+                  "replaceCharacter": 36,
+                  "segmentTerminator": 39,
+                  "characterSet": "Extended",
+                  "segmentTerminatorSuffix": "None"
+                },
+                "envelopeSettings": {
+                  "controlStandardsId": 85,
+                  "useControlStandardsIdAsRepetitionCharacter": false,
+                  "senderApplicationId": "ROEV",
+                  "receiverApplicationId": "001981570",
+                  "controlVersionNumber": "00401",
+                  "interchangeControlNumberLowerBound": 1,
+                  "interchangeControlNumberUpperBound": 999999999,
+                  "rolloverInterchangeControlNumber": true,
+                  "enableDefaultGroupHeaders": true,
+                  "groupControlNumberLowerBound": 1,
+                  "groupControlNumberUpperBound": 999999999,
+                  "rolloverGroupControlNumber": true,
+                  "groupHeaderAgencyCode": "X",
+                  "groupHeaderVersion": "004010",
+                  "transactionSetControlNumberLowerBound": 1,
+                  "transactionSetControlNumberUpperBound": 999999999,
+                  "rolloverTransactionSetControlNumber": true,
+                  "overwriteExistingTransactionSetControlNumber": true,
+                  "groupHeaderDateFormat": "CCYYMMDD",
+                  "groupHeaderTimeFormat": "HHMM",
+                  "usageIndicator": "Test"
+                },
+                "acknowledgementSettings": {
+                  "needTechnicalAcknowledgement": false,
+                  "batchTechnicalAcknowledgements": true,
+                  "needFunctionalAcknowledgement": true,
+                  "functionalAcknowledgementVersion": "00401",
+                  "batchFunctionalAcknowledgements": true,
+                  "needImplementationAcknowledgement": false,
+                  "batchImplementationAcknowledgements": false,
+                  "needLoopForValidMessages": false,
+                  "sendSynchronousAcknowledgement": true,
+                  "acknowledgementControlNumberLowerBound": 1,
+                  "acknowledgementControlNumberUpperBound": 999999999,
+                  "rolloverAcknowledgementControlNumber": true
+                },
+                "messageFilter": {
+                  "messageFilterType": "Exclude"
+                },
+                "securitySettings": {
+                  "authorizationQualifier": "00",
+                  "securityQualifier": "00"
+                },
+                "processingSettings": {
+                  "maskSecurityInfo": true,
+                  "convertImpliedDecimal": false,
+                  "preserveInterchange": false,
+                  "suspendInterchangeOnError": false,
+                  "createEmptyXmlTagsForTrailingSeparators": true,
+                  "useDotAsDecimalSeparator": false
+                },
+                "envelopeOverrides": [
+                ],
+                "validationOverrides": [],
+                "messageFilterList": [],
+                "schemaReferences": [
+                  {
+                    "messageId": "810",
+                    "schemaVersion": "00401",
+                    "schemaName": "X12_00401_810",
+                    "senderApplicationId": "11111",
+                    "targetNameSpace": "http://MSIT.EPS.ICOE.Zones.X12810.MSLI.Schemas.AP.X1200401810"
+                  }
+                ],
+                "x12DelimiterOverrides": [
+                ]
+              },
+              "senderBusinessIdentity": {
+                "qualifier": "ZZ",
+                "value": "1234567"
+              },
+              "receiverBusinessIdentity": {
+                "qualifier": "ZZ",
+                "value": "7654321"
+              }
+            }
+          }
+        },
+        "createdTime": "2017-01-21T03:16:58.4722919Z",
+        "changedTime": "2021-09-15T09:15:32.5237047Z"
+      },
+      "id": "/integrationAccounts/7efaac716593420ab0ebe7a29705400f/agreements/testAgreement",
+      "name": "testAgreement",
+      "type": "Microsoft.Logic/integrationAccounts/agreements"
+    }
+  ]
+}

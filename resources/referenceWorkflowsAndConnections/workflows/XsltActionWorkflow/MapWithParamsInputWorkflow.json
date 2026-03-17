@@ -1,0 +1,41 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Transform_XML": {
+        "type": "Xslt",
+        "inputs": {
+          "content": "<ns0:Root xmlns:ns0=\"http://Integration.Source\" />",
+          "map": {
+            "name": "MapWithParams.xslt",
+            "source": "##source##"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@outputs('Transform_XML')?['body']"
+        },
+        "runAfter": {
+          "Transform_XML": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

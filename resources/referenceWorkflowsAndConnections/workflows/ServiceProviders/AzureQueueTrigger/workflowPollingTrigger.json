@@ -1,0 +1,30 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {},
+    "triggers": {
+      "When_a_specified_number_of_messages_are_available_in_a_queue": {
+        "type": "ServiceProvider",
+        "kind": "Polling",
+        "inputs": {
+          "parameters": {
+            "queueName": "@newQueueName",
+            "threshold": 3
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "azurequeues",
+            "operationId": "specifiedNumberOfMessagesAvailable",
+            "serviceProviderId": "/serviceProviders/azurequeues"
+          }
+        },
+        "recurrence": {
+          "frequency": "Second",
+          "interval": 15
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

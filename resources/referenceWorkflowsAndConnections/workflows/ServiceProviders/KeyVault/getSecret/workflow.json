@@ -1,0 +1,46 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@outputs('Get_Secret')?['body']"
+        },
+        "runAfter": {
+          "Get_Secret": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Get_Secret": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "secretName": "testSecret"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "KeyVault",
+            "operationId": "getSecret",
+            "serviceProviderId": "/serviceProviders/keyVault"
+          }
+        },
+        "runAfter": {}
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "method": "GET"
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

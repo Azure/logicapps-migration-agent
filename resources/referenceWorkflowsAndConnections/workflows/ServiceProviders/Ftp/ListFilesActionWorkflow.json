@@ -1,0 +1,46 @@
+{{
+    "definition": {{
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {{
+            "Response": {{
+                "type": "Response",
+                "kind": "http",
+                "inputs": {{
+                    "statusCode": 200,
+                    "body": {{
+                        "body": "@body('Lists_files_in_a_folder')"
+                    }}
+                }},
+                "runAfter": {{
+                    "Lists_files_in_a_folder": [
+                        "Succeeded"
+                    ]
+                }}
+            }},
+            "Lists_files_in_a_folder": {{
+                "type": "ServiceProvider",
+                "inputs": {{
+                    "parameters": {{
+                        "folderPath": "{0}"
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "Ftp",
+                        "operationId": "listFilesInFolder",
+                        "serviceProviderId": "/serviceProviders/Ftp"
+                    }}
+                }},
+                "runAfter": {{}}
+            }}
+        }},
+        "triggers": {{
+            "manual": {{
+                "type": "Request",
+                "kind": "Http",
+                "inputs": {{}}
+            }}
+        }},
+        "contentVersion": "1.0.0.0",
+        "outputs": {{}}
+    }},
+    "kind": "Stateful"
+}}

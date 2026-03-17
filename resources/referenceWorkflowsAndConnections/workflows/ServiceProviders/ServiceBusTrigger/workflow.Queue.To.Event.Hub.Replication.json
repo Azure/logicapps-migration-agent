@@ -1,0 +1,41 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Send_Multiple_Events_for_replication": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "eventHubName": "destination1",
+            "skipAlreadyReplicated": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "eventHubConnectionString",
+            "operationId": "replicateEvents",
+            "serviceProviderId": "/serviceProviders/eventHub"
+          }
+        },
+        "runAfter": {}
+      }
+    },
+    "triggers": {
+      "When_messages_are_available_in_a_queue_for_replication": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "source",
+            "isSessionsEnabled": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "receiveQueueMessagesForReplication",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateless"
+}

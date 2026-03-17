@@ -1,0 +1,12 @@
+{
+    "serviceProviderConnections": {
+        "FileSystem": {
+            "parameterValues": {
+                "mountPath": "@appsetting('FileSystem_mountPath')"
+            },
+            "serviceProvider": {
+                "id": "/serviceProviders/FileSystem"
+            }
+        }
+    }
+}

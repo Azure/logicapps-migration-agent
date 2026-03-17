@@ -1,0 +1,91 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "num1": {
+                "type": "number",
+                "description": "First number to add"
+              },
+              "num2": {
+                "type": "number",
+                "description": "Second number to add"
+              }
+            }
+          }
+        }
+      }
+    },
+    "actions": {
+      "Get_Current_Time": {
+        "type": "Compose",
+        "inputs": {
+          "hour": "@int(formatDateTime(utcNow(), 'HH'))",
+          "minute": "@int(formatDateTime(utcNow(), 'mm'))",
+          "second": "@int(formatDateTime(utcNow(), 'ss'))"
+        },
+        "runAfter": {}
+      },
+      "Calculate_Time_Sum": {
+        "type": "Compose",
+        "inputs": {
+          "timeDigitSum": "@add(add(outputs('Get_Current_Time')?['hour'], outputs('Get_Current_Time')?['minute']), outputs('Get_Current_Time')?['second'])"
+        },
+        "runAfter": {
+          "Get_Current_Time": ["Succeeded"]
+        }
+      },
+      "Calculate_Input_Sum": {
+        "type": "Compose",
+        "inputs": {
+          "inputSum": "@add(coalesce(triggerBody()?['num1'], 0), coalesce(triggerBody()?['num2'], 0))"
+        },
+        "runAfter": {}
+      },
+      "Calculate_Grand_Total": {
+        "type": "Compose",
+        "inputs": {
+          "grandTotal": "@add(outputs('Calculate_Time_Sum')?['timeDigitSum'], outputs('Calculate_Input_Sum')?['inputSum'])"
+        },
+        "runAfter": {
+          "Calculate_Time_Sum": ["Succeeded"],
+          "Calculate_Input_Sum": ["Succeeded"]
+        }
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 200,
+          "body": {
+            "message": "Basic Stateful Workflow - Time-based calculation",
+            "timestamp": "@utcNow()",
+            "timeComponents": "@outputs('Get_Current_Time')",
+            "timeDigitSum": "@outputs('Calculate_Time_Sum')?['timeDigitSum']",
+            "inputNumbers": {
+              "num1": "@coalesce(triggerBody()?['num1'], 0)",
+              "num2": "@coalesce(triggerBody()?['num2'], 0)"
+            },
+            "inputSum": "@outputs('Calculate_Input_Sum')?['inputSum']",
+            "grandTotal": "@outputs('Calculate_Grand_Total')?['grandTotal']",
+            "explanation": "Grand total = (hour + minute + second) + (num1 + num2)"
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "runAfter": {
+          "Calculate_Grand_Total": ["Succeeded"]
+        }
+      }
+    }
+  },
+  "kind": "Stateful"
+}

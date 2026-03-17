@@ -1,0 +1,265 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Scope-Finally": {
+                "actions": {
+                    "Compose": {
+                        "inputs": "Process Complete",
+                        "type": "Compose"
+                    }
+                },
+                "runAfter": {
+                    "Scope-Try": [
+                        "SUCCEEDED",
+                        "TIMEDOUT",
+                        "SKIPPED",
+                        "FAILED"
+                    ]
+                },
+                "type": "Scope"
+            },
+            "Scope-Try": {
+                "actions": {
+                    "Compose_-_Process_Complete": {
+                        "inputs": "Process Complete.",
+                        "runAfter": {
+                            "Send_message_materials": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "Compose"
+                    },
+                    "For_each": {
+                        "actions": {
+                            "Update_a_row_-_Customer_Notification": {
+                                "inputs": {
+                                    "body": {
+                                        "_createdby_type": "",
+                                        "_createdonbehalfby_type": "",
+                                        "_modifiedby_type": "",
+                                        "_modifiedonbehalfby_type": "",
+                                        "_ownerid_type": "",
+                                        "_owningbusinessunit_type": "",
+                                        "cred1_outagecomplete": true,
+                                        "int23_customernotified": false,
+                                        "int23_workorderstatus": "@triggerBody()?['int23_workorderstatus']"
+                                    },
+                                    "host": {
+                                        "connection": {
+                                            "referenceName": "commondataservice-1"
+                                        }
+                                    },
+                                    "method": "patch",
+                                    "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('https://org7a3fb188.crm.dynamics.com'))}/tables/@{encodeURIComponent(encodeURIComponent('int23_cpl_marketings'))}/items/@{encodeURIComponent(encodeURIComponent(item()?['int23_cpl_marketingid']))}"
+                                },
+                                "type": "ApiConnection"
+                            }
+                        },
+                        "foreach": "@body('List_rows_-_Get_Customer_Notification')?['value']",
+                        "runAfter": {
+                            "List_rows_-_Get_Customer_Notification": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "foreach"
+                    },
+                    "For_each_1": {
+                        "actions": {
+                            "Update_a_row_Customer_Ticket": {
+                                "inputs": {
+                                    "body": {
+                                        "_createdby_type": "",
+                                        "_createdonbehalfby_type": "",
+                                        "_modifiedby_type": "",
+                                        "_modifiedonbehalfby_type": "",
+                                        "_ownerid_type": "",
+                                        "_owningbusinessunit_type": "",
+                                        "int23_workorderstatus": "@triggerBody()?['int23_workorderstatus']"
+                                    },
+                                    "host": {
+                                        "connection": {
+                                            "referenceName": "commondataservice-1"
+                                        }
+                                    },
+                                    "method": "patch",
+                                    "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('https://org7a3fb188.crm.dynamics.com'))}/tables/@{encodeURIComponent(encodeURIComponent('int23_cpl_customertickets'))}/items/@{encodeURIComponent(encodeURIComponent(item()?['int23_cpl_customerticketid']))}"
+                                },
+                                "type": "ApiConnection"
+                            }
+                        },
+                        "foreach": "@body('List_rows_Customer_Tickets')?['value']",
+                        "runAfter": {
+                            "List_rows_Customer_Tickets": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "foreach"
+                    },
+                    "List_rows_-_Get_Customer_Notification": {
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "referenceName": "commondataservice-1"
+                                }
+                            },
+                            "method": "get",
+                            "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('https://org7a3fb188.crm.dynamics.com'))}/tables/@{encodeURIComponent(encodeURIComponent('int23_cpl_marketings'))}/items",
+                            "queries": {
+                                "$filter": "int23_ticketnumber eq '@{triggerBody()?['int23_ticketnumber']}'",
+                                "$top": 1
+                            }
+                        },
+                        "runAfter": {
+                            "Send_message": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "ApiConnection"
+                    },
+                    "List_rows_Customer_Tickets": {
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "referenceName": "commondataservice-1"
+                                }
+                            },
+                            "method": "get",
+                            "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('https://org7a3fb188.crm.dynamics.com'))}/tables/@{encodeURIComponent(encodeURIComponent('int23_cpl_customertickets'))}/items",
+                            "queries": {
+                                "$filter": "int23_ticketnumber eq '@{triggerBody()?['int23_ticketnumber']}'"
+                            }
+                        },
+                        "runAfter": {
+                            "For_each": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "ApiConnection"
+                    },
+                    "Parse_JSON_-_Canonical": {
+                        "inputs": {
+                            "content": "@body('Transform_using_Data_Mapper_XSLT')",
+                            "schema": {
+                                "properties": {
+                                    "body": {
+                                        "properties": {
+                                            "MeanTimeToRetore": {
+                                                "type": "string"
+                                            },
+                                            "TicketNumber": {
+                                                "type": "string"
+                                            },
+                                            "WorkOrderStatus": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "runAfter": {
+                            "Transform_using_Data_Mapper_XSLT": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "ParseJson"
+                    },
+                    "Send_message": {
+                        "inputs": {
+                            "parameters": {
+                                "entityName": "workmanagement-ticketcomplete-queue",
+                                "message": {
+                                    "contentData": "@{body('Transform_using_Data_Mapper_XSLT')}@{body('Parse_JSON_-_Canonical')?['body']?['WorkOrderStatus']}",
+                                    "contentType": "application/json"
+                                }
+                            },
+                            "serviceProviderConfiguration": {
+                                "connectionName": "serviceBus",
+                                "operationId": "sendMessage",
+                                "serviceProviderId": "/serviceProviders/serviceBus"
+                            }
+                        },
+                        "runAfter": {
+                            "Parse_JSON_-_Canonical": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "ServiceProvider"
+                    },
+                    "Send_message_materials": {
+                        "inputs": {
+                            "parameters": {
+                                "entityName": "workmanagement-updatematerials-queue",
+                                "message": {
+                                    "contentData": {
+                                        "MaterialId": "@triggerBody()?['int23_materialid']",
+                                        "MaterialsDescription": "@triggerBody()?['int23_materialdescription']",
+                                        "TicketNumber": "@triggerBody()?['int23_ticketnumber']"
+                                    },
+                                    "contentType": "application/json"
+                                }
+                            },
+                            "serviceProviderConfiguration": {
+                                "connectionName": "serviceBus",
+                                "operationId": "sendMessage",
+                                "serviceProviderId": "/serviceProviders/serviceBus"
+                            }
+                        },
+                        "runAfter": {
+                            "For_each_1": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "ServiceProvider"
+                    },
+                    "Transform_using_Data_Mapper_XSLT": {
+                        "inputs": {
+                            "content": "@triggerBody()",
+                            "map": {
+                                "name": "WorkOrderUpdatesDataverse-to-WorkOrderUpdatesCanonical.xslt",
+                                "source": "LogicApp"
+                            }
+                        },
+                        "kind": "DataMapper",
+                        "type": "Xslt"
+                    }
+                },
+                "runAfter": {},
+                "type": "Scope"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "triggers": {
+            "When_a_row_is_modified": {
+                "conditions": [
+                    {
+                        "expression": "@equals(triggerBody()?['int23_workorderstatus'],'Complete')"
+                    }
+                ],
+                "inputs": {
+                    "body": {
+                        "AttributeFilters": [
+                            "int23_workorderstatus"
+                        ],
+                        "NotificationUrl": "@{listCallbackUrl()}"
+                    },
+                    "host": {
+                        "connection": {
+                            "referenceName": "commondataservice-1"
+                        }
+                    },
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent('https://org7a3fb188.crm.dynamics.com'))}/tables/@{encodeURIComponent(encodeURIComponent('int23_cpl_workorders'))}/onupdateditemswebhook",
+                    "queries": {
+                        "scope": "Organization"
+                    }
+                },
+                "type": "ApiConnectionWebhook"
+            }
+        }
+    },
+    "kind": "Stateful"
+}

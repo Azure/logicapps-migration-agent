@@ -1,0 +1,28 @@
+{
+  "serviceProviderConnections": {
+    "blobStorageConnection": {
+      "parameterValues": {
+        "connectionString": "@appsetting('blobStorageConnectionString')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/azureBlob"
+      }
+    }
+  },
+  "managedApiConnections": {
+    "arm_test_connection": {
+      "connection": {
+        "id": "/subscriptions/80d4fe69-c95b-4dd2-a938-9250f1c8ab03/resourceGroups/resourceGroupName/providers/Microsoft.Web/connections/connectionName"
+      },
+      "api": {
+        "id": "/subscriptions/80d4fe69-c95b-4dd2-a938-9250f1c8ab03/providers/Microsoft.Web/locations/centralus/managedapis/apiName"
+      },
+      "connectionRuntimeUrl": "https://testruntimedomain.azure-apihub.net/apim/arm/connectionId",
+      "authentication": {
+        "type": "Raw",
+        "scheme": "key",
+        "parameter": "@appsetting('connection_Key')"
+      }
+    }
+  }
+}

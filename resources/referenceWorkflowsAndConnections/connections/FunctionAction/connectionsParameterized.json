@@ -1,0 +1,16 @@
+﻿{
+    "functionConnections": {
+        "azureFunctionOperation": {
+            "function": {
+                "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/ResourceGroups/@{parameters('function-TriggerUrl')}/providers/Microsoft.Web/sites/@{parameters('function-SiteName')}/functions/HttpTrigger1"
+            },
+            "triggerUrl": "@parameters('function-TriggerUrl')",
+            "authentication": {
+                "type": "QueryString",
+                "name": "Code",
+                "value": "@appsetting('azureFunctionOperation-functionAppKey')"
+            },
+            "displayName": "function connection"
+        }
+    }
+}

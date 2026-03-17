@@ -1,0 +1,51 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Compose": {
+        "inputs": "@triggerBody()",
+        "runAfter": {},
+        "type": "Compose"
+      },
+      "Complete_Messages": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "entityName": "ServiceBuscit",
+            "guid": "@triggerBody()['transactionId']"
+          },
+          "serviceProviderConfiguration": {
+            "serviceProviderId": "/serviceProviders/customApi",
+            "operationId": "completeMessages",
+            "connectionName": "serviceBusConnection"
+          }
+        },
+        "runAfter": {
+          "Compose": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "receive_event_from_servicebusqueue": {
+        "inputs": {
+          "parameters": {
+            "queueName": "ServiceBuscit",
+            "autoComplete":  "false",
+          },
+          "serviceProviderConfiguration": {
+            "serviceProviderId": "/serviceProviders/customApi",
+            "operationId": "customServiceBusTrigger",
+            "connectionName": "serviceBusConnectionString"
+          }
+        },
+        "type": "ServiceProvider"
+      }
+    }
+  },
+  "kind": "Stateless"
+}

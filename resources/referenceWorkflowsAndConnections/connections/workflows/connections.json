@@ -1,0 +1,47 @@
+{
+  "serviceProviderConnections": {
+    "azureQueuesConnection": {
+      "parameterValues": {
+        "connectionString": "@appsetting('STD_STORAGE_CONNECTION')"
+      },
+      "parameterSetName": "connectionString",
+      "serviceProvider": {
+        "id": "/serviceProviders/azurequeues"
+      },
+      "displayName": "Local Azure Queue (Azurite)"
+    },
+    "azureBlobConnection": {
+      "parameterValues": {
+        "connectionString": "@appsetting('STD_STORAGE_CONNECTION')"
+      },
+      "parameterSetName": "connectionString",
+      "serviceProvider": {
+        "id": "/serviceProviders/AzureBlob"
+      },
+      "displayName": "Local Azure Blob (Azurite)"
+    },
+    "azureTableConnection": {
+      "parameterValues": {
+        "connectionString": "@appsetting('STD_STORAGE_CONNECTION')"
+      },
+      "parameterSetName": "connectionString",
+      "serviceProvider": {
+        "id": "/serviceProviders/azureTables"
+      },
+      "displayName": "Local Azure Table (Azurite)"
+    }
+  },
+  "managedApiConnections": {},
+  "agentConnections": {
+    "agentConnection1": {
+      "type": "model",
+      "endpoint": "@appsetting('AZURE_OPENAI_ENDPOINT')",
+      "resourceId": "/subscriptions/local/resourceGroups/local/providers/Microsoft.CognitiveServices/accounts/local-openai",
+      "displayName": "modelConnection1",
+      "authentication": {
+        "type": "Key",
+        "key": "@appsetting('AZURE_OPENAI_KEY')"
+      }
+    }
+  }
+}

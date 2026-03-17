@@ -1,0 +1,54 @@
+{{
+  "definition": {{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {{
+      "ReadFile": {{
+        "type": "Http",
+        "inputs": {{
+          "uri": "https://brbennstorage.blob.core.windows.net/files/Extracted%20from%20meidtations.pdf",
+          "method": "GET"
+        }},
+        "runAfter": {{}},
+        "runtimeConfiguration": {{
+          "contentTransfer": {{
+            "transferMode": "Chunked"
+          }}
+        }}
+      }},
+      "ParseDocument": {{
+        "type": "ParseDocument",
+        "inputs": {{
+          "content": "@body('ReadFile')"
+        }},
+          "runAfter": {{
+            "ReadFile": [ "Succeeded" ]
+                       }}
+      }},
+      "Response": {{
+        "type": "Response",
+        "kind": "http",
+        "inputs": {{
+          "statusCode": 200,
+          "body": "@body('ParseDocument')"
+        }},
+        "runAfter": {{
+          "ParseDocument": [
+            "Succeeded"
+          ]
+        }}
+      }}
+    }},
+    "triggers": {{
+      "manual": {{
+        "inputs": {{
+          "schema": {{}}
+        }},
+        "kind": "Http",
+        "type": "Request"
+      }}
+    }},
+    "contentVersion": "1.0.0.0",
+    "outputs": {{}}
+  }},
+  "kind": "Stateful"
+}}

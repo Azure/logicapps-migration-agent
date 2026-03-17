@@ -1,0 +1,37 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Current_time": {
+        "type": "Expression",
+        "kind": "CurrentTime",
+        "inputs": {},
+        "runAfter": {}
+      }
+    },
+    "triggers": {
+      "When_a_file_is_added_or_updated": {
+        "type": "ServiceProvider",
+        "kind": "Polling",
+        "inputs": {
+          "parameters": {
+            "folderPath": "",
+            "includeFileContent": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Sftp",
+            "operationId": "whenFilesAreAddedOrModified",
+            "serviceProviderId": "/serviceProviders/Sftp"
+          }
+        },
+        "recurrence": {
+          "frequency": "Second",
+          "interval": 30
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

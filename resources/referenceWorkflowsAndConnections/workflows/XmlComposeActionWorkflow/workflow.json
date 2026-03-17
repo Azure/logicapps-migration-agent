@@ -1,0 +1,155 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "XmlCompose": {
+        "type": "xmlCompose",
+        "runAfter": {},
+        "inputs": {
+          "content": {
+            "Customers": [
+              {
+                ":Attribute:CustomerID": "CustomerID_0",
+                "CompanyName": "CompanyName_0",
+                "ContactName": "ContactName_0",
+                "ContactTitle": "ContactTitle_0",
+                "Fax": "Fax_0",
+                "FullAddress": {
+                  ":Attribute:CustomerID": "CustomerID_0",
+                  "Address": "Address_0",
+                  "City": "City_0",
+                  "Country": "Country_0",
+                  "PostalCode": "PostalCode_0",
+                  "Region": "Region_0"
+                },
+                "Phone": "Phone_0"
+              },
+              {
+                ":Attribute:CustomerID": "CustomerID_1",
+                "CompanyName": "CompanyName_0",
+                "ContactName": "ContactName_0",
+                "ContactTitle": "ContactTitle_0",
+                "Fax": "Fax_0",
+                "FullAddress": {
+                  ":Attribute:CustomerID": "CustomerID_1",
+                  "Address": "Address_0",
+                  "City": "City_0",
+                  "Country": "Country_0",
+                  "PostalCode": "PostalCode_0",
+                  "Region": "Region_0"
+                },
+                "Phone": "Phone_0"
+              },
+              {
+                ":Attribute:CustomerID": "CustomerID_2",
+                "CompanyName": "CompanyName_0",
+                "ContactName": "ContactName_0",
+                "ContactTitle": "ContactTitle_0",
+                "Fax": "Fax_0",
+                "FullAddress": {
+                  ":Attribute:CustomerID": "CustomerID_2",
+                  "Address": "Address_0",
+                  "City": "City_0",
+                  "Country": "Country_0",
+                  "PostalCode": "PostalCode_0",
+                  "Region": "Region_0"
+                },
+                "Phone": "Phone_0"
+              }
+            ],
+            "Orders": [
+              {
+                "CustomerID": "CustomerID_0",
+                "EmployeeID": "EmployeeID_0",
+                "OrderDate": "1999-05-31T13:20:00.000-05:00",
+                "RequiredDate": "1999-05-31T13:20:00.000-05:00",
+                "ShipInfo": {
+                  ":Attribute:ShippedDate": "1999-05-31T13:20:00.000-05:00",
+                  "Freight": 10.5,
+                  "ShipAddress": "ShipAddress_0",
+                  "ShipCity": "ShipCity_0",
+                  "ShipCountry": "ShipCountry_0",
+                  "ShipName": "ShipName_0",
+                  "ShipPostalCode": "ShipPostalCode_0",
+                  "ShipRegion": "ShipRegion_0",
+                  "ShipVia": 100.0
+                }
+              },
+              {
+                "CustomerID": "CustomerID_2",
+                "EmployeeID": "EmployeeID_0",
+                "OrderDate": "1999-05-31T13:20:00.000-05:00",
+                "RequiredDate": "1999-05-31T13:20:00.000-05:00",
+                "ShipInfo": {
+                  ":Attribute:ShippedDate": "1999-05-31T13:20:00.000-05:00",
+                  "Freight": 10.5,
+                  "ShipAddress": "ShipAddress_0",
+                  "ShipCity": "ShipCity_0",
+                  "ShipCountry": "ShipCountry_0",
+                  "ShipName": "ShipName_0",
+                  "ShipPostalCode": "ShipPostalCode_0",
+                  "ShipRegion": "ShipRegion_0",
+                  "ShipVia": 100.0
+                }
+              },
+              {
+                "CustomerID": "CustomerID_1",
+                "EmployeeID": "EmployeeID_0",
+                "OrderDate": "1999-05-31T13:20:00.000-05:00",
+                "RequiredDate": "1999-05-31T13:20:00.000-05:00",
+                "ShipInfo": {
+                  ":Attribute:ShippedDate": "1999-05-31T13:20:00.000-05:00",
+                  "Freight": 10.5,
+                  "ShipAddress": "ShipAddress_0",
+                  "ShipCity": "ShipCity_0",
+                  "ShipCountry": "ShipCountry_0",
+                  "ShipName": "ShipName_0",
+                  "ShipPostalCode": "ShipPostalCode_0",
+                  "ShipRegion": "ShipRegion_0",
+                  "ShipVia": 100.0
+                }
+              }
+            ]
+          },
+          "schema": {
+            "source": "LogicApp",
+            "name": "###schema###"
+          },
+          "DateTimeFormat": "yyyy-MM-ddTHH:mm:ss.fffK"
+        }
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('XmlCompose')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "XmlCompose": [ "Succeeded" ] },
+        "type": "Response"
+      },
+      "ResponseFailed": {
+        "inputs": {
+          "body": {
+            "value": "@actions('XmlCompose')"
+          },
+          "statusCode": 400
+        },
+        "runAfter": { "XmlCompose": [ "Failed" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

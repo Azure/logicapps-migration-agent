@@ -1,0 +1,21 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "actions": {
+      "Compose": {
+        "type": "Compose",
+        "inputs": "You are running the prod version",
+        "runAfter": {}
+      }
+    },
+    "outputs": {},
+    "triggers": {
+      "When_an_HTTP_request_is_received": {
+        "type": "Request",
+        "kind": "Http"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

@@ -1,0 +1,60 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Send_Multiple_Events": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "eventHubName": "demo",
+            "eventDatas": [
+              {
+                "contentData": "multipleEvent01"
+              },
+              {
+                "contentData": "multipleEvent02"
+              }
+            ]
+          },
+          "serviceProviderConfiguration": {
+            "serviceProviderId": "/serviceProviders/eventHub",
+            "operationId": "sendEvents",
+            "connectionName": "eventHubConnectionString"
+          }
+        },
+        "runAfter": {}
+      },
+      "Compose": {
+        "type": "compose",
+        "runAfter": {
+          "Send_Multiple_Events": [
+            "Succeeded"
+          ]
+        },
+        "inputs": "@body('Send_Multiple_Events')"
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('compose')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "Compose": [ "Succeeded" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

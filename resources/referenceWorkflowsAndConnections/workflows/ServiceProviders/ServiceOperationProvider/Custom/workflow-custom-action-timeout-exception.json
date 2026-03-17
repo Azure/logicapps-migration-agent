@@ -1,0 +1,57 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Test_Action": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "TimeOutException"
+          },
+          "serviceProviderConfiguration": {
+            "serviceProviderId": "/serviceProviders/customApi",
+            "operationId": "testAction",
+            "connectionName": "serviceBusConnection"
+          },
+          "retryPolicy": {
+            "type": "fixed",
+            "count": 3,
+            "interval": "PT5S"
+          }
+        },
+        "runAfter": {}
+      },
+      "Compose": {
+        "type": "compose",
+        "runAfter": {
+          "Test_Action": [
+            "Succeeded"
+          ]
+        },
+        "inputs": "@body('Test_Action')"
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('compose')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "Compose": [ "Succeeded" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

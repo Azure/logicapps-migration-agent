@@ -1,0 +1,46 @@
+{{
+  "definition": {{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {{
+      "Get_File_Content": {{
+        "type": "ServiceProvider",
+        "inputs": {{
+          "parameters": {{
+            "filePath": "/LogicAppTests/{0}"
+          }},
+          "serviceProviderConfiguration": {{
+            "connectionName": "Ftp",
+            "operationId": "getFtpFileContent",
+            "serviceProviderId": "/serviceProviders/Ftp"
+          }}
+        }},
+        "runAfter": {{}}
+      }},
+      "Response": {{
+        "type": "Response",
+        "kind": "http",
+        "inputs": {{
+          "statusCode": 200,
+          "body": {{
+            "content": "@body('Get_File_Content')"
+          }}
+        }},
+        "runAfter": {{
+          "Get_File_Content": [
+            "Succeeded"
+          ]
+        }}
+      }}
+    }},
+    "triggers": {{
+      "manual": {{
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {{}}
+      }}
+    }},
+    "contentVersion": "1.0.0.0",
+    "outputs": {{}}
+  }},
+  "kind": "Stateful"
+}}

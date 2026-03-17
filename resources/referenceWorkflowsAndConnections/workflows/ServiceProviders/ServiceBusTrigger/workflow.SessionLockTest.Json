@@ -1,0 +1,167 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Delay": {
+                "type": "Wait",
+                "inputs": {
+                    "interval": {
+                        "count": 20,
+                        "unit": "Second"
+                    }
+                },
+                "runAfter": {
+                    "Initialize_variables": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "Close_a_queue_session": {
+                "type": "ServiceProvider",
+                "inputs": {
+                    "parameters": {
+                        "queueName": "ServiceBuscit",
+                        "sessionId": "@triggerBody()?['sessionId']"
+                    },
+                    "serviceProviderConfiguration": {
+                        "connectionName": "serviceBusConnectionString",
+                        "operationId": "closeQueueSession",
+                        "serviceProviderId": "/serviceProviders/serviceBus"
+                    }
+                },
+                "runAfter": {
+                    "Delay": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "Complete_the_first_message_in_a_session": {
+                "type": "ServiceProvider",
+                "inputs": {
+                    "parameters": {
+                        "messageId": "@triggerBody()?['messageId']"
+                    },
+                    "serviceProviderConfiguration": {
+                        "connectionName": "serviceBusConnectionString",
+                        "operationId": "completeMessageInSession",
+                        "serviceProviderId": "/serviceProviders/serviceBus"
+                    }
+                },
+                "runAfter": {}
+            },
+            "Until": {
+                "type": "Until",
+                "expression": "@equals(variables('loopCounter'),7)",
+                "limit": {
+                    "count": 5,
+                    "timeout": "PT1H"
+                },
+                "actions": {
+                    "Delay_in_loop": {
+                        "type": "Wait",
+                        "inputs": {
+                            "interval": {
+                                "count": 10,
+                                "unit": "Second"
+                            }
+                        },
+                        "runAfter": {
+                            "Condition_for_lease_renew": [
+                                "SUCCEEDED"
+                            ]
+                        }
+                    },
+                    "Increment_variable": {
+                        "type": "IncrementVariable",
+                        "inputs": {
+                            "name": "loopCounter",
+                            "value": 1
+                        },
+                        "runAfter": {
+                            "Delay_in_loop": [
+                                "SUCCEEDED"
+                            ]
+                        }
+                    },
+                    "Condition_for_lease_renew": {
+                        "type": "If",
+                        "expression": {
+                            "and": [
+                                {
+                                  "equals": [
+                                    "@triggerBody()?['contentData']",
+                                    "enableSessionLeaseRenew"
+                                  ]
+                                }
+                            ]
+                        },
+                        "actions": {
+                            "Renew_a_queue_session": {
+                                "type": "ServiceProvider",
+                                "inputs": {
+                                    "parameters": {
+                                        "queueName": "ServiceBuscit",
+                                        "sessionId": "@triggerBody()?['sessionId']"
+                                    },
+                                    "serviceProviderConfiguration": {
+                                        "connectionName": "serviceBusConnectionString",
+                                        "operationId": "renewQueueSession",
+                                        "serviceProviderId": "/serviceProviders/serviceBus"
+                                    }
+                                }
+                            }
+                        },
+                        "else": {
+                            "actions": {}
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Initialize_variables": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "Initialize_variables": {
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "loopCounter",
+                            "type": "integer",
+                            "value": 1
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Complete_the_first_message_in_a_session": [
+                        "SUCCEEDED"
+                    ]
+                }
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "triggers": {
+            "On_single_new_message_from_queue_session": {
+                "type": "ServiceProvider",
+                "kind": "Polling",
+                "inputs": {
+                    "parameters": {
+                        "queueName": "ServiceBuscit"
+                    },
+                    "serviceProviderConfiguration": {
+                        "connectionName": "serviceBusConnectionString",
+                        "operationId": "onSingleNewMessageFromQueueSession",
+                        "serviceProviderId": "/serviceProviders/serviceBus"
+                    }
+                },
+                "recurrence": {
+                    "interval": 30,
+                    "frequency": "Second"
+                }
+            }
+        }
+    },
+    "kind": "Stateful"
+}

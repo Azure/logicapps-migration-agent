@@ -1,0 +1,14 @@
+{
+  "serviceProviderConnections": {
+    "Ftp": {
+      "parameterValues": {
+        "serverAddress": "@appsetting('Ftp_ServerAddress')",
+        "username": "@appsetting('Ftp_Username')",
+        "password": "@appsetting('Ftp_Password')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/Ftp"
+      }
+    }
+  }
+}

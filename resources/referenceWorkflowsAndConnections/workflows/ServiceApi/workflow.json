@@ -1,0 +1,65 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Response": {
+                "type": "Response",
+                "kind": "http",
+                "inputs": {
+                    "statusCode": 200,
+                    "body": "The product Ids were received."
+                },
+                "runAfter": {
+                    "For_each": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "For_each": {
+                "type": "Foreach",
+                "foreach": "@triggerBody()?['ProductID']",
+                "actions": {
+                    "Compose_2": {
+                        "type": "Compose",
+                        "inputs": "@items('For_each')",
+                        "runAfter": {}
+                    }
+                },
+                "runAfter": {
+                    "Compose": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Compose": {
+                "type": "Compose",
+                "inputs": {
+                    "body": "Hello from LogicApp running in function runtime"
+                },
+                "runAfter": {}
+            }
+        },
+        "parameters": {},
+        "triggers": {
+            "manual": {
+                "type": "Request",
+                "kind": "Http",
+                "inputs": {
+                    "schema": {
+                        "properties": {
+                          "ProductID": {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {}
+    }
+}

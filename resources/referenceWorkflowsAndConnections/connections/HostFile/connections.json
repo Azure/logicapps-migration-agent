@@ -1,0 +1,15 @@
+{
+  "serviceProviderConnections": {
+    "hostfile": {
+      "parameterValues": {
+        "isISeries": "@appsetting('hostfile_isISeries')",
+        "codePage": "@appsetting('hostfile_codePage')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/hostfile"
+      },
+      "displayName": "mainframe_37"
+    }
+  },
+  "managedApiConnections": {}
+}

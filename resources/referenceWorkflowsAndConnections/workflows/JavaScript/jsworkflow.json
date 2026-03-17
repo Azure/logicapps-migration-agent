@@ -1,0 +1,44 @@
+﻿{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Compose": {
+        "type": "compose",
+        "runAfter": {},
+        "inputs": { "body": "Logic Apps" }
+      },
+      "inlinejs": {
+          "inputs": {
+              "code": "return 'Hello from ' + workflowContext.actions.compose.outputs.body;",
+              "explicitDependencies": {
+                "includeTrigger": true
+              }
+          },
+          "runAfter": {"Compose": [ "Succeeded" ] },
+          "type": "JavaScriptCode"
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@actionOutputs('inlinejs')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "inlinejs": [ "Succeeded" ] },
+        "type": "Response"
+      }
+  },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {}
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

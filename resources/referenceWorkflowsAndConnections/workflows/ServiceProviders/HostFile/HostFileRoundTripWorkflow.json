@@ -1,0 +1,86 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Generate_Host_File_Contents": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "hidx": "Redefines.hidx",
+            "schema": "CUSTOMER_FILE_ROW",
+            "rows": [
+              {
+                "CUSTOMER_TYPE": "B",
+                "SIMPLE_REDEFINITION1": {
+                  "BUSINESS": {
+                    "NAME": "ABC"
+                  }
+                }
+              },
+              {
+                "CUSTOMER_TYPE": "P",
+                "SIMPLE_REDEFINITION1": {
+                  "PERSONAL": {
+                    "NAME": {
+                      "FIRST_NAME": "Rob",
+                      "LAST_NAME": "BEA"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "hostfile",
+            "operationId": "generateFileContents",
+            "serviceProviderId": "/serviceProviders/hostfile"
+          }
+        },
+        "runAfter": {}
+      },
+      "Parse_Host_File_Contents": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "hidx": "Redefines.hidx",
+            "schema": "CUSTOMER_FILE_ROW",
+            "contents": "@outputs('Generate_Host_File_Contents')?['body']?['contents']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "hostfile",
+            "operationId": "parseFileContents",
+            "serviceProviderId": "/serviceProviders/hostfile"
+          }
+        },
+        "runAfter": {
+          "Generate_Host_File_Contents": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@outputs('Parse_Host_File_Contents')?['body']?['rows']"
+        },
+        "runAfter": {
+          "Parse_Host_File_Contents": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

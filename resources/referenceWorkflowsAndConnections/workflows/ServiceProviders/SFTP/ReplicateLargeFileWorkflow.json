@@ -1,0 +1,51 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Get_File_Content_V(2)": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "filePath": "@downloadFilePathRelativeToRoot"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Sftp",
+            "operationId": "getFileContentV2",
+            "serviceProviderId": "/serviceProviders/Sftp"
+          }
+        },
+        "runAfter": {}
+      },
+      "Upload_File_Content": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "filePath": "@uploadFilePathRelativeToRoot",
+            "content": "@body('Get_File_Content_V(2)')",
+            "overWriteFileIfExists": true
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Sftp",
+            "operationId": "uploadFileContent",
+            "serviceProviderId": "/serviceProviders/Sftp"
+          }
+        },
+        "runAfter": {
+          "Get_File_Content_V(2)": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

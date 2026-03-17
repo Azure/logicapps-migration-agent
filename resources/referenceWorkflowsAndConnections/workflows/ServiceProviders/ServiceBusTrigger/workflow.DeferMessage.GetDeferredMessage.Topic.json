@@ -1,0 +1,105 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "For_each": {
+        "type": "Foreach",
+        "foreach": "@triggerOutputs()?['body']",
+        "runAfter": {},
+        "actions": {
+          "Defer_Message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "messageId": "@item()?['messageId']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "deferMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {}
+          },
+          "Get_Deferred_Message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "topicName": "ServiceBuscit",
+                "subscriptionName": "subscription",
+                "sequenceNumber": "@item()?['sequenceNumber']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "getDeferredMessageFromTopic",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {
+              "Defer_Message": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Renew_Lock": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "messageId": "@body('Get_deferred_message')?['messageId']",
+                "lockToken": "@body('Get_deferred_message')?['lockToken']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "renewLockMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {
+              "Get_Deferred_Message": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Dead_Letter": {
+            "inputs": {
+              "parameters": {
+                "messageId": "@body('Get_deferred_message')?['messageId']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "deadLetterMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {
+              "Renew_Lock": [
+                "Succeeded"
+              ]
+            },
+            "type": "ServiceProvider"
+          }
+        }
+      }
+    },
+    "triggers": {
+      "When_messages_are_available_in_a_topic_subscription_(peek-lock)": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "topicName": "ServiceBuscit",
+            "subscriptionName": "subscription",
+            "isSessionsEnabled": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "peekLockTopicMessages",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

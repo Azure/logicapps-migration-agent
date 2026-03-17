@@ -1,0 +1,46 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Response": {
+                "inputs": {
+                    "body": "@outputs('List_Tables')",
+                        "statusCode": 200
+                },
+                "kind": "http",
+                "runAfter": {
+                    "List_Tables": [
+                        "Succeeded",
+                        "Failed"
+                    ]
+                },
+                "type": "Response"
+            },
+            "List_Tables": {
+                "inputs": {
+                    "parameters": {
+                    },
+                    "serviceProviderConfiguration": {
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "listTables",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    },
+                    "retryPolicy": {
+                        "type": "none"
+                    }
+                },
+                "runAfter": {},
+                "type": "ServiceProvider"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "triggers": {
+            "manual": {
+                "kind": "http",
+                "type": "request"
+            }
+        }
+    },
+    "kind": "Stateful"
+}

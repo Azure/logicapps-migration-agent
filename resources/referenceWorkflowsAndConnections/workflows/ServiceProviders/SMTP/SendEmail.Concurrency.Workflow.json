@@ -1,0 +1,122 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Send_Email": {
+        "inputs": {
+          "parameters": {
+            "body": "<h1>Hello!</h1> This is a <b>test</b>",
+            "from": "smtp_username",
+            "importance": "Normal",
+            "isHTML": true,
+            "subject": "Test Concurrency",
+            "to": "smtp_username"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Smtp",
+            "operationId": "sendEmail",
+            "serviceProviderId": "/serviceProviders/Smtp"
+          }
+        },
+        "runAfter": {},
+        "type": "ServiceProvider"
+      },
+      "Send_Email_2": {
+        "inputs": {
+          "parameters": {
+            "body": "test",
+            "from": "smtp_username",
+            "importance": "Normal",
+            "subject": "Test Parallel",
+            "to": "smtp_username"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Smtp",
+            "operationId": "sendEmail",
+            "serviceProviderId": "/serviceProviders/Smtp"
+          }
+        },
+        "runAfter": {},
+        "type": "ServiceProvider"
+      },
+      "For_each": {
+        "actions": {
+          "Send_Email_3": {
+            "inputs": {
+              "parameters": {
+                "body": "concurrency test in foreach",
+                "from": "smtp_username",
+                "importance": "Normal",
+                "to": "smtp_username",
+                "subject": "@items('For_each')"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "Smtp",
+                "operationId": "sendEmail",
+                "serviceProviderId": "/serviceProviders/Smtp"
+              }
+            },
+            "runAfter": {},
+            "type": "ServiceProvider"
+          }
+        },
+        "foreach": "@variables('concurrency')",
+        "runAfter": {
+          "Initialize_variable": [
+            "Succeeded"
+          ]
+        },
+        "type": "Foreach"
+      },
+      "Initialize_variable": {
+        "inputs": {
+          "variables": [
+            {
+              "name": "concurrency",
+              "type": "array",
+              "value": [
+                1,
+                2,
+                3
+              ]
+            }
+          ]
+        },
+        "runAfter": {
+          "Send_Email": [
+            "Succeeded"
+          ],
+          "Send_Email_2": [
+            "Succeeded"
+          ]
+        },
+        "type": "InitializeVariable"
+      },
+      "Response": {
+        "inputs": {
+          "body": "test",
+          "statusCode": 200
+        },
+        "kind": "http",
+        "runAfter": {
+          "For_each": [
+            "Succeeded"
+          ]
+        },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

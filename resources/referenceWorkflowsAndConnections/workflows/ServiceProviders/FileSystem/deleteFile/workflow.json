@@ -1,0 +1,45 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Delete_File": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "filePath": "LogicAppStandardTests/testfolder/inputfile.txt",
+            "skipIfFileNotPresent": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "FileSystem",
+            "operationId": "deleteFile",
+            "serviceProviderId": "/serviceProviders/FileSystem"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@body('Delete_File')"
+        },
+        "runAfter": {
+          "Delete_File": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

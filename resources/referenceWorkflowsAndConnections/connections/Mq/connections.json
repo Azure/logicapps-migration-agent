@@ -1,0 +1,26 @@
+{
+    "serviceProviderConnections": {
+        "mq": {
+            "parameterValues": {
+                "serverName": "@appsetting('mq_serverName')",
+                "portNumber": "@appsetting('mq_portNumber')",
+                "channelName": "@appsetting('mq_channelName')",
+                "queueManagerName": "@appsetting('mq_queueManagerName')",
+                "connectAs": "@appsetting('mq_connectAs')",
+                "backupServerName": "@appsetting('mq_backupServerName')",
+                "userName": "@appsetting('mq_userName')",
+                "password": "@appsetting('mq_password')",
+                "maxConnections": "@appsetting('mq_maxConnections')",
+                "connectionTimeoutSeconds": "@appsetting('mq_connectionTimeoutSeconds')",
+                "deadLetterQueueName": "@appsetting('mq_deadLetterQueueName')",
+                "useTLS": "@appsetting('mq_useTLS')",
+                "clientCertThumbprint": "@appsetting('mq_clientCertThumbprint')"
+            },
+            "serviceProvider": {
+                "id": "/serviceProviders/mq"
+            },
+            "displayName": "CN-MQ"
+        }
+    },
+    "managedApiConnections": {}
+}

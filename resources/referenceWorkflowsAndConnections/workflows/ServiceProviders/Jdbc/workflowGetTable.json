@@ -1,0 +1,43 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Gets_List_of_Tables": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "serviceProviderConfiguration": {
+            "connectionName": "@ConnectionName",
+            "operationId": "getTables",
+            "serviceProviderId": "/serviceProviders/Jdbc"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@outputs('Gets_List_of_Tables')?['body']"
+        },
+        "runAfter": {
+          "Gets_List_of_Tables": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "method": "GET"
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

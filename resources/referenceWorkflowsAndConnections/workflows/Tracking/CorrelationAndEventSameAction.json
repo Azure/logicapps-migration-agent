@@ -1,0 +1,29 @@
+{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2024-03-31/trackingdefinitionschema.json#",
+    "description": "Tracking definition of Logic App POProcessing for order processing business process",
+    "businessProcess": {
+        "name": "OrderProcessing",
+        "version": "d52c9c91-6e10-4a90-9c1f-08ee5d01c656",
+        "correlationPropertyName": "OrderNumber"
+    },
+    "trackingDefinitions": {
+        "PurchaseOrder": {
+            "events": {
+                "Processing": {
+                    "statuses": {
+                        "success": {
+                            "operationType": "action",
+                            "operationName": "ApprovedPO",
+                            "properties": {
+                                "OrderNumber": "@action().inputs.OrderNumber",
+                                "ApprovalStatus": "@action().inputs.ApprovalStatus",
+                                "ApproverName": "@action().inputs.ApproverName",
+                                "POAmount": "@action().inputs.POamount"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

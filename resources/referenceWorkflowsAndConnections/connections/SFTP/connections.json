@@ -1,0 +1,21 @@
+{
+  "serviceProviderConnections": {
+    "Sftp": {
+      "parameterValues": {
+        "sshHostAddress": "@appsetting('Sftp_sshHostAddress')",
+        "username": "@appsetting('Sftp_username')",
+        "password": "@appsetting('Sftp_password')",
+        "rootDirectory": "@appsetting('Sftp_rootDirectory')",
+        "sshPrivateKey": "@appsetting('Sftp_sshPrivateKey')",
+        "sshPrivateKeyPassphrase": "@appsetting('Sftp_sshPrivateKeyPassphrase')",
+        "enableHostKeyValidation": "@appsetting('Sftp_enableHostKeyValidation')",
+        "sshHostKeyFingerprint": "@appsetting('Sftp_sshHostKeyFingerprint')",
+        "portNumber": "@appsetting('Sftp_portNumber')",
+        "disableConnectionCache":  "@appsetting('Sftp_disableConnectionCache')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/Sftp"
+      }
+    }
+  }
+}

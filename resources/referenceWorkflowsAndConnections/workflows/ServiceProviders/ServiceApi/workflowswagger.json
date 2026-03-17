@@ -1,0 +1,266 @@
+{{
+  "swagger": "2.0",
+  "info": {{
+    "version": "1.0.0.0",
+    "title": "Azure Logic Apps (standard) - UNDEFINED_SITE_NAME",
+    "description": "Azure Logic App."
+  }},
+  "host": "localhost:7071",
+  "basePath": "/",
+  "schemes": [
+    "http"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {{
+    "/{0}/triggers/manual/invoke": {{
+      "post": {{
+        "description": "Trigger a run of the logic app.",
+        "operationId": "{0}_manual_invoke",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {{
+            "name": "api-version",
+            "in": "query",
+            "description": "The service API version.",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "2020-05-01-preview"
+            ],
+            "default": "2020-05-01-preview"
+          }},
+          {{
+            "name": "payload",
+            "in": "body",
+            "description": "A JSON serialized request body payload containing the propeties specified.",
+            "required": false,
+            "schema": {{
+                "$ref": "#/definitions/{0}-request-manual"
+              }}
+          }},
+          {{
+            "name": "sp",
+            "in": "query",
+            "description": "The permissions; generally 'read' or 'write'.",
+            "required": true,
+            "type": "string"
+          }},
+          {{
+            "name": "sv",
+            "in": "query",
+            "description": "The version number of the query parameters.",
+            "required": true,
+            "type": "string"
+          }},
+          {{
+            "name": "sig",
+            "in": "query",
+            "description": "The SHA 256 hash of the entire request URI with an internal key.",
+            "required": true,
+            "type": "string"
+          }}
+        ],
+        "responses": {{
+          "default": {{
+            "description": "The Logic App Response.",
+            "schema": {{
+              "type": "object"
+            }}
+          }},
+          "200": {{
+            "description": "The Logic App Response.",
+            "schema": {{
+              "type": "object"
+            }}
+          }}
+        }},
+        "deprecated": false
+      }}
+    }},
+    "/{1}/triggers/manual/invoke": {{
+      "post": {{
+        "description": "Trigger a run of the logic app.",
+        "operationId": "{1}_manual_invoke",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {{
+            "name": "api-version",
+            "in": "query",
+            "description": "The service API version.",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "2020-05-01-preview"
+            ],
+            "default": "2020-05-01-preview"
+          }},
+          {{
+            "name": "payload",
+            "in": "body",
+            "description": "A JSON serialized request body payload containing the propeties specified.",
+            "required": false,
+            "schema": {{
+              "$ref": "#/definitions/{1}-request-manual"
+            }}
+          }},          
+          {{
+            "name": "sp",
+            "in": "query",
+            "description": "The permissions; generally 'read' or 'write'.",
+            "required": true,
+            "type": "string"
+          }},
+          {{
+            "name": "sv",
+            "in": "query",
+            "description": "The version number of the query parameters.",
+            "required": true,
+            "type": "string"
+          }},
+          {{
+            "name": "sig",
+            "in": "query",
+            "description": "The SHA 256 hash of the entire request URI with an internal key.",
+            "required": true,
+            "type": "string"
+          }}
+        ],
+        "responses": {{
+          "default": {{
+            "description": "The Logic App Response.",
+            "schema": {{
+              "type": "object"
+            }}
+          }},
+          "200": {{
+            "description": "The Logic App Response.",
+            "schema": {{
+              "type": "object"
+            }}
+          }}
+        }},
+        "deprecated": false
+      }}
+    }},
+    "/{2}/triggers/manual/invoke": {{
+      "post": {{
+        "description": "Trigger a run of the logic app.",
+        "operationId": "{2}_manual_invoke",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {{
+            "name": "api-version",
+            "in": "query",
+            "description": "The service API version.",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "2020-05-01-preview"
+            ],
+            "default": "2020-05-01-preview"
+          }},
+          {{
+            "name": "payload",
+            "in": "body",
+            "description": "A JSON serialized request body payload containing the propeties specified.",
+            "required": false,
+            "schema": {{
+              "$ref": "#/definitions/{2}-request-manual"
+            }}
+          }},
+          {{
+            "name": "sp",
+            "in": "query",
+            "description": "The permissions; generally 'read' or 'write'.",
+            "required": true,
+            "type": "string"
+          }},
+          {{
+            "name": "sv",
+            "in": "query",
+            "description": "The version number of the query parameters.",
+            "required": true,
+            "type": "string"
+          }},
+          {{
+            "name": "sig",
+            "in": "query",
+            "description": "The SHA 256 hash of the entire request URI with an internal key.",
+            "required": true,
+            "type": "string"
+          }}
+        ],
+        "responses": {{
+          "default": {{
+            "description": "The Logic App Response.",
+            "schema": {{
+              "type": "object"
+            }}
+          }},
+          "200": {{
+            "description": "The Logic App Response.",
+            "schema": {{
+              "type": "object"
+            }}
+          }}
+        }},
+        "deprecated": false
+      }}
+    }}
+  }},
+  "definitions": {{
+    "{0}-request-manual": {{
+      "properties": {{
+        "ProductID": {{
+          "items": {{
+            "type": "integer"
+          }},
+          "type": "array"
+        }}
+      }},
+      "type": "object"
+    }},
+    "{1}-request-manual": {{
+      "properties": {{
+        "ProductID": {{
+          "items": {{
+            "type": "integer"
+          }},
+          "type": "array"
+        }}
+      }},
+      "type": "object"
+    }},
+    "{2}-request-manual": {{
+      "properties": {{
+        "ProductID": {{
+          "items": {{
+            "type": "integer"
+          }},
+          "type": "array"
+        }}
+      }},
+      "type": "object"
+    }}
+  }}
+}}

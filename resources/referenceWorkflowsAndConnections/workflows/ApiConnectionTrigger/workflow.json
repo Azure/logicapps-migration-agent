@@ -1,0 +1,51 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "actions": {
+      "Compose": {
+        "type": "Compose",
+        "inputs": "hello this is the prod version. subject: @{triggerBody()?['subject']}",
+        "runAfter": {}
+      }
+    },
+    "outputs": {},
+    "triggers": {
+      "When_a_new_email_mentioning_me_arrives_(V3)": {
+        "type": "ApiConnectionNotification",
+        "inputs": {
+          "host": {
+            "connection": {
+              "referenceName": "office365"
+            }
+          },
+          "fetch": {
+            "pathTemplate": {
+              "template": "/v3/Mail/OnNewMentionMeEmail"
+            },
+            "method": "get",
+            "queries": {
+              "importance": "Any",
+              "fetchOnlyWithAttachment": false,
+              "includeAttachments": false
+            }
+          },
+          "subscribe": {
+            "body": {
+              "NotificationUrl": "@listCallbackUrl()"
+            },
+            "pathTemplate": {
+              "template": "/GraphMentionMeMailSubscriptionPoke/$subscriptions"
+            },
+            "method": "post",
+            "queries": {
+              "importance": "Any",
+              "fetchOnlyWithAttachment": false
+            }
+          }
+        }
+      }
+    }
+  },
+  "kind": "Stateful"
+}

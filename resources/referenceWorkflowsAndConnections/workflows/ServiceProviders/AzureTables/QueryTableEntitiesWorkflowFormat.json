@@ -1,0 +1,111 @@
+{{
+    "definition": {{
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {{
+            "Response": {{
+                "inputs": {{
+                    "body": {{
+                        "query1": "@outputs('Query_Entities')",
+                        "query2": "@outputs('Query_Entities_2')",
+                        "query3": "@outputs('Query_Entities_3')",
+                        "query4": "@outputs('Query_Entities_4')",
+                    }},
+                    "statusCode": 200
+                }},
+                "kind": "http",
+                "runAfter": {{
+                    "Query_Entities_4": [
+                        "Succeeded",
+                        "Failed",
+                        "Skipped"
+                    ]
+                }},
+                "type": "Response"
+            }},
+            "Query_Entities": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}"
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "queryEntities",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{}},
+                "type": "ServiceProvider"
+            }},
+            "Query_Entities_2": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "filter": "stringValue ge 'test' and stringValue lt 'tesu'",
+                        "select": [ "stringValue" ] 
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "queryEntities",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "Query_Entities": [
+                      "Succeeded"
+                    ]
+                  }},
+                "type": "ServiceProvider"
+            }},
+            "Query_Entities_3": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "filter": "IntegerValue lt 10",
+                        "top":  5
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "queryEntities",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "Query_Entities_2": [
+                      "Succeeded"
+                    ]
+                  }},
+                "type": "ServiceProvider"
+            }},
+            "Query_Entities_4": {{
+                "inputs": {{
+                    "parameters": {{
+                        "tableName": "{0}",
+                        "filter": "IntegerValue lt 10",
+                        "top": 5,
+                        "continuationToken": "@{{body('Query_Entities_3')?['continuationToken']}}"
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "queryEntities",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "Query_Entities_3": [
+                      "Succeeded"
+                    ]
+                  }},
+                "type": "ServiceProvider"
+            }}
+        }},
+        "contentVersion": "1.0.0.0",
+        "outputs": {{}},
+        "triggers": {{
+            "manual": {{
+                "kind": "http",
+                "type": "request"
+            }}
+        }}
+    }},
+    "kind": "Stateful"
+}}

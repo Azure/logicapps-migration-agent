@@ -1,0 +1,39 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Flat_File_Encoding": {
+                "type": "FlatFileEncoding",
+                "runAfter": {},
+              "inputs": {
+                "content": "@triggerBody()",
+                "emptyNodeGenerationMode": "HonorSchemaNodeProperty",
+                "schema": { "name": "SchemaNamePlaceholder" },
+                "xmlNormalization": false
+              }
+            },
+            "Response": {
+                "inputs": {
+                    "body": {
+                        "value": "@body('Flat_File_Encoding')"
+                    },
+                    "statusCode": 200
+                },
+                "runAfter": { "Flat_File_Encoding": [ "Succeeded" ] },
+                "type": "Response"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {},
+        "triggers": {
+            "manual": {
+                "inputs": {
+                    "schema": {}
+                },
+                "kind": "Http",
+                "type": "Request"
+            }
+        }
+    }
+}

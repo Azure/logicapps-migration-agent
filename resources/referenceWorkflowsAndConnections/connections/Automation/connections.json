@@ -1,0 +1,21 @@
+{
+  "serviceProviderConnections": {
+    "Automation": {
+      "parameterValues": {
+        "authProvider": {
+          "type": "ActiveDirectoryOAuth",
+          "clientId": "@ClientId",
+          "pfx": "@ClientCertPfx",
+          "tenant": "@TenantId",
+          "credentialType": "Certificate",
+          "password": ""
+        }
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/azureAutomation"
+      },
+      "displayName": "test-cred"
+    }
+  },
+  "managedApiConnections": {}
+}

@@ -1,0 +1,41 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Delay": {
+        "type": "Wait",
+        "inputs": {
+          "interval": {
+            "count": 5,
+            "unit": "Second"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "inputs": {
+          "body": "Some Response Action.",
+          "statusCode": 200
+        },
+        "kind": "http",
+        "runAfter": {
+          "Delay": [
+            "Succeeded"
+          ]
+        },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

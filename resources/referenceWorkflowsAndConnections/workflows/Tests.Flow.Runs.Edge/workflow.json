@@ -1,0 +1,64 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Initialize_variable": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "StringVariable",
+              "type": "string",
+              "value": "\"a\""
+            }
+          ]
+        },
+        "runAfter": {}
+      },
+      "For_each": {
+        "type": "Foreach",
+        "foreach": [
+          "1"
+        ],
+        "actions": {
+          "Append_to_string_variable": {
+            "type": "AppendToStringVariable",
+            "inputs": {
+              "name": "StringVariable",
+              "value": "b"
+            },
+            "runAfter": {}
+          }
+        },
+        "runAfter": {
+          "Initialize_variable": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@variables('StringVariable')"
+        },
+        "runAfter": {
+          "For_each": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateless"
+}

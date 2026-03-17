@@ -1,0 +1,25 @@
+{
+  "managedApiConnections": {
+    "msnweather": {
+      "api": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/providers/Microsoft.Web/locations/@{appsetting('WORKFLOWS_LOCATION_NAME')}/managedApis/msnweather"
+      },
+      "connection": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.Web/connections/msnweather"
+      },
+      "connectionRuntimeUrl": "@parameters('msnweather-ConnectionRuntimeUrl')",
+      "authentication": "@parameters('msnweather-Authentication')"
+    }
+  },
+  "agentConnections": {
+    "agentConnection1": {
+      "type": "model",
+      "endpoint": "@appsetting('openai_openAIEndpoint')",
+      "displayName": "modelConnection1",
+      "authentication": {
+        "type": "Key",
+        "key": "@appsetting('openai_openAIKey')"
+      }
+    }
+  }
+ }

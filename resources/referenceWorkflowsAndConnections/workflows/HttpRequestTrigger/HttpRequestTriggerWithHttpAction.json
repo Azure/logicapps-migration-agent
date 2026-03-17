@@ -1,0 +1,687 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Initialize_variable": {
+        "inputs": {
+          "variables": [
+            {
+              "name": "variable1",
+              "type": "Integer",
+              "value": 0
+            }
+          ]
+        },
+        "runAfter": {},
+        "type": "InitializeVariable"
+      },
+      "Increment_variable": {
+        "inputs": {
+          "name": "variable1",
+          "value": 2
+        },
+        "runAfter": {
+          "Initialize_variable": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "IncrementVariable"
+      },
+      "Decrement_variable": {
+        "type": "DecrementVariable",
+        "inputs": {
+          "name": "variable1",
+          "value": 1
+        },
+        "runAfter": {
+          "Increment_variable": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "Variable_set": {
+        "type": "SetVariable",
+        "inputs": {
+          "name": "variable1",
+          "value": 3
+        },
+        "runAfter": {
+          "Decrement_variable": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "Initialize_string": {
+        "inputs": {
+          "variables": [
+            {
+              "name": "variable_string",
+              "type": "string",
+              "value": "bry"
+            }
+          ]
+        },
+        "runAfter": {
+          "Variable_set": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "InitializeVariable"
+      },
+      "Append_string": {
+        "type": "AppendToStringVariable",
+        "inputs": {
+          "name": "variable_string",
+          "value": "an"
+        },
+        "runAfter": {
+          "Initialize_string": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "Initialize_array": {
+        "inputs": {
+          "variables": [
+            {
+              "name": "variable_array",
+              "type": "array",
+              "value": [
+                1,
+                2
+              ]
+            }
+          ]
+        },
+        "runAfter": {
+          "Append_string": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "InitializeVariable"
+      },
+      "Append_array": {
+        "type": "AppendToArrayVariable",
+        "inputs": {
+          "name": "variable_array",
+          "value": "3"
+        },
+        "runAfter": {
+          "Initialize_array": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "notSimplePostHttpAction": {
+        "type": "http",
+        "inputs": {
+          "uri": "###httpUri###/request",
+          "method": "POST"
+        },
+        "runAfter": {
+          "Append_array": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "notSimplePostHttpAction2": {
+        "type": "http",
+        "inputs": {
+          "uri": "###httpUri###/request",
+          "method": "POST"
+        },
+        "runAfter": {
+          "notSimplePostHttpAction": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "simpleGetHttpAction": {
+        "runAfter": {
+          "notSimplePostHttpAction2": [ "SUCCEEDED" ]
+        },
+        "type": "http",
+        "inputs": {
+          "uri": "###httpUri###/request",
+          "method": "GET"
+        }
+      },
+      "Decrement_variable2": {
+        "inputs": {
+          "name": "variable1",
+          "value": 1
+        },
+        "runAfter": {
+          "simpleGetHttpAction": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "DecrementVariable"
+      },
+      "HTTP": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "Decrement_variable2": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP-get": {
+        "inputs": {
+          "method": "GET",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "trackedProperties": {},
+        "type": "Http"
+      },
+      "HTTP-post": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP-get": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP-post": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_1": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_1": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_1": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_10": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_9": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_11": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_10": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_12": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_11": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_13": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_12": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_14": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_13": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_15": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_14": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_16": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_15": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_17": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_16": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_18": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_17": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_19": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_18": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_2": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_1": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_20": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_19": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_21": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_20": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_22": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_21": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_23": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_22": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_3": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_2": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_4": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_3": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_5": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_4": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_6": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_5": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_7": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_6": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_8": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_7": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      },
+      "HTTP_copy_2_copy_9": {
+        "inputs": {
+          "method": "POST",
+          "uri": "###httpUri###"
+        },
+        "runAfter": {
+          "HTTP_copy_2_copy_8": [
+            "SUCCEEDED"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        },
+        "type": "Http"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

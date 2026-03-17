@@ -1,0 +1,67 @@
+{{
+    "definition": {{
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {{
+            "Response": {{
+                "inputs": {{
+                    "body": {{
+                            "listTables1": "@outputs('List_Tables')",
+                            "listTables2": "@outputs('List_Tables_2')"
+                    }},
+                    "statusCode": 200
+                }},
+                "kind": "http",
+                "runAfter": {{
+                    "List_Tables_2": [
+                        "Succeeded"
+                    ]
+                }},
+                "type": "Response"
+            }},
+            "List_Tables": {{
+                "inputs": {{
+                    "parameters": {{
+                        "top": 1,
+                        "filter": "TableName ge '{0}' and TableName lt '{1}'"
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "listTables",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{}},
+                "type": "ServiceProvider"
+            }},
+            "List_Tables_2": {{
+                "inputs": {{
+                    "parameters": {{
+                        "top": 1,
+                        "filter": "TableName ge '{0}' and TableName lt '{1}'",
+                        "continuationToken": "@{{body('List_tables')?['continuationToken']}}"
+                    }},
+                    "serviceProviderConfiguration": {{
+                        "connectionName": "tableStorageConnection",
+                        "operationId": "listTables",
+                        "serviceProviderId": "/serviceProviders/azureTables"
+                    }}
+                }},
+                "runAfter": {{
+                    "List_Tables": [
+                        "Succeeded"
+                    ]
+                }},
+                "type": "ServiceProvider"
+            }}
+        }},
+        "contentVersion": "1.0.0.0",
+        "outputs": {{}},
+        "triggers": {{
+            "manual": {{
+                "kind": "http",
+                "type": "request"
+            }}
+        }}
+    }},
+    "kind": "Stateful"
+}}

@@ -1,0 +1,68 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Encrypt_data_with_key": {
+        "inputs": {
+          "parameters": {
+            "algorithm": "RSA-OAEP",
+            "keyName": "testRsaKey",
+            "rawData": "Hello World"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "KeyVault",
+            "operationId": "encryptDataWithKey",
+            "serviceProviderId": "/serviceProviders/keyVault"
+          }
+        },
+        "runAfter": {},
+        "type": "ServiceProvider"
+      },
+      "Decrypt_data_with_key": {
+        "inputs": {
+          "parameters": {
+            "algorithm": "RSA-OAEP",
+            "encryptedData": "@body('Encrypt_data_with_key')?['encryptedData']",
+            "keyName": "testRsaKey"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "KeyVault",
+            "operationId": "decryptDataWithKey",
+            "serviceProviderId": "/serviceProviders/keyVault"
+          }
+        },
+        "runAfter": {
+          "Encrypt_data_with_key": [
+            "Succeeded"
+          ]
+        },
+        "type": "ServiceProvider"
+      },
+      "Response": {
+        "inputs": {
+          "body": "@body('Decrypt_data_with_key')",
+          "statusCode": 200
+        },
+        "kind": "http",
+        "runAfter": {
+          "Decrypt_data_with_key": [
+            "Succeeded"
+          ]
+        },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "method": "GET"
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

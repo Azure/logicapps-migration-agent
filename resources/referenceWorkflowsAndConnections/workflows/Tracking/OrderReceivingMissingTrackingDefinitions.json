@@ -1,0 +1,8 @@
+{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2024-03-31/trackingdefinitionschema.json#",
+    "businessProcess": {
+        "name": "OrderReceiving",
+        "version": "d52c9c91-6e10-4a90-9c1f-08ee5d01c656",
+        "correlationPropertyName": "OrderNumber"
+    }
+}

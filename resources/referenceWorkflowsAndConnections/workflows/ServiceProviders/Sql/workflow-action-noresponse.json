@@ -1,0 +1,29 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Sql_Action": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": "SqlWorkflow_Parameters",
+          "serviceProviderConfiguration": {
+            "connectionName": "SqlWorkflow_ConnectionName",
+            "operationId": "SqlWorkflow_OperationId",
+            "serviceProviderId": "/serviceProviders/sql"
+          }
+        },
+        "runAfter": {}
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

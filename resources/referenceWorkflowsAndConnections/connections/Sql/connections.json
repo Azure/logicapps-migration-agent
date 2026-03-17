@@ -1,0 +1,44 @@
+{
+  "serviceProviderConnections": {
+    "sqlConnectionString": {
+      "parameterValues": {
+        "connectionString": "@appsetting('sqlConnectionString')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/sql"
+      }
+    },
+    "sqlAADConnection": {
+      "parameterValues": {
+        "serverName": "@appsetting('serverName')",
+        "databaseName": "@appsetting('databaseName')",
+        "authProvider": {
+          "Type": "ActiveDirectoryOAuth",
+          "Tenant": "72f988bf-86f1-41af-91ab-2d7cd011db47",
+          "CredentialType": "Certificate",
+          "ClientId": "SqlConnections_ClientId",
+          "pfx": "SqlConnections_CertPfx",
+          "Password": ""
+        }
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/sql"
+      }
+    },
+    "sqlParameterizedConnection": {
+      "parameterValues": "@parameters('SqlParameter')",
+      "serviceProvider": {
+        "id": "/serviceProviders/sql"
+      }
+    },
+    "sqlInvalidConnection": {
+      "parameterValues": {
+        "serverName": "@appsetting('serverName')",
+        "databaseName": "@appsetting('databaseName')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/sql"
+      }
+    }
+  }
+}

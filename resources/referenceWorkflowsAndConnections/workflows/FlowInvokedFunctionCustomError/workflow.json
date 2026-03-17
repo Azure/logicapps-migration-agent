@@ -1,0 +1,46 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "FunctionCode": {
+        "type": "invokefunction",
+        "runAfter": {},
+        "inputs": {
+          "functionName": "FlowInvokedFunctionWithCustomError",
+          "parameters": {
+            "parameter1": "throw",
+            "parameter2": "error"
+          },
+          "retryPolicy": {
+            "type": "fixed",
+            "count": 3,
+            "interval": "PT1S"
+          }
+        }
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('FunctionCode')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "FunctionCode": [ "Succeeded" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

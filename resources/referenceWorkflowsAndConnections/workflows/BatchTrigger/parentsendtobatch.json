@@ -1,0 +1,46 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@actions('batch-send')"
+        },
+        "runAfter": {
+          "batch-send": [
+            "Succeeded"
+          ]
+        }
+      },
+      "batch-send": {
+        "inputs": {
+          "batchName": "testbatch",
+          "content": "Some test message for send to batch action",
+          "host": {
+            "triggerName": "Batch_messages",
+            "workflow": {
+              "id": "REPLACE_WITH_CHILD_WORKFLOW"
+            }
+          }
+        },
+        "runAfter": {},
+        "type": "SendToBatch"
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {}
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

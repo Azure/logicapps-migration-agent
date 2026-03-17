@@ -1,0 +1,62 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Read_Blob": {
+        "inputs": {
+          "parameters": {
+            "containerName": "azurelogicappscontainer",
+            "blobName": "image123.jpg"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "blobStorageConnection",
+            "operationId": "readBlob",
+            "serviceProviderId": "/serviceProviders/AzureBlob"
+          }
+        },
+        "runAfter": {},
+        "type": "ServiceProvider"
+      },
+      "Get_Completion": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            actionInputParameters
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "openAi",
+            "operationId": "getChatCompletions",
+            "serviceProviderId": "/serviceProviders/openAi"
+          }
+        },
+        "runAfter": {
+          "Read_Blob": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Response": {
+        "inputs": {
+          "body": "@body('Get_Completion')",
+          "statusCode": 200
+        },
+        "kind": "http",
+        "runAfter": {
+          "Get_Completion": [
+            "Succeeded"
+          ]
+        },
+        "type": "Response"
+      },
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "kind": "http",
+        "type": "request"
+      }
+    }
+  },
+  "kind": "Stateless"
+}

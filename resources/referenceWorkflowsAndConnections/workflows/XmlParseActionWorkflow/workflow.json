@@ -1,0 +1,56 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "XmlParse": {
+        "type": "xmlParse",
+        "runAfter": {},
+        "inputs": {
+          "content": {
+            "$content": "###content###",
+            "$content-type": "application/xml; charset=utf-8"
+          },
+          "schema": {
+            "source": "LogicApp",
+            "name": "###schema###"
+          },
+          "jsonWriterSettings": {
+            "ignoreAttributes": false
+          }
+        }
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('XmlParse')['json']"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "XmlParse": [ "Succeeded" ] },
+        "type": "Response"
+      },
+      "ResponseFailed": {
+        "inputs": {
+          "body": {
+            "value": "@actions('XmlParse')"
+          },
+          "statusCode": 400
+        },
+        "runAfter": { "XmlParse": [ "Failed" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Create_Topic_Subscription": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "topicName": "ServiceBuscit",
+            "topicSubscriptionName": "testTopicSubscription",
+            "topicSubscriptionFilterType": "Correlation",
+            "topicSubscriptionCorrelationFilter": {
+              "messageId": "123",
+              "to": "smtp2022@outlook.com",
+              "label": "Subject",
+              "userProperties": {
+                "key": "value",
+                "key2":  "value"
+              }
+            }
+          },
+          "serviceProviderConfiguration": {
+            "serviceProviderId": "/serviceProviders/serviceBus",
+            "operationId": "createTopicSubscription",
+            "connectionName": "serviceBusConnectionString"
+          }
+        },
+        "runAfter": {
+        }
+      },
+      "Delete_Topic_Subscription": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "topicName": "ServiceBuscit",
+            "topicSubscriptionName": "testTopicSubscription"
+          },
+          "serviceProviderConfiguration": {
+            "serviceProviderId": "/serviceProviders/serviceBus",
+            "operationId": "deleteTopicSubscription",
+            "connectionName": "serviceBusConnectionString"
+          }
+        },
+        "runAfter": {
+          "Create_Topic_Subscription": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateless"
+}

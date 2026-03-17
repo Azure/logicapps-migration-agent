@@ -1,0 +1,37 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Run_in-line_JavaScript": {
+        "type": "JavaScriptCode",
+        "inputs": {
+          "code": "return \"FOO\""
+        },
+        "runAfter": {}
+      },
+      "Run_in-line_JavaScript_2": {
+        "type": "JavaScriptCode",
+        "inputs": {
+          "code": "return \"BAR\""
+        },
+        "runAfter": {
+          "Run_in-line_JavaScript": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "Recurrence": {
+        "type": "Recurrence",
+        "recurrence": {
+          "frequency": "Second",
+          "interval": 15
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

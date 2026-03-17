@@ -1,0 +1,59 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "HTTP": {
+        "inputs": {
+          "method": "GET",
+          "uri": "testURI",
+          "retryPolicy": {
+            "type": "none"
+          }
+        },
+        "runtimeConfiguration": {
+          "requestOptions": {
+            "timeout": "testTimeout"
+          }
+        },
+        "operationOptions": "DisableAsyncPattern",
+        "runAfter": {},
+        "type": "Http"
+      },
+      "Response": {
+        "inputs": {
+          "statusCode": 408
+        },
+        "kind": "http",
+        "runAfter": {
+          "HTTP": [
+            "TIMEDOUT",
+            "FAILED"
+          ]
+        },
+        "type": "Response"
+      },
+      "Response_2": {
+        "inputs": {
+          "statusCode": 200
+        },
+        "kind": "http",
+        "runAfter": {
+          "HTTP": [
+            "Succeeded"
+          ]
+        },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "inputs": {},
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "testState"
+}

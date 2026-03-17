@@ -1,0 +1,110 @@
+﻿{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "actions": {
+        "Initialize_variable": {
+          "inputs": {
+            "variables": [
+              {
+                "name": "variable1",
+                "type": "integer",
+                "value": 1
+              }
+            ]
+          },
+          "runAfter": {},
+          "type": "InitializeVariable"
+        },
+        "notSimpleGetHttpAction": {
+          "type": "http",
+          "inputs": {
+            "uri": "###httpUri###/request",
+            "method": "POST"
+          },
+          "runAfter": {
+            "Initialize_variable": [ "SUCCEEDED" ]
+          }
+        },
+        "For_each": {
+          "type": "Foreach",
+          "foreach": [
+            1,
+            2
+          ],
+          "actions": {
+            "Inside_foreach_action": {
+              "type": "http",
+              "inputs": {
+                "uri": "###httpUri###/request",
+                "method": "POST"
+              }
+            }
+          },
+          "runAfter": {
+            "notSimpleGetHttpAction": [
+              "SUCCEEDED"
+            ]
+          }
+        },
+        "Condition": {
+          "actions": {},
+          "else": {
+            "actions": {
+              "Terminate": {
+                "inputs": {
+                  "runError": {
+                    "code": "404",
+                    "message": "error message"
+                  },
+                  "runStatus": "Failed"
+                },
+                "type": "Terminate"
+              }
+            }
+          },
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@variables('variable1')",
+                  1
+                ]
+              }
+            ]
+          },
+          "runAfter": {
+            "For_each": [
+              "SUCCEEDED"
+            ]
+          },
+          "type": "If"
+        },
+        "After_foreach_action": {
+          "runAfter": {
+            "Condition": [ "SUCCEEDED" ]
+          },
+          "type": "http",
+          "inputs": {
+            "uri": "###httpUri###/request",
+            "method": "GET"
+          }
+        }
+      },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {},
+        "triggers": {
+            "manual": {
+                "inputs": {
+                    "schema": {}
+                },
+                "kind": "Http",
+                "type": "Request"
+            }
+        }
+    },
+    "kind": "Stateful"
+}
+
+
+

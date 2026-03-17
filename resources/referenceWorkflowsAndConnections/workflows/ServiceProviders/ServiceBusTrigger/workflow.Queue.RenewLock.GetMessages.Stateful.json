@@ -1,0 +1,146 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "For_each": {
+        "actions": {
+          "Complete_the_message": {
+            "inputs": {
+              "parameters": {
+                "messageId": "@item()?['messageId']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "completeMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {
+              "Renew_Lock": [
+                "Succeeded"
+              ]
+            },
+            "type": "ServiceProvider"
+          },
+          "Renew_Lock": {
+            "inputs": {
+              "parameters": {
+                "messageId": "@item()?['messageId']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "renewLockMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "type": "ServiceProvider"
+          },
+          "Send_message": {
+            "inputs": {
+              "parameters": {
+                "entityName": "ServiceBuscit",
+                "message": {
+                  "contentData": "Resend after complete",
+                  "messageId": "@items('For_each')?['messageId']"
+                }
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "sendMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {
+              "Complete_the_message": [
+                "SUCCEEDED"
+              ]
+            },
+            "type": "ServiceProvider"
+          }
+        },
+        "foreach": "@triggerOutputs()?['body']",
+        "runAfter": {},
+        "type": "Foreach"
+      },
+      "For_each_1": {
+        "actions": {
+          "Complete_the_message_1": {
+            "inputs": {
+              "parameters": {
+                "messageId": "@items('For_each_1')?['messageId']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "completeMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {
+              "Renew": [
+                "SUCCEEDED"
+              ]
+            },
+            "type": "ServiceProvider"
+          },
+          "Renew": {
+            "inputs": {
+              "parameters": {
+                "messageId": "@items('For_each_1')?['messageId']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "renewLockMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "type": "ServiceProvider"
+          }
+        },
+        "foreach": "@body('Get_messages_from_a_queue1')",
+        "runAfter": {
+          "Get_messages_from_a_queue1": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "Foreach"
+      },
+      "Get_messages_from_a_queue1": {
+        "inputs": {
+          "parameters": {
+            "queueName": "ServiceBuscit"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "getMessagesFromQueue",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "For_each": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "ServiceProvider"
+      }
+    },
+    "triggers": {
+      "When_messages_are_available_in_a_Service_Bus_queue_(peek-lock)": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "ServiceBuscit",
+            "isSessionsEnabled": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "peekLockQueueMessages",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateless"
+}

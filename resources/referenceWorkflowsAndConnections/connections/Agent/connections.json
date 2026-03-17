@@ -1,0 +1,101 @@
+{
+  "managedApiConnections": {
+    "msnweather": {
+      "api": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/providers/Microsoft.Web/locations/@{appsetting('WORKFLOWS_LOCATION_NAME')}/managedApis/msnweather"
+      },
+      "connection": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.Web/connections/msnweather"
+      },
+      "connectionRuntimeUrl": "@parameters('msnweather-ConnectionRuntimeUrl')",
+      "authentication": "@parameters('msnweather-Authentication')"
+    },
+    "onedrive": {
+      "api": {
+        "id": "/subscriptions/f34b22a3-2202-4fb1-b040-1332bd928c84/providers/Microsoft.Web/locations/brazilsouth/managedApis/onedrive"
+      },
+      "authentication": {
+        "type": "Raw",
+        "scheme": "@appsetting('scheme')",
+        "parameter": "@appsetting('arm-connectionKey')"
+      },
+      "connection": {
+        "id": "/subscriptions/f34b22a3-2202-4fb1-b040-1332bd928c84/resourceGroups/edwardhe-rg/providers/Microsoft.Web/connections/onedrive"
+      },
+      "connectionRuntimeUrl": "https://a9ab15f5a12185bf.07.common.logic-df.azure-apihub.net/apim/onedrive/testConnection",
+      "dynamicConnectionProxyUrl": "@appsetting('dynamicConnectionProxyUrl')",
+      "runtimeSource": "Dynamic"
+    },
+    "mycustomapi": {
+      "api": {
+        "id": "/subscriptions/f34b22a3-2202-4fb1-b040-1332bd928c84/resourceGroups/edwardhe-rg/providers/Microsoft.Web/customApis/mycustomapi"
+      },
+      "authentication": {
+        "type": "Raw",
+        "scheme": "@appsetting('scheme')",
+        "parameter": "@appsetting('arm-connectionKey')"
+      },
+      "connection": {
+        "id": "/subscriptions/f34b22a3-2202-4fb1-b040-1332bd928c84/resourceGroups/edwardhe-rg/providers/Microsoft.Web/connections/mycustomapi"
+      },
+      "connectionRuntimeUrl": "https://a9ab15f5a12185bf.07.custom.logic-df.azure-apihub.net/apim/d4ca015c709144e68c10fcd39c2002cd/testConnection",
+      "dynamicConnectionProxyUrl": "@appsetting('dynamicConnectionProxyUrl')",
+      "runtimeSource": "Dynamic"
+    }
+  },
+  "agentConnections": {
+    "agentConnection1": {
+      "type": "model",
+      "endpoint": "@appsetting('openai_openAIEndpoint')",
+      "resourceId": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.CognitiveServices/accounts/testAccount",
+      "displayName": "modelConnection1",
+      "authentication": {
+        "type": "Key",
+        "key": "@appsetting('openai_openAIKey')"
+      }
+    },
+    "agentConnection2": {
+      "type": "FoundryAgentService",
+      "endpoint": "@appsetting('foundry_projectEndpoint')",
+      "resourceId": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.CognitiveServices/accounts/testAccount/projects/project",
+      "displayName": "foundryConnection2",
+      "authentication": {
+        "type": "ActiveDirectoryOAuth",
+        "clientId": "@appsetting('CLIENTAPP_CLIENT_ID')",
+        "pfx": "@appsetting('CLIENTAPP_CERTIFICATE_PFX')",
+        "tenant": "@appsetting('CLIENTAPP_TENANT_ID')",
+        "credentialType": "Certificate",
+        "password": ""
+      }
+    },
+    "agentConnection3": {
+      "type": "APIMGenAIGateway",
+      "endpoint": "@appsetting('apim_genAIEndpoint')",
+      "resourceId": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.ApiManagement/service/laApim/apis/testAPI",
+      "displayName": "apimgenaiConnection3",
+      "authentication": {
+        "type": "Key",
+        "key": "@appsetting('apim_genAIAPIKey')"
+      }
+    },
+    "agentConnection4": {
+      "type": "model",
+      "endpoint": "@appsetting('openai_openAIEndpoint')",
+      "displayName": "modelConnection4",
+      "authentication": {
+        "type": "Key",
+        "key": "@appsetting('openai_openAIKey')"
+      }
+    },
+    "agentConnection5": {
+      "type": "model",
+      "endpoint": "@appsetting('openai_openAIEndpointbrbennWUS')",
+      "resourceId": "/subscriptions/2ba690bf-a85f-4cbc-b4cb-3bfead7e2f97/resourceGroups/brbennWUS/providers/Microsoft.CognitiveServices/accounts/brbennOpenAIWUS",
+      "displayName": "modelConnection5",
+      "authentication": {
+        "type": "Key",
+        "key": "@appsetting('openai_openAIKeybrbennWUS')"
+      }
+    }
+  }
+}

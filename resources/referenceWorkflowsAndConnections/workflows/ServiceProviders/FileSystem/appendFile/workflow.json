@@ -1,0 +1,46 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Append_File": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "filePath": "LogicAppStandardTests/testfolder/inputfile.txt",
+            "body": "Append this to end of file!",
+            "createFileIfNotPresent": "False"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "FileSystem",
+            "operationId": "appendFile",
+            "serviceProviderId": "/serviceProviders/FileSystem"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": {}
+        },
+        "runAfter": {
+          "Append_File": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

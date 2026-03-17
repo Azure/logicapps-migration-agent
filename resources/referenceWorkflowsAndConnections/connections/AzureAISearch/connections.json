@@ -1,0 +1,30 @@
+{
+  "serviceProviderConnections": {
+    "AzureAISearchAdminKeyAuth": {
+      "parameterValues": {
+        "searchServiceEndpoint": "@appsetting('Endpoint')",
+        "searchServiceAdminKey": "@appsetting('AdminKey')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/azureaisearch"
+      }
+    },
+    "AzureAISearchAAD": {
+      "parameterSetName": "ActiveDirectoryOAuth",
+      "parameterValues": {
+        "searchServiceEndpoint": "@appsetting('Endpoint')",
+        "authProvider": {
+          "ClientId": "@appsetting('AzureAIClientId')",
+          "pfx": "@appsetting('AzureAIAppClientCertPfx')",
+          "CredentialType": "Certificate",
+          "Tenant": "@appsetting('AzureAITenantId')",
+          "Type": "ActiveDirectoryOAuth",
+          "Password":  ""
+        }
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/azureaisearch"
+      }
+    }
+  }
+}

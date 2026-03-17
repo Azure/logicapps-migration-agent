@@ -1,0 +1,46 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "For_each": {
+        "type": "Foreach",
+        "foreach": "@triggerOutputs()?['body']",
+        "actions": {
+          "Complete_the_message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": parameterSection,
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "completeMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "runAfter": {}
+      }
+    },
+    "triggers": {
+      "When_messages_are_available_in_a_Service_Bus_queue_(peek-lock)": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "ServiceBuscit",
+            "isSessionsEnabled": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "peekLockQueueMessages",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        }
+        runtimeConfigurationPlaceHolder
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "stateKindPlaceholder"
+}

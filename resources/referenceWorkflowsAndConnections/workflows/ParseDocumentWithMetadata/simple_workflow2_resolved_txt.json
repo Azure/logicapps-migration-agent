@@ -1,0 +1,43 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "ParseDocumentWithMetadata": {
+        "type": "ParseDocumentWithMetadata",
+        "inputs": {
+          "content": {
+            "$content-type": "text/plain",
+            "$content": "TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQu"
+          },
+          "filetype": "txt"
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@body('ParseDocumentWithMetadata')"
+        },
+        "runAfter": {
+          "ParseDocumentWithMetadata": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

@@ -1,0 +1,46 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Get_File_Metadata": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "filePath": "LogicAppStandardTests/image-artifact.png"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "FileSystem",
+            "operationId": "getFileMetadata",
+            "serviceProviderId": "/serviceProviders/FileSystem"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": {
+            "content": "@body('Get_File_Metadata')"
+          }
+        },
+        "runAfter": {
+          "Get_File_Metadata": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

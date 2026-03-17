@@ -1,0 +1,17 @@
+{
+  "serviceProviderConnections": {
+    "cicsElmLink": {
+      "parameterValues": {
+        "codePage": "@appsetting('cicsElmLink_codePage')",
+        "portNumber": "@appsetting('cicsElmLink_portNumber')",
+        "serverName": "@appsetting('cicsElmLink_serverName')"
+      },
+      "parameterSetName": "ElmLink",
+      "serviceProvider": {
+        "id": "/serviceProviders/cicsProgramCall"
+      },
+      "displayName": "mainframe_37"
+    }
+  },
+  "managedApiConnections": {}
+}

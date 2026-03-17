@@ -1,0 +1,43 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Response": {
+        "inputs": {
+          "body": "@outputs('List_Blobs')",
+          "statusCode": 200
+        },
+        "kind": "http",
+        "runAfter": {
+          "List_Blobs": [
+            "Succeeded"
+          ]
+        },
+        "type": "Response"
+      },
+      "List_Blobs": {
+        "inputs": {
+          "parameters": {
+            "pageSize" : "1000"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "blobStorageConnection",
+            "operationId": "listBlobs",
+            "serviceProviderId": "/serviceProviders/AzureBlob"
+          }
+        },
+        "runAfter": {},
+        "type": "ServiceProvider"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "kind": "http",
+        "type": "request"
+      }
+    }
+  },
+  "kind": "Stateless"
+}

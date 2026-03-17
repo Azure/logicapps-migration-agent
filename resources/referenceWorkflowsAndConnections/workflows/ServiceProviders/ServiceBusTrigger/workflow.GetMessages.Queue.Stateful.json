@@ -1,0 +1,66 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "get_messages_from_queue": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "ServiceBuscit"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "getMessagesFromQueue",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          },
+          "retryPolicy": {
+            "count": "@int('10')",
+            "interval": "PT10S",
+            "type": "fixed"
+          }
+        },
+        "runAfter": {}
+      },
+      "For_each": {
+        "type": "Foreach",
+        "foreach": "@body('get_messages_from_queue')",
+        "actions": {
+          "Complete_the_message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "messageId": "@item()?['messageId']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "completeMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              },
+              "retryPolicy": {
+                "count": "@int('10')",
+                "interval": "PT10S",
+                "type": "fixed"
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "runAfter": {
+          "get_messages_from_queue": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

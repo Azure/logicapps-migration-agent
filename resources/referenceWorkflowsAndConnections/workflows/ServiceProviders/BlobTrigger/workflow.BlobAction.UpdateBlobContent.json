@@ -1,0 +1,84 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Read_Upload_Blob": {
+        "inputs": {
+          "parameters": {
+            "containerName": "azurelogicappscontainer",
+            "blobName": "update.txt"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "blobStorageConnection",
+            "operationId": "readBlob",
+            "serviceProviderId": "/serviceProviders/AzureBlob"
+          }
+        },
+        "runAfter": {},
+        "type": "ServiceProvider"
+      },
+      "Read_Upload_Result_Blob": {
+        "inputs": {
+          "parameters": {
+            "containerName": "azurelogicappscontainer",
+            "blobName": "azurelogicapps###datetimeticks###.txt"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "blobStorageConnection",
+            "operationId": "readBlob",
+            "serviceProviderId": "/serviceProviders/AzureBlob"
+          }
+        },
+        "runAfter": {
+          "Upload_Blob": [
+            "Succeeded"
+          ]
+        },
+        "type": "ServiceProvider"
+      },
+      "Response": {
+        "inputs": {
+          "body": "@outputs('Read_Upload_Result_Blob')",
+          "statusCode": 200
+        },
+        "kind": "http",
+        "runAfter": {
+          "Read_Upload_Result_Blob": [
+            "Succeeded"
+          ]
+        },
+        "type": "Response"
+      },
+      "Upload_Blob": {
+        "inputs": {
+          "parameters": {
+            "content": "@outputs('Read_Upload_Blob').body.content",
+            "containerName": "azurelogicappscontainer",
+            "blobName": "azurelogicapps###datetimeticks###.txt",
+            "overrideIfExists":  "true"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "blobStorageConnection",
+            "operationId": "uploadBlob",
+            "serviceProviderId": "/serviceProviders/AzureBlob"
+          }
+        },
+        "runAfter": {
+          "Read_Upload_Blob": [
+            "Succeeded"
+          ]
+        },
+        "type": "ServiceProvider"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "kind": "http",
+        "type": "request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

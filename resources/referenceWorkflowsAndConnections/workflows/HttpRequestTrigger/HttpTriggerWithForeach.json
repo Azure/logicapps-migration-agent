@@ -1,0 +1,56 @@
+﻿{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "foreach": {
+        "type": "foreach",
+        "foreach": "@range(0, 5)",
+        "actions": {
+          "compose": {
+            "runAfter": { "HTTP": [ "Succeeded" ] },
+            "type": "compose",
+            "inputs": {
+              "method": "POST",
+              "uri": " ###httpUri### "
+            }
+          },
+          "HTTP": {
+            "inputs": {
+              "method": "GET",
+              "uri": " ###httpUri### "
+            },
+            "runAfter": {},
+            "type": "Http"
+          }
+        }
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "Some Response Body After successful wait execution."
+          },
+          "statusCode": 200
+        },
+        "kind": "http",
+        "operationOptions": "Asynchronous",
+        "runAfter": {
+          "foreach": [
+            "Succeeded"
+          ]
+        },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

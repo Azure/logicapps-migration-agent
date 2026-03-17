@@ -1,0 +1,415 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Scope-Catch": {
+                "actions": {},
+                "runAfter": {
+                    "Scope-Try": [
+                        "TIMEDOUT",
+                        "SKIPPED",
+                        "FAILED"
+                    ]
+                },
+                "type": "Scope"
+            },
+            "Scope-Try": {
+                "actions": {
+                    "Compose-EmailAddress": {
+                        "inputs": "@body('Parse_JSON_-_Customer_Record')?['int23_emailaddress']",
+                        "runAfter": {
+                            "Parse_JSON_-_Customer_Record": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "Compose"
+                    },
+                    "Compose_-_Composite_message": {
+                        "inputs": {
+                            "Customer": "@outputs('Compose_-_Customer_Message')",
+                            "Ticket": "@body('Parse_JSON-_TicketCreated')"
+                        },
+                        "runAfter": {
+                            "Compose_-_Customer_Message": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "Compose"
+                    },
+                    "Compose_-_Customer_Message": {
+                        "inputs": {
+                            "Address": "@body('Parse_JSON_-_Customer_Record')?['int23_address']",
+                            "City": "@body('Parse_JSON_-_Customer_Record')?['int23_city']",
+                            "EmailAddress": "@body('Parse_JSON_-_Customer_Record')?['int23_emailaddress']",
+                            "Name": "@body('Parse_JSON_-_Customer_Record')?['int23_name']",
+                            "PhoneNumber": "@body('Parse_JSON_-_Customer_Record')?['int23_phonenumber']",
+                            "SiteId": "@body('Parse_JSON_-_Customer_Record')?['int23_siteid']",
+                            "State": "@body('Parse_JSON_-_Customer_Record')?['int23_state']"
+                        },
+                        "runAfter": {
+                            "Compose-EmailAddress": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "Compose"
+                    },
+                    "List_rows_-_Select_Customer_Record": {
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "referenceName": "commondataservice-1"
+                                }
+                            },
+                            "method": "get",
+                            "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('https://org7a3fb188.crm.dynamics.com'))}/tables/@{encodeURIComponent(encodeURIComponent('int23_cpl_customers'))}/items",
+                            "queries": {
+                                "$filter": "int23_siteid eq '@{triggerBody()?['int23_siteid']}'"
+                            }
+                        },
+                        "runAfter": {
+                            "Parse_JSON-_TicketCreated": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection"
+                    },
+                    "Parse_JSON-_TicketCreated": {
+                        "inputs": {
+                            "content": "@triggerBody()",
+                            "schema": {
+                                "properties": {
+                                    "ItemInternalId": {
+                                        "type": "string"
+                                    },
+                                    "RowVersion": {
+                                        "type": "string"
+                                    },
+                                    "RunAsSystemUserId": {
+                                        "type": "string"
+                                    },
+                                    "SdkMessage": {
+                                        "type": "string"
+                                    },
+                                    "_createdby_type": {
+                                        "type": "string"
+                                    },
+                                    "_createdby_value": {
+                                        "type": "string"
+                                    },
+                                    "_createdby_value@Microsoft.Dynamics.CRM.lookuplogicalname": {
+                                        "type": "string"
+                                    },
+                                    "_modifiedby_type": {
+                                        "type": "string"
+                                    },
+                                    "_modifiedby_value": {
+                                        "type": "string"
+                                    },
+                                    "_modifiedby_value@Microsoft.Dynamics.CRM.lookuplogicalname": {
+                                        "type": "string"
+                                    },
+                                    "_ownerid_type": {
+                                        "type": "string"
+                                    },
+                                    "_ownerid_value": {
+                                        "type": "string"
+                                    },
+                                    "_ownerid_value@Microsoft.Dynamics.CRM.lookuplogicalname": {
+                                        "type": "string"
+                                    },
+                                    "_owningbusinessunit_type": {
+                                        "type": "string"
+                                    },
+                                    "_owningbusinessunit_value": {
+                                        "type": "string"
+                                    },
+                                    "_owningbusinessunit_value@Microsoft.Dynamics.CRM.lookuplogicalname": {
+                                        "type": "string"
+                                    },
+                                    "_statecode_label": {
+                                        "type": "string"
+                                    },
+                                    "_statuscode_label": {
+                                        "type": "string"
+                                    },
+                                    "createdon": {
+                                        "type": "string"
+                                    },
+                                    "int23_cpl_customerticketid": {
+                                        "type": "string"
+                                    },
+                                    "int23_issuedescription": {
+                                        "type": "string"
+                                    },
+                                    "int23_name": {
+                                        "type": "string"
+                                    },
+                                    "int23_siteid": {
+                                        "type": "string"
+                                    },
+                                    "int23_ticketnumber": {
+                                        "type": "string"
+                                    },
+                                    "modifiedon": {
+                                        "type": "string"
+                                    },
+                                    "statecode": {
+                                        "type": "integer"
+                                    },
+                                    "statuscode": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "type": "ParseJson"
+                    },
+                    "Parse_JSON_-_Canonical_Message": {
+                        "inputs": {
+                            "content": "@body('Transform_using_Data_Mapper_XSLT')",
+                            "schema": {
+                                "properties": {
+                                    "int23_address": {
+                                        "type": "string"
+                                    },
+                                    "int23_city": {
+                                        "type": "string"
+                                    },
+                                    "int23_emailaddress": {
+                                        "type": "string"
+                                    },
+                                    "int23_fullname": {
+                                        "type": "string"
+                                    },
+                                    "int23_issuedescription": {
+                                        "type": "string"
+                                    },
+                                    "int23_phonenumber": {
+                                        "type": "string"
+                                    },
+                                    "int23_siteid": {
+                                        "type": "string"
+                                    },
+                                    "int23_state": {
+                                        "type": "string"
+                                    },
+                                    "int23_ticketnumber": {
+                                        "type": "string"
+                                    },
+                                    "int23_workorderid": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "runAfter": {
+                            "Transform_using_Data_Mapper_XSLT": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "ParseJson"
+                    },
+                    "Parse_JSON_-_Customer_Record": {
+                        "inputs": {
+                            "content": "@first(body('List_rows_-_Select_Customer_Record')?['value'])",
+                            "schema": {
+                                "properties": {
+                                    "@@odata.etag": {
+                                        "type": "string"
+                                    },
+                                    "@@odata.id": {
+                                        "type": "string"
+                                    },
+                                    "ItemInternalId": {
+                                        "type": "string"
+                                    },
+                                    "_createdby_type": {
+                                        "type": "string"
+                                    },
+                                    "_createdby_value": {
+                                        "type": "string"
+                                    },
+                                    "_createdonbehalfby_value": {},
+                                    "_modifiedby_type": {
+                                        "type": "string"
+                                    },
+                                    "_modifiedby_value": {
+                                        "type": "string"
+                                    },
+                                    "_modifiedonbehalfby_value": {},
+                                    "_ownerid_type": {
+                                        "type": "string"
+                                    },
+                                    "_ownerid_value": {
+                                        "type": "string"
+                                    },
+                                    "_owningbusinessunit_type": {
+                                        "type": "string"
+                                    },
+                                    "_owningbusinessunit_value": {
+                                        "type": "string"
+                                    },
+                                    "_owningteam_value": {},
+                                    "_statecode_label": {
+                                        "type": "string"
+                                    },
+                                    "_statuscode_label": {
+                                        "type": "string"
+                                    },
+                                    "createdon": {
+                                        "type": "string"
+                                    },
+                                    "importsequencenumber": {},
+                                    "int23_address": {
+                                        "type": "string"
+                                    },
+                                    "int23_city": {
+                                        "type": "string"
+                                    },
+                                    "int23_cpl_customerid": {
+                                        "type": "string"
+                                    },
+                                    "int23_emailaddress": {
+                                        "type": "string"
+                                    },
+                                    "int23_name": {
+                                        "type": "string"
+                                    },
+                                    "int23_phonenumber": {
+                                        "type": "string"
+                                    },
+                                    "int23_siteid": {
+                                        "type": "string"
+                                    },
+                                    "int23_state": {
+                                        "type": "string"
+                                    },
+                                    "modifiedon": {
+                                        "type": "string"
+                                    },
+                                    "overriddencreatedon": {},
+                                    "statecode": {
+                                        "type": "integer"
+                                    },
+                                    "statuscode": {
+                                        "type": "integer"
+                                    },
+                                    "timezoneruleversionnumber": {},
+                                    "utcconversiontimezonecode": {},
+                                    "versionnumber": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "runAfter": {
+                            "List_rows_-_Select_Customer_Record": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ParseJson"
+                    },
+                    "Send_message": {
+                        "inputs": {
+                            "parameters": {
+                                "entityName": "workmanagement-ticketcreated-queue",
+                                "message": {
+                                    "contentData": "@body('Transform_using_Data_Mapper_XSLT')"
+                                }
+                            },
+                            "serviceProviderConfiguration": {
+                                "connectionName": "serviceBus",
+                                "operationId": "sendMessage",
+                                "serviceProviderId": "/serviceProviders/serviceBus"
+                            }
+                        },
+                        "runAfter": {
+                            "Parse_JSON_-_Canonical_Message": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "ServiceProvider"
+                    },
+                    "Transform_using_Data_Mapper_XSLT": {
+                        "inputs": {
+                            "content": "@outputs('Compose_-_Composite_message')",
+                            "map": {
+                                "name": "TicketCustomer-to-WorkOrder.xslt",
+                                "source": "LogicApp"
+                            },
+                            "transformedContentSchema": {
+                                "properties": {
+                                    "int23_address": {
+                                        "type": "string"
+                                    },
+                                    "int23_city": {
+                                        "type": "string"
+                                    },
+                                    "int23_emailaddress": {
+                                        "type": "string"
+                                    },
+                                    "int23_fullname": {
+                                        "type": "string"
+                                    },
+                                    "int23_issuedescription": {
+                                        "type": "string"
+                                    },
+                                    "int23_phonenumber": {
+                                        "type": "string"
+                                    },
+                                    "int23_siteid": {
+                                        "type": "string"
+                                    },
+                                    "int23_state": {
+                                        "type": "string"
+                                    },
+                                    "int23_ticketnumber": {
+                                        "type": "string"
+                                    },
+                                    "int23_workorderid": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "kind": "DataMapper",
+                        "runAfter": {
+                            "Compose_-_Composite_message": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "Xslt"
+                    }
+                },
+                "runAfter": {},
+                "type": "Scope"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "triggers": {
+            "When_a_row_is_added": {
+                "inputs": {
+                    "body": {
+                        "NotificationUrl": "@{listCallbackUrl()}"
+                    },
+                    "host": {
+                        "connection": {
+                            "referenceName": "commondataservice-1"
+                        }
+                    },
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent('https://org7a3fb188.crm.dynamics.com'))}/tables/@{encodeURIComponent(encodeURIComponent('int23_cpl_customertickets'))}/onnewitemswebhook",
+                    "queries": {
+                        "scope": "Organization"
+                    }
+                },
+                "type": "ApiConnectionWebhook"
+            }
+        }
+    },
+    "kind": "Stateful"
+}

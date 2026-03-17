@@ -1,0 +1,40 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Create_a_new_queue": {
+                "type": "ServiceProvider",
+                "inputs": {
+                    "parameters": {
+                        "queueName": "@newQueueName"
+                    },
+                    "serviceProviderConfiguration": {
+                        "connectionName": "azurequeues",
+                        "operationId": "putQueue",
+                        "serviceProviderId": "/serviceProviders/azurequeues"
+                    }
+                },
+                "runAfter": {}
+            }
+        },
+        "triggers": {
+            "When_messages_are_available_in_a_queue": {
+                "type": "ServiceProvider",
+                "inputs": {
+                    "parameters": {
+                        "queueName": "testqueue",
+                        "visibilityTimeout": "30"
+                    },
+                    "serviceProviderConfiguration": {
+                        "connectionName": "azurequeues",
+                        "operationId": "receiveQueueMessages",
+                        "serviceProviderId": "/serviceProviders/azurequeues"
+                    }
+                }
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {}
+    },
+    "kind": "Stateful"
+}

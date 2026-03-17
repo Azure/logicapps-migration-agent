@@ -1,0 +1,98 @@
+{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2024-03-31/trackingdefinitionschema.json#",
+    "description": "Tracking definition of Logic App POProcessing for order processing business process",
+    "businessProcess": {
+        "name": "OrderProcessingLongName !@#$%^&*()_charsnot supported in name 1234567890123456789012345678901234567890123456789012345678901234567890",
+        "version": "",
+        "correlationPropertyName": "OrderNumber"
+    },
+    "trackingDefinitions": {
+        "PurchaseOrder": {
+            "events": {
+                "Received": {
+                    "statuses": {
+                        "success": {
+                            "operationType": "trigger",
+                            "operationName": "manual",
+                            "properties": {
+                                "OrderNumber": "@trigger().outputs.body.OrderNumber",
+                                "Product": "@trigger().outputs.body.Product",
+                                "Quantity": "@trigger().outputs.body.Quantity",
+                                "State": "@trigger().outputsinvalid.body.Address.State",
+                                "City": "@action(Compose).inputs.OrderNumber()"
+                            }
+                        }
+                    }
+                },
+                "Processing": {
+                    "statuses": {
+                        "success": {
+                            "operationType": "action",
+                            "operationName": "ApprovedPO",
+                            "properties": {
+                                "OrderNumber": "@trigger().outputs.body.OrderNumber",
+                                "ApprovalStatus": "@action().inputs.ApprovalStatus",
+                                "ApproverName": "@action().inputs.ApproverName",
+                                "POAmount": "@action().inputs(invalid).POamount"
+                            }
+                        }
+                    }
+                },
+                "Den!ed": {
+                    "statuses": {
+                        "success": {
+                            "operationType": "action",
+                            "operationName": "OrderDenied",
+                            "properties": {
+                                "OrderNumber": "@trigger().outputs.body.OrderNumber"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "Fulfilment": {
+            "events": {
+                "@Shipped12345678901234567890123456789012345678901234567890123456789012345678901234567890": {
+                    "statuses": {
+                        "success": {
+                            "operationType": "trigger",
+                            "operationName": "When_a_HTTP_request_is_received",
+                            "properties": {
+                                "OrderNumber": "@action('Compose').inputs.OrderNumber(sanjiv)",
+                                "TrackingID": "@actions('Compose_2').inputs.TrackingID",
+                                "@ShipPrior!ty123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890": "@actions('Compose_2').inputs.Priority"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "Shipping": {
+            "events": {
+                "Completed": {
+                    "statuses": {
+                        "success": {
+                            "operationType": "action",
+                            "operationName": "Delivered",
+                            "properties": {
+                                "OrderNumber": "@action().inputs"
+                            }
+                        }
+                    }
+                },
+                "ErrorEvent": {
+                    "statuses": {
+                        "success": {
+                            "operationType": "notSpecified",
+                            "operationName": "Delivered",
+                            "properties": {
+                                "OrderNumber": "@action().inputs"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

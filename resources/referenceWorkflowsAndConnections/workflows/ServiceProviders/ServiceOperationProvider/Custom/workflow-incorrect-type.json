@@ -1,0 +1,56 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Send_event": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "serviceProviderConfiguration": {
+            "serviceProviderId": "serviceProvider/eventhub",
+            "operationId": "SendEvent",
+            "incorrectType": "hola",
+            "connectionName": "eventHubConnectionString"
+          },
+          "parameters": {
+            "eventHubName": "send",
+            "eventData": {
+              "contentData": "HOLA"
+            }
+          }
+        },
+        "runAfter": {}
+      },
+      "Compose": {
+        "type": "compose",
+        "runAfter": {
+          "Send_event": [
+            "Succeeded"
+          ]
+        },
+        "inputs": "@body('Send_event')"
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('compose')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "Compose": [ "Succeeded" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

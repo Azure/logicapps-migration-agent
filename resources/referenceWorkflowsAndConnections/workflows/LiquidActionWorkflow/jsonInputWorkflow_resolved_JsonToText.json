@@ -1,0 +1,43 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Liquid": {
+        "type": "liquid",
+        "kind": "JsonToText",
+        "runAfter": {},
+        "inputs": {
+          "content": {
+            "firstName": "Rama Krishna",
+            "lastName": "Rayudu",
+            "phone": "(917)7025448",
+            "devices": "laptop, Windows Phone, Desktop computer, monitors"
+          },
+          "map": { "name": "SimpleJsonToTextTemplate.liquid" }
+        }
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('liquid')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "Liquid": [ "Succeeded" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

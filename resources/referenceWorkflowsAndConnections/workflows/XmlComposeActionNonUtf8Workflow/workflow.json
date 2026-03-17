@@ -1,0 +1,63 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "XmlCompose": {
+        "type": "xmlCompose",
+        "runAfter": {},
+        "inputs": {
+          "schema": {
+            "source": "LogicApp",
+            "name": "schPIPointInternal_MS.xsd"
+          },
+          "xmlWriterSettings": {
+            "encoding": "iso-2022-jp"
+          },
+          "content": {
+            "Name": "pointee",
+            "PointValue": [
+              {
+                "Value": "1",
+                "Timestamp": "08-29-2024 00:00:00-07:00",
+                "Unit": "日unity"
+              }
+            ]
+          },
+          "DateTimeFormat": "yyyy-MM-ddTHH:mm:ss.fffK"
+        }
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('XmlCompose')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "XmlCompose": [ "Succeeded" ] },
+        "type": "Response"
+      },
+      "ResponseFailed": {
+        "inputs": {
+          "body": {
+            "value": "@actions('XmlCompose')"
+          },
+          "statusCode": 400
+        },
+        "runAfter": { "XmlCompose": [ "Failed" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

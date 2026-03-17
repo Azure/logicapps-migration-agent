@@ -1,0 +1,91 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "For_each": {
+        "type": "Foreach",
+        "foreach": "@triggerOutputs()?['body']",
+        "runAfter": {},
+        "actions": {
+          "Defer_Message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "messageId": "@item()?['messageId']"
+                @lockTokenDeferParam
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "deferMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {}
+          },
+          "Get_Deferred_Message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "queueName": "ServiceBuscit",
+                "sessionId": "@item()?['sessionId']",
+                "sequenceNumber": "@item()?['sequenceNumber']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "getDeferredMessageFromQueueSession",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {
+              "Defer_Message": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Complete_the_message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "messageId": "@body('Get_deferred_message')?['messageId']"
+                @lockTokenCompleteParam
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "completeMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {
+              "Get_Deferred_Message": [
+                "Succeeded"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "triggers": {
+      "When_messages_are_available_in_a_Service_Bus_queue_Session(peek-lock)": {
+        "type": "ServiceProvider",
+        "kind": "Polling",
+        "recurrence": {
+          "frequency": "Second",
+          "interval": 1
+        },
+        "inputs": {
+          "parameters": {
+            "queueName": "ServiceBuscit"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "onNewMessagesFromQueueSession",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateless"
+}

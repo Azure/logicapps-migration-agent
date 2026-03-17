@@ -1,0 +1,60 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Send_Multiple_Messages": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "entityName": "demo",
+            "messages": [
+              {
+                "contentData": "@triggerBody()"
+              },
+              {
+                "contentData": "messageContent2"
+              }
+            ]
+          },
+          "serviceProviderConfiguration": {
+            "serviceProviderId": "/serviceProviders/serviceBus",
+            "operationId": "sendMessages",
+            "connectionName": "serviceBusConnection"
+          }
+        },
+        "runAfter": {}
+      },
+      "Compose": {
+        "type": "compose",
+        "runAfter": {
+          "Send_Multiple_Messages": [
+            "Succeeded"
+          ]
+        },
+        "inputs": "@body('Send_Multiple_Messages')"
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('compose')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "Compose": [ "Succeeded" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

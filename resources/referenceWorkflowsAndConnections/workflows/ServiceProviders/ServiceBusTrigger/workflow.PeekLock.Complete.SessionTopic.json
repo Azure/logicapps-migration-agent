@@ -1,0 +1,123 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Close_a_topic_session": {
+        "inputs": {
+          "parameters": {
+            "sessionId": "@triggerBody()?['sessionId']",
+            "topicName": "ServiceBuscit",
+            "subscriptionName": "subscription"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "closeTopicSession",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Renew_a_topic_session": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "ServiceProvider"
+      },
+      "Complete_the_message": {
+        "inputs": {
+          "parameters": {
+            "messageId": "@triggerBody()?['messageId']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "completeMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {},
+        "type": "ServiceProvider"
+      },
+      "Complete_the_message_1": {
+        "inputs": {
+          "parameters": {
+            "messageId": "@body('Get_messages_from_a_topic_session')?[0]['messageId']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "completeMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Get_messages_from_a_topic_session": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "ServiceProvider"
+      },
+      "Get_messages_from_a_topic_session": {
+        "inputs": {
+          "parameters": {
+            "sessionId": "@triggerBody()?['sessionId']",
+            "topicName": "ServiceBuscit",
+            "subscriptionName": "subscription"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "getMessagesFromTopicSession",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Complete_the_message": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "ServiceProvider"
+      },
+      "Renew_a_topic_session": {
+        "inputs": {
+          "parameters": {
+            "sessionId": "@triggerBody()?['sessionId']",
+            "topicName": "ServiceBuscit",
+            "subscriptionName": "subscription"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "renewTopicSession",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Complete_the_message_1": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "ServiceProvider"
+      }
+    },
+    "triggers": {
+      "On_single_new_message_from_topic_session": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "topicName": "ServiceBuscit",
+            "subscriptionName": "subscription"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "onSingleNewMessageFromTopicSession",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "kind": "Polling",
+        "recurrence": {
+          "frequency": "Second",
+          "interval": 1
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "stateKindPlaceholder"
+}

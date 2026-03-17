@@ -1,0 +1,40 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Get_file_or_directory_metadata": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "fileOrFolderPath": "@triggerBody()?['path']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Sftp",
+            "operationId": "getMetadata",
+            "serviceProviderId": "/serviceProviders/Sftp"
+          }
+        },
+        "runAfter": {}
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

@@ -1,0 +1,49 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Response": {
+                "type": "Response",
+                "kind": "Http",
+                "inputs": {
+                    "statusCode": 200
+                },
+                "runAfter":{
+                    "Send_Messages_To_Kafka_Topic": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Send_Messages_To_Kafka_Topic": {
+                "type": "ServiceProvider",
+                "inputs": {
+                    "parameters": {
+                        "TopicName": "topic_0011",
+                        "Message": "message",
+                        "Key": "key01",
+                        "Headers": {
+                            "X-Custom-Header": "HeaderValue01",
+                            "Authorization": "token-value01"
+                        }
+                    },
+                    "serviceProviderConfiguration": {
+                        "serviceProviderId": "/serviceProviders/confluentKafka",
+                        "connectionName": "confluentKafka",
+                        "operationId": "SendMessage"
+                    }
+                },
+                "runAfter": {}
+            }
+        },
+        "triggers": {
+            "manual": {
+                "type": "Request",
+                "kind": "Http",
+                "inputs": {}
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {}
+    },
+    "kind": "Stateful"
+}

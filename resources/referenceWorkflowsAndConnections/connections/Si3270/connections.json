@@ -1,0 +1,17 @@
+{
+  "serviceProviderConnections": {
+    "si3270": {
+      "parameterValues": {
+        "codePage": "@appsetting('si3270_codePage')",
+        "timeout": "@appsetting('si3270_timeout')",
+        "serverName": "@appsetting('si3270_serverName')",
+        "logExceptionScreens": "@appsetting('si3270_logExceptionScreens')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/si3270"
+      },
+      "displayName": "mainframe_37"
+    }
+  },
+  "managedApiConnections": {}
+}

@@ -1,0 +1,63 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Send_Email": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "from": "smtp_username",
+            "to": "smtp_username",
+            "cc": "smtp_username",
+            "subject": "Test Email With Attachments",
+            "isHTML":  true,
+            "body": "<html><h1>Testing html</h1><p>This is an html body</p></html>",
+            "attachment": [
+              {
+                "fileName": "Test.txt",
+                "contentData": "[72,101,108,108,111]",
+                "contentType": "text/plain",
+                "contentId":  "1"
+              },
+              {
+                "fileName": "Test2.txt",
+                "contentData": "[65,110,111,116,104,97,32,79,110,101,33]"
+              }
+            ]
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Smtp",
+            "operationId": "sendEmail",
+            "serviceProviderId": "/serviceProviders/Smtp"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": {
+            "content": "Hello World"
+          }
+        },
+        "runAfter": {
+          "Send_Email": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

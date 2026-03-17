@@ -1,0 +1,65 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Publish_Event": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "events": [
+              {
+                "id": "831e1650-001e-001b-66ab-eeb76e069631",
+                "subject": "EventSubject",
+                "eventType": "EventGridEvent",
+                "data": {
+                  "test": "2020-06-19T12:54:40.100Z"
+                },
+                "eventTime": "2020-06-19T12:54:40.100Z"
+              },
+              {
+                "id": "831e1650-001e-001b-66ab-eeb76e069632",
+                "subject": "EventSubject2",
+                "eventType": "EventGridEvent2",
+                "data": {
+                  "test": "2020-06-19T12:54:40.000Z",
+                  "contentType": "application/json"
+                }
+              }
+            ]
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "eventGridPublisherConnectionString",
+            "operationId": "publishEvents",
+            "serviceProviderId": "/serviceProviders/eventGridPublisher"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": {
+            "content": "Hello World"
+          }
+        },
+        "runAfter": {
+          "Publish_Event": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

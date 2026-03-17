@@ -1,0 +1,34 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Get_Job_Output": {
+        "inputs": {
+          "parameters": {
+            "automationAccount": "LogicAppsUnitTests",
+            "jobId": "@JobId",
+            "resourceGroup": "AzureAutomationTestResources",
+            "subscriptionId": "182f1b53-b50e-47d0-b2c4-7ee918137a99"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Automation",
+            "operationId": "getJobOutput",
+            "serviceProviderId": "/serviceProviders/azureAutomation"
+          }
+        },
+        "runAfter": {},
+        "type": "ServiceProvider"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "inputs": {},
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

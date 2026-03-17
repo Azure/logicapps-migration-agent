@@ -1,0 +1,62 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "GetMessages": {
+        "inputs": {
+          "parameters": {
+            "queueName": "ServiceBuscit"
+          },
+          "serviceProviderConfiguration": {
+            "serviceProviderId": "/serviceProviders/customApi",
+            "operationId": "getmessages",
+            "connectionName": "serviceBusConnectionString"
+          }
+        },
+        "type": "ServiceProvider",
+        "runAfter": {}
+      },
+    "CompleteMessages": {
+      "inputs": {
+        "parameters": {
+          "entityName": "ServiceBuscit",
+          "guid": "@body('GetMessages')['body']['transactionId']"
+        },
+        "serviceProviderConfiguration": {
+          "serviceProviderId": "/serviceProviders/customApi",
+          "operationId": "completeMessages",
+          "connectionName": "serviceBusConnectionString"
+        }
+      },
+      "type": "ServiceProvider",
+      "runAfter": {
+        "GetMessages": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('CompleteMessages')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "CompleteMessages": [ "Succeeded" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

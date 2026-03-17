@@ -1,0 +1,41 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Delay": {
+                "type": "Wait",
+                "inputs": {
+                    "interval": {
+                        "count": "{{WaitTimeInSecondsPlaceHolder}}",
+                        "unit": "Second"
+                    }
+                },
+                "runAfter": {}
+            },
+            "Response": {
+                "inputs": {
+                    "body": {
+                        "value": "Some Response Body After successful wait execution."
+                    },
+                    "statusCode": 200
+                },
+                "runAfter": { "Delay": ["Succeeded"] },
+                "type": "Response",
+                "kind": "http",
+                "operationOptions": "Asynchronous"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {},
+        "triggers": {
+            "manual": {
+                "inputs": {
+                    "schema": {}
+                },
+                "kind": "Http",
+                "type": "Request"
+            }
+        }
+    }
+}

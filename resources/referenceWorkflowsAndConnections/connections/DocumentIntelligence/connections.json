@@ -1,0 +1,39 @@
+{
+  "serviceProviderConnections": {
+    "blobStorageConnection": {
+      "parameterValues": {
+        "connectionString": "@appsetting('blobStorageConnectionString')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/azureBlob"
+      }
+    },
+    "docIntelligence": {
+      "parameterSetName": "KeyAndEndpointConnection",
+      "parameterValues": {
+        "documentIntelligenceEndpoint": "@appsetting('documentIntelligenceEndpoint')",
+        "documentIntelligenceKey": "@appsetting('documentIntelligenceKey')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/documentIntelligence"
+      }
+    },
+    "docIntelligenceAAD": {
+      "parameterSetName": "ActiveDirectoryOAuth",
+      "parameterValues": {
+        "documentIntelligenceEndpoint": "@appsetting('documentIntelligenceEndpoint')",
+        "authProvider": {
+          "ClientId": "@appsetting('documentIntelligenceClientId')",
+          "CredentialType": "Certificate",
+          "Pfx": "@appsetting('documentIntelligenceClientCertPfx')",
+          "Tenant": "@appsetting('documentIntelligenceTenantId')",
+          "Type": "ActiveDirectoryOAuth",
+          "Password":  ""
+        }
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/documentIntelligence"
+      }
+    }
+  }
+}

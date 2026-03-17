@@ -1,0 +1,63 @@
+{
+  "managedApiConnections": {},
+  "serviceProviderConnections": {
+    "SapSncNoPwdWithMessageServer": {
+      "displayName": "SapConnection",
+      "parameterValues": {
+        "authenticationType": "Snc",
+        "client": "100",
+        "logonType": "MessageServer",
+        "messageServerHost": "10.0.1.4",
+        "messageServerLogonGroup": "FICO",
+        "messageServerPort": "3601",
+        "messageServerSystemId": "DV3",
+        "password": "@appsetting('pwd')",
+        "sncCertificate": "",
+        "sncPartnerName": "",
+        "sncQop": "Authentication",
+        "sncSso": "On"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/sap"
+      }
+    },
+    "SapSncUNamePwdWithMessageServer": {
+      "displayName": "SapConnection",
+      "parameterValues": {
+        "authenticationType": "Snc",
+        "client": "100",
+        "logonType": "MessageServer",
+        "messageServerHost": "10.0.1.4",
+        "messageServerLogonGroup": "FICO",
+        "messageServerPort": "3601",
+        "messageServerSystemId": "DV3",
+        "password": "@appsetting('pwd')",
+        "sncPartnerName": "",
+        "sncPassword": "",
+        "sncQop": "Authentication",
+        "sncSso": "Off",
+        "sncUserName": "LACloudTest"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/sap"
+      }
+    },
+    "sap": {
+      "displayName": "Trigger",
+      "parameterValues": {
+        "applicationServerHost": "10.0.1.4",
+        "applicationServerService": "3200",
+        "applicationServerSystemNumber": "00",
+        "authenticationType": "Basic",
+        "client": "100",
+        "language": "",
+        "logonType": "ApplicationServer",
+        "password": "@appsetting('pwd')",
+        "userName": ""
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/sap"
+      }
+    }
+  }
+}

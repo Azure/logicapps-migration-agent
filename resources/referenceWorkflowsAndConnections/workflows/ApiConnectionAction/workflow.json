@@ -1,0 +1,57 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Read_a_resource_group": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {
+              "referenceName": "arm"
+            }
+          },
+          "method": "get",
+          "path": "/subscriptions/@{encodeURIComponent('f34b22a3-2202-4fb1-b040-1332bd928c84')}/resourcegroups/@{encodeURIComponent('npathakrg')}",
+          "queries": {
+            "x-ms-api-version": "2016-06-01"
+          }
+        },
+        "runAfter": {}
+      },
+      "Compose": {
+        "type": "Compose",
+        "inputs": "@{body('Read_a_resource_group')?['name']}\n@{body('Read_a_resource_group')?['properties']}\n@{body('Read_a_resource_group')?['properties']?['provisioningState']}",
+        "runAfter": {
+          "Read_a_resource_group": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@outputs('Compose')"
+        },
+        "runAfter": {
+          "Compose": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {}
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

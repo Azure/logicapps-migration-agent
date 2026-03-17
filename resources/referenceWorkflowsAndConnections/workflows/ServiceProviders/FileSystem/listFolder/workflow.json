@@ -1,0 +1,47 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Lists_files_in_a_folder": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "folderPath": "LogicAppStandardTests/testfolder",
+            "enableRecursiveListing": "True"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "FileSystem",
+            "operationId": "listFolder",
+            "serviceProviderId": "/serviceProviders/FileSystem"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": {
+            "body": "@body('Lists_files_in_a_folder')"
+          }
+        },
+        "runAfter": {
+          "Lists_files_in_a_folder": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

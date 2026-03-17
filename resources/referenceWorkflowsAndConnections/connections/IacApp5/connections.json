@@ -1,0 +1,62 @@
+{
+  "managedApiConnections": {
+    "msnweather": {
+      "api": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/providers/Microsoft.Web/locations/@{appsetting('WORKFLOWS_LOCATION_NAME')}/managedApis/msnweather"
+      },
+      "connection": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.Web/connections/msnweather"
+      },
+      "connectionRuntimeUrl": "@parameters('msnweather-ConnectionRuntimeUrl')",
+      "authentication": "@parameters('msnweather-Authentication')"
+    },
+    "keyvault": {
+      "api": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/providers/Microsoft.Web/locations/@{appsetting('WORKFLOWS_LOCATION_NAME')}/managedApis/keyvault"
+      },
+      "connection": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.Web/connections/keyvault"
+      },
+      "connectionRuntimeUrl": "@parameters('keyvault-ConnectionRuntimeUrl')",
+      "authentication": "@parameters('keyvault-Authentication')"
+    },
+    "keyvault-6": {
+      "api": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/providers/Microsoft.Web/locations/@{appsetting('WORKFLOWS_LOCATION_NAME')}/managedApis/keyvault"
+      },
+      "connection": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.Web/connections/keyvault-4"
+      },
+      "connectionRuntimeUrl": "@parameters('keyvault-6-ConnectionRuntimeUrl')",
+      "authentication": "@parameters('keyvault-6-Authentication')"
+    }
+  },
+  "serviceProviderConnections": {
+    "keyVault": {
+      "parameterValues": {
+        "VaultUri": "@appsetting('keyVault_VaultUri')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        }
+      },
+      "parameterSetName": "ManagedServiceIdentity",
+      "serviceProvider": {
+        "id": "/serviceProviders/keyVault"
+      },
+      "displayName": "somekvconnection"
+    },
+    "keyVault-2": {
+      "parameterValues": {
+        "VaultUri": "@appsetting('keyVault_12_VaultUri')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        }
+      },
+      "parameterSetName": "ManagedServiceIdentity",
+      "serviceProvider": {
+        "id": "/serviceProviders/keyVault"
+      },
+      "displayName": "somekvconnection2"
+    }
+  }
+}

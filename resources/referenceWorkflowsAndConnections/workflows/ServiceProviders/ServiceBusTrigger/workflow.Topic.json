@@ -1,0 +1,32 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Compose": {
+        "inputs": "@triggerBody()",
+        "runAfter": {},
+        "type": "Compose"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "receive_event_from_servicebusqueue": {
+        "inputs": {
+          "parameters": {
+            "topicName": "ServiceBuscit",
+            "subscriptionName": "subscription",
+            "maxMessageBatchSize": 2
+          },
+          "serviceProviderConfiguration": {
+            "serviceProviderId": "/serviceProviders/serviceBus",
+            "operationId": "ReceiveTopicMessages",
+            "connectionName": "serviceBusConnectionString"
+          }
+        },
+        "type": "ServiceProvider"
+      }
+    }
+  }
+}

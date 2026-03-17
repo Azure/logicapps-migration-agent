@@ -1,0 +1,49 @@
+{
+  "managedApiConnections": {
+    "arm": {
+      "api": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/providers/Microsoft.Web/locations/@{appsetting('WORKFLOWS_LOCATION_NAME')}/managedApis/arm"
+      },
+      "connection": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.Web/connections/armConnectionV2"
+      },
+      "connectionRuntimeUrl": "@appsetting('connectionRuntimeUrl')",
+      "authentication": "@appsetting('key1')"
+    },
+    "msnweather": {
+      "api": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/providers/Microsoft.Web/locations/@{appsetting('WORKFLOWS_LOCATION_NAME')}/managedApis/msnweather"
+      },
+      "connection": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.Web/connections/msnweather"
+      },
+      "connectionRuntimeUrl": "@appsetting('connectionRuntimeUrl')",
+      "authentication": "@appsetting('key1')"
+    }
+  },
+  "functionConnections": {
+    "azureFunctionOperation": {
+      "function": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourcegroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.Web/sites/logicappsunittest/functions/HttpTrigger1"
+      },
+      "triggerUrl": "FunctionTriggerUrlPlaceholder",
+      "authentication": {
+        "type": "QueryString",
+        "name": "Code",
+        "value": "@appsetting('azureFunctionOperation-functionAppKey')"
+      },
+      "displayName": "function connection"
+    }
+  },
+  "serviceProviderConnections": {
+    "eventGridPublisherConnectionString": {
+      "parameterValues": {
+        "topicEndpoint": "@appsetting('EventGridPublisher_topicEndpoint')",
+        "accessKey": "fakeval"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/eventGridPublisher"
+      }
+    }
+  }
+}

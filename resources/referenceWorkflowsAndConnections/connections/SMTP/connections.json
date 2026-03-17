@@ -1,0 +1,16 @@
+{
+  "serviceProviderConnections": {
+    "Smtp": {
+      "parameterValues": {
+        "serverAddress": "@appsetting('Smtp_serverAddress')",
+        "username": "@appsetting('Smtp_username')",
+        "password": "@appsetting('Smtp_password')",
+        "port": "@appsetting('Smtp_port')",
+        "enableSSL": "@appsetting('Smtp_enableSSL')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/Smtp"
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "serviceProviderConnections": {
+    "rabbitmq": {
+      "parameterValues": {
+        "connectionString": "@appsetting('RabbitMQConnectionString')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/rabbitmq"
+      },
+      "displayName": "Test"
+    }
+  }
+}

@@ -1,0 +1,96 @@
+{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2024-03-31/trackingdefinitionschema.json#",
+    "businessProcess": {
+        "name": "OrderProcessingLongName !@#$%^&*()_charsnot supported in name 1234567890123456789012345678901234567890123456789012345678901234567890",
+        "version": "",
+        "correlationPropertyName": "OrderNumber"
+    },
+    "trackingDefinitions": {
+        "PurchaseOrder": {
+            "events": {
+                "Received": {
+                    "statuses": {
+                        "success": {
+                            "operationType": "trigger",
+                            "operationName": "manual",
+                            "properties": {
+                                "Product": "@trigger().outputs.body.Product",
+                                "Quantity": "@trigger().outputs.body.Quantity",
+                                "State": "@trigger().outputsinvalid.body.Address.State",
+                                "City": "@action(Compose).inputs.OrderNumber()"
+                            }
+                        }
+                    }
+                },
+                "Processing": {
+                    "statuses": {
+                        "success": {
+                            "operationType": "action",
+                            "operationName": "ApprovedPO",
+                            "properties": {
+                                "ApprovalStatus": "@action().inputs.ApprovalStatus",
+                                "ApproverName": "@action().inputs.ApproverName",
+                                "POAmount": "@action().inputs(invalid).POamount",
+                                "WrongResultUse": "@result('Assign_POAmount')"
+                            }
+                        }
+                    }
+                },
+                "Den!ed": {
+                    "statuses": {
+                        "success": {
+                            "operationType": "action",
+                            "operationName": "OrderDenied",
+                            "properties": {
+                                "OrderNumber": "@action().inputs.OrderNumber"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "Fulfilment": {
+            "events": {
+                "@Shipped12345678901234567890123456789012345678901234567890123456789012345678901234567890": {
+                    "statuses": {
+                        "success": {
+                            "operationType": "trigger",
+                            "operationName": "When_a_HTTP_request_is_received",
+                            "properties": {
+                                "OrderNumber": "@action().inputs.OrderNumber(sanjiv)",
+                                "TrackingID": "@actions('Compose_2').inputs.TrackingID",
+                                "@ShipPrior!ty123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890": "@actions('Compose_2').inputs.Priority"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "Shipping": {
+            "events": {
+                "Completed": {
+                    "statuses": {
+                        "success": {
+                            "operationType": "action",
+                            "operationName": "Delivered",
+                            "properties": {
+                                "OrderNumber": "@action().inputs"
+                            }
+                        }
+                    }
+                },
+                "ErrorEvent": {
+                    "statuses": {
+                        "failure": {
+                            "operationType": "action",
+                            "operationName": "Delivered",
+                            "properties": {
+                                "OrderNumber": "@action().inputs.OrderNumber"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

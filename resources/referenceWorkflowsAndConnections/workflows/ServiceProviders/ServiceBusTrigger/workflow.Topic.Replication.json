@@ -1,0 +1,42 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Replicate_messages": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "entityName": "destinationQueue",
+            "context": "@{triggerBody()?['context']}",
+            "skipAlreadyReplicated": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "replicateMessages",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {}
+      }
+    },
+    "triggers": {
+      "When_messages_are_available_in_a_topic_subscription_for_replication": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "topicName": "source",
+            "subscriptionName": "subscription"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "receiveTopicMessagesForReplication",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateless"
+}

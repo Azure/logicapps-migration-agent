@@ -1,0 +1,171 @@
+{
+  "id": "/subscriptions/f34b22a3-2202-4fb1-b040-1332bd928c84/resourceGroups/IgniteExportConsumption/providers/Microsoft.Logic/workflows/ConsumptionLogicApp",
+  "location": "westus",
+  "name": "ConsumptionLogicApp",
+  "properties": {
+    "accessEndpoint": "https://prod-125.westus.logic.azure.com:443/workflows/26addab3c3d94ff595579cb39d0040ea",
+    "changedTime": "2021-10-20T01:11:07.7272776Z",
+    "createdTime": "2021-10-19T22:48:29.1649956Z",
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "actions": {
+        "For_each_item_in_the_order_": {
+          "actions": {
+            "Condition": {
+              "actions": {
+                "Order_Accepted": {
+                  "inputs": {
+                    "body": {
+                      "Body": "<p>@{body('Update_Order_Table_')?['name']}</p>",
+                      "Subject": "order @{body('Update_Order_Table_')?['number2']}",
+                      "To": "admin@adminemailaccount.com"
+                    },
+                    "host": { "connection": { "name": "@parameters('$connections')['office365']['connectionId']" } },
+                    "method": "post",
+                    "path": "/v2/Mail"
+                  },
+                  "runAfter": {},
+                  "type": "ApiConnection"
+                }
+              },
+              "else": {
+                "actions": {
+                  "Order_rejected_": {
+                    "inputs": {
+                      "body": {
+                        "Body": "<p>More stock needed!</p>",
+                        "Subject": "We need more stock for @{body('Update_Order_Table_')?['item']}",
+                        "To": "admin@adminemailaccount.com"
+                      },
+                      "host": { "connection": { "name": "@parameters('$connections')['office365']['connectionId']" } },
+                      "method": "post",
+                      "path": "/v2/Mail"
+                    },
+                    "runAfter": {},
+                    "type": "ApiConnection"
+                  }
+                }
+              },
+              "expression": { "and": [ { "less": [ "@body('Update_Order_Table_')?['quantity']", 100 ] } ] },
+              "runAfter": { "Update_Order_Table_": [ "Succeeded" ] },
+              "type": "If"
+            },
+            "Update_Order_Table_": {
+              "inputs": {
+                "body": {
+                  "OrderID": 2,
+                  "address": "blah",
+                  "item": "Coffee",
+                  "name": "Heynow",
+                  "number": "1",
+                  "quantity": 20
+                },
+                "host": { "connection": { "name": "@parameters('$connections')['sql']['connectionId']" } },
+                "method": "post",
+                "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('default'))},@{encodeURIComponent(encodeURIComponent('default'))}/tables/@{encodeURIComponent(encodeURIComponent('[dbo].[OrdersTable]'))}/items"
+              },
+              "runAfter": {},
+              "type": "ApiConnection"
+            }
+          },
+          "foreach": "@triggerBody()?['ItemArray']",
+          "runAfter": {},
+          "type": "Foreach"
+        },
+        "Response": {
+          "inputs": { "statusCode": 200 },
+          "kind": "Http",
+          "runAfter": { "For_each_item_in_the_order_": [ "Succeeded" ] },
+          "type": "Response"
+        }
+      },
+      "contentVersion": "1.0.0.0",
+      "outputs": {},
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "inputs": {
+            "schema": {
+              "properties": {
+                "ItemArray": {
+                  "items": {
+                    "properties": { "item": { "type": "string" } },
+                    "required": [ "item" ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "kind": "Http",
+          "type": "Request"
+        }
+      }
+    },
+    "endpointsConfiguration": {
+      "connector": {
+        "outgoingIpAddresses": [
+          { "address": "13.93.148.62" },
+          { "address": "104.42.122.49" },
+          { "address": "40.112.195.87" },
+          { "address": "13.86.223.32/27" },
+          { "address": "40.112.243.160/28" },
+          { "address": "20.59.77.0/27" },
+          { "address": "20.66.6.112/28" }
+        ]
+      },
+      "workflow": {
+        "accessEndpointIpAddresses": [
+          { "address": "52.160.90.237" },
+          { "address": "138.91.188.137" },
+          { "address": "13.91.252.184" },
+          { "address": "157.56.160.212" }
+        ],
+        "outgoingIpAddresses": [
+          { "address": "52.160.92.112" },
+          { "address": "40.118.244.241" },
+          { "address": "40.118.241.243" },
+          { "address": "157.56.162.53" },
+          { "address": "157.56.167.147" },
+          { "address": "104.42.49.145" },
+          { "address": "40.83.164.80" },
+          { "address": "104.42.38.32" },
+          { "address": "13.86.223.0" },
+          { "address": "13.86.223.1" },
+          { "address": "13.86.223.2" },
+          { "address": "13.86.223.3" },
+          { "address": "13.86.223.4" },
+          { "address": "13.86.223.5" }
+        ]
+      }
+    },
+    "parameters": {
+      "$connections": {
+        "value": {
+          "office365": {
+            "connectionId": "/subscriptions/f34b22a3-2202-4fb1-b040-1332bd928c84/resourceGroups/IgniteExportConsumption/providers/Microsoft.Web/connections/office365",
+            "connectionName": "office365",
+            "id": "/subscriptions/f34b22a3-2202-4fb1-b040-1332bd928c84/providers/Microsoft.Web/locations/westus/managedApis/office365"
+          },
+          "sql": {
+            "connectionId": "/subscriptions/f34b22a3-2202-4fb1-b040-1332bd928c84/resourceGroups/IgniteExportConsumption/providers/Microsoft.Web/connections/sql",
+            "connectionName": "sql",
+            "id": "/subscriptions/f34b22a3-2202-4fb1-b040-1332bd928c84/providers/Microsoft.Web/locations/westus/managedApis/sql"
+          }
+        }
+      }
+    },
+    "provisioningState": "Succeeded",
+    "state": "Enabled",
+    "version": "08585669146177532121"
+  },
+  "tags": {},
+  "type": "Microsoft.Logic/workflows"
+}

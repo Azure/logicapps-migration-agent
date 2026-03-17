@@ -1,0 +1,32 @@
+{
+  "metadata": {
+    "automationTaskConfiguration": {
+      "templateId": "someID",
+      "managedBy":  "someId"
+    }
+  },
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Response": {
+        "inputs": {
+          "statusCode": 200
+        },
+        "kind": "http",
+        "operationOptions": "Asynchronous",
+        "runAfter": {},
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "inputs": {},
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

@@ -1,0 +1,15 @@
+{
+  "managedApiConnections": {},
+  "serviceProviderConnections": {
+    "sql-1": {
+      "displayName": "ishankconstr",
+      "parameterSetName": "connectionString",
+      "parameterValues": {
+        "connectionString": "@appsetting('sql_11_connectionString')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/sql"
+      }
+    }
+  }
+}

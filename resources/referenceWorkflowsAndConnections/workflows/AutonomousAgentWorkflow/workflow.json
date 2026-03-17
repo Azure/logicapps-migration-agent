@@ -1,0 +1,152 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Agent_Loop": {
+        "type": "Agent",
+        "runAfter": {},
+        "limit": {
+          "timeout": "PT1H",
+          "count": 100
+        },
+        "inputs": {
+          "parameters": {
+            "deploymentId": "gpt-5",
+            "agentModelType": "AzureOpenAI",
+            "messages": [
+              {
+                "role": "System",
+                "content": "You are a helpful assistant that can perform tasks for users. You have access to tools to get the current time and perform calculations. Always be helpful and use the tools when appropriate. When a user asks you a question, use the available tools to help answer it. After completing a task, summarize what you did."
+              },
+              {
+                "role": "User",
+                "content": "@{triggerBody()?['question']}"
+              }
+            ],
+            "agentModelSettings": {
+              "deploymentModelProperties": {
+                "name": "gpt-5"
+              }
+            }
+          },
+          "modelConfigurations": {
+            "model1": {
+              "referenceName": "agentConnection1"
+            }
+          }
+        },
+        "tools": {
+          "get_current_time": {
+            "description": "Gets the current date and time in UTC format. Use this when users ask about the current time or date.",
+            "agentParameterSchema": {
+              "type": "object",
+              "properties": {}
+            },
+            "actions": {
+              "Get_Time": {
+                "type": "Compose",
+                "inputs": {
+                  "currentTime": "@utcNow()",
+                  "formattedTime": "@formatDateTime(utcNow(), 'yyyy-MM-dd HH:mm:ss')",
+                  "timezone": "UTC"
+                }
+              }
+            }
+          },
+          "calculate": {
+            "description": "Performs basic arithmetic calculations. Supports addition, subtraction, multiplication, and division.",
+            "agentParameterSchema": {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "description": "The operation to perform: add, subtract, multiply, or divide"
+                },
+                "num1": {
+                  "type": "number",
+                  "description": "The first number"
+                },
+                "num2": {
+                  "type": "number",
+                  "description": "The second number"
+                }
+              },
+              "required": ["operation", "num1", "num2"]
+            },
+            "actions": {
+              "Calculate_Result": {
+                "type": "Compose",
+                "inputs": {
+                  "operation": "@agentparameters('operation')",
+                  "num1": "@agentparameters('num1')",
+                  "num2": "@agentparameters('num2')",
+                  "result": "@if(equals(agentparameters('operation'), 'add'), add(agentparameters('num1'), agentparameters('num2')), if(equals(agentparameters('operation'), 'subtract'), sub(agentparameters('num1'), agentparameters('num2')), if(equals(agentparameters('operation'), 'multiply'), mul(agentparameters('num1'), agentparameters('num2')), if(equals(agentparameters('operation'), 'divide'), div(agentparameters('num1'), agentparameters('num2')), 'Unknown operation'))))"
+                }
+              }
+            }
+          },
+          "echo_message": {
+            "description": "Echoes back a message with some additional context. Useful for testing or confirmation.",
+            "agentParameterSchema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "The message to echo back"
+                }
+              },
+              "required": ["message"]
+            },
+            "actions": {
+              "Echo": {
+                "type": "Compose",
+                "inputs": {
+                  "echoedMessage": "@agentparameters('message')",
+                  "timestamp": "@utcNow()",
+                  "status": "Message received and echoed successfully"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Response": {
+        "type": "Response",
+        "runAfter": {
+          "Agent_Loop": ["Succeeded"]
+        },
+        "inputs": {
+          "statusCode": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "answer": "@{outputs('Agent_Loop')?['LastAssistantMessage']}",
+            "runId": "@workflow()['run']['name']"
+          }
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "When_a_HTTP_request_is_received": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "question": {
+                "type": "string",
+                "description": "The question to ask the agent"
+              }
+            },
+            "required": ["question"]
+          }
+        }
+      }
+    }
+  },
+  "kind": "Stateful"
+}

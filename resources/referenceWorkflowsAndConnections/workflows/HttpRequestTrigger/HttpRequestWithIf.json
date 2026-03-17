@@ -1,0 +1,94 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Initialize_variable": {
+        "inputs": {
+          "variables": [
+            {
+              "name": "variable1",
+              "type": "integer",
+              "value": 0
+            }
+          ]
+        },
+        "runAfter": {},
+        "type": "InitializeVariable"
+      },
+      "notSimpleGetHttpAction": {
+        "type": "http",
+        "inputs": {
+          "uri": "###httpUri###/request",
+          "method": "POST"
+        },
+        "runAfter": {
+          "Initialize_variable": [ "SUCCEEDED" ]
+        }
+      },
+      "if_action": {
+        "type": "If",
+        "expression": {
+          "and": [
+          {
+            "equals": [
+              "@variables('variable1')",
+              0
+            ]
+          }
+          ]
+        },
+        "actions": {
+          "Inside_if_if": {
+            "type": "IncrementVariable",
+            "inputs": {
+              "name": "variable1",
+              "value": 3
+            }
+          }
+        },
+        "else": {
+          "actions": {
+            "Inside_if_else": {
+              "type": "IncrementVariable",
+              "inputs": {
+                "name": "variable1",
+                "value": 2
+              }
+            }
+          }
+        },
+        "runAfter": {
+          "notSimpleGetHttpAction": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "After_if_action": {
+        "runAfter": {
+          "if_action": [ "SUCCEEDED" ]
+        },
+        "type": "http",
+        "inputs": {
+          "uri": "###httpUri###/request",
+          "method": "GET"
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}
+
+
+

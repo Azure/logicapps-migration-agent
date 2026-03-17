@@ -1,0 +1,58 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Compose": {
+        "type": "Compose",
+        "inputs": "foobar",
+        "runAfter": {}
+      },
+      "Condition": {
+        "type": "If",
+        "expression": {
+          "and": [
+            {
+              "equals": [
+                "@xml(outputs('Compose'))",
+                "foobar"
+              ]
+            }
+          ]
+        },
+        "actions": {
+          "Response": {
+            "type": "Response",
+            "kind": "Http",
+            "inputs": {
+              "statusCode": 200
+            }
+          }
+        },
+        "else": {
+          "actions": {
+            "Response_1": {
+              "type": "Response",
+              "kind": "Http",
+              "inputs": {
+                "statusCode": 400
+              }
+            }
+          }
+        },
+        "runAfter": {
+          "Compose": [
+            "SUCCEEDED"
+          ]
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http"
+      }
+    }
+  }
+}

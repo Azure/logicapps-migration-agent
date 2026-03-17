@@ -1,0 +1,35 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Compose": {
+        "inputs": "@triggerBody()",
+        "runAfter": {},
+        "type": "Compose"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "receive_event_from_servicebusqueue": {
+        "inputs": {
+          "parameters": {
+            "queueName": "OK"
+          },
+          "serviceProviderConfiguration": {
+            "serviceProviderId": "/serviceProviders/customApi",
+            "operationId": "TriggerState",
+            "connectionName": "serviceBusConnection"
+          }
+        },
+        "type": "ServiceProvider",
+        "kind": "Polling",
+        "recurrence": {
+          "frequency": "Second",
+          "interval": 3
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,221 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Parse_JSON-Temp": {
+                "inputs": {
+                    "content": "@triggerBody()?['contentData']",
+                    "schema": {
+                        "properties": {
+                            "int23_address": {
+                                "type": "string"
+                            },
+                            "int23_city": {
+                                "type": "string"
+                            },
+                            "int23_emailaddress": {
+                                "type": "string"
+                            },
+                            "int23_fullname": {
+                                "type": "string"
+                            },
+                            "int23_issuedescription": {
+                                "type": "string"
+                            },
+                            "int23_phonenumber": {
+                                "type": "string"
+                            },
+                            "int23_siteid": {
+                                "type": "string"
+                            },
+                            "int23_state": {
+                                "type": "string"
+                            },
+                            "int23_ticketnumber": {
+                                "type": "string"
+                            },
+                            "int23_workorderid": {
+                                "type": "string"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "runAfter": {},
+                "type": "ParseJson"
+            },
+            "Scope-Try": {
+                "actions": {
+                    "Add_a_new_row_-_Workorder": {
+                        "inputs": {
+                            "body": {
+                                "int23_address": "@body('Parse_JSON_-_Work_Order_Message')?['int23_address']",
+                                "int23_city": "@body('Parse_JSON_-_Work_Order_Message')?['int23_city']",
+                                "int23_cpl_workorderid": "@{guid()}",
+                                "int23_emailaddress": "@body('Parse_JSON_-_Work_Order_Message')?['int23_emailaddress']",
+                                "int23_fullname": "@body('Parse_JSON_-_Work_Order_Message')?['int23_fullname']",
+                                "int23_issuedescription": "@body('Parse_JSON_-_Work_Order_Message')?['int23_issuedescription']",
+                                "int23_meantimetoretore": "@body('Call_an_Azure_API_Management_API')?['MeanTimeToRetore']",
+                                "int23_name": "@{guid()}",
+                                "int23_phonenumber": "@body('Parse_JSON_-_Work_Order_Message')?['int23_phonenumber']",
+                                "int23_siteid": "@body('Parse_JSON_-_Work_Order_Message')?['int23_siteid']",
+                                "int23_state": "@body('Parse_JSON_-_Work_Order_Message')?['int23_state']",
+                                "int23_ticketnumber": "@body('Parse_JSON_-_Work_Order_Message')?['int23_ticketnumber']",
+                                "int23_workorderstatus": "Created"
+                            },
+                            "host": {
+                                "connection": {
+                                    "referenceName": "commondataservice-1"
+                                }
+                            },
+                            "method": "post",
+                            "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('https://org7a3fb188.crm.dynamics.com'))}/tables/@{encodeURIComponent(encodeURIComponent('int23_cpl_workorders'))}/items"
+                        },
+                        "runAfter": {
+                            "Call_an_Azure_API_Management_API": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection"
+                    },
+                    "Call_an_Azure_API_Management_API": {
+                        "inputs": {
+                            "apiManagement": {
+                                "connection": "apiManagementOperation-4",
+                                "operationId": "powerrestore"
+                            },
+                            "body": {
+                                "SiteId": "@body('Parse_JSON_-_Work_Order_Message')?['int23_siteid']",
+                                "TicketNumber": "@body('Parse_JSON_-_Work_Order_Message')?['int23_ticketnumber']"
+                            },
+                            "method": "post",
+                            "pathTemplate": {
+                                "template": "/powerrestore"
+                            },
+                            "retryPolicy": {
+                                "type": "none"
+                            }
+                        },
+                        "runAfter": {
+                            "Parse_JSON_-_Work_Order_Message": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "ApiManagement"
+                    },
+                    "List_rows-CustomerTickets": {
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "referenceName": "commondataservice-1"
+                                }
+                            },
+                            "method": "get",
+                            "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('https://org7a3fb188.crm.dynamics.com'))}/tables/@{encodeURIComponent(encodeURIComponent('int23_cpl_customertickets'))}/items",
+                            "queries": {
+                                "$filter": "int23_ticketnumber eq '@{body('Parse_JSON_-_Work_Order_Message')?['int23_ticketnumber']}'"
+                            }
+                        },
+                        "runAfter": {
+                            "Add_a_new_row_-_Workorder": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "ApiConnection"
+                    },
+                    "Parse_JSON_-_Work_Order_Message": {
+                        "inputs": {
+                            "content": "@triggerOutputs()?['body']?['contentData']",
+                            "schema": {
+                                "properties": {
+                                    "int23_address": {
+                                        "type": "string"
+                                    },
+                                    "int23_city": {
+                                        "type": "string"
+                                    },
+                                    "int23_emailaddress": {
+                                        "type": "string"
+                                    },
+                                    "int23_fullname": {
+                                        "type": "string"
+                                    },
+                                    "int23_issuedescription": {
+                                        "type": "string"
+                                    },
+                                    "int23_phonenumber": {
+                                        "type": "string"
+                                    },
+                                    "int23_siteid": {
+                                        "type": "string"
+                                    },
+                                    "int23_state": {
+                                        "type": "string"
+                                    },
+                                    "int23_ticketnumber": {
+                                        "type": "string"
+                                    },
+                                    "int23_workorderid": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "type": "ParseJson"
+                    },
+                    "Update_Customer_Ticket_-_Work_Order_Status": {
+                        "inputs": {
+                            "body": {
+                                "_createdby_type": "",
+                                "_modifiedby_type": "",
+                                "_ownerid_type": "",
+                                "int23_meantimetoretore": "@body('Call_an_Azure_API_Management_API')?['MeanTimeToRetore']",
+                                "int23_workorderstatus": "@body('Add_a_new_row_-_Workorder')?['int23_workorderstatus']"
+                            },
+                            "host": {
+                                "connection": {
+                                    "referenceName": "commondataservice-1"
+                                }
+                            },
+                            "method": "patch",
+                            "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('https://org7a3fb188.crm.dynamics.com'))}/tables/@{encodeURIComponent(encodeURIComponent('int23_cpl_customertickets'))}/items/@{encodeURIComponent(encodeURIComponent(first(body('List_rows-CustomerTickets')?['value'])['int23_cpl_customerticketid']))}"
+                        },
+                        "runAfter": {
+                            "List_rows-CustomerTickets": [
+                                "SUCCEEDED"
+                            ]
+                        },
+                        "type": "ApiConnection"
+                    }
+                },
+                "runAfter": {
+                    "Parse_JSON-Temp": [
+                        "SUCCEEDED"
+                    ]
+                },
+                "type": "Scope"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "triggers": {
+            "When_messages_are_available_in_a_queue": {
+                "inputs": {
+                    "parameters": {
+                        "isSessionsEnabled": false,
+                        "queueName": "workmanagement-ticketcreated-queue"
+                    },
+                    "serviceProviderConfiguration": {
+                        "connectionName": "serviceBus",
+                        "operationId": "receiveQueueMessages",
+                        "serviceProviderId": "/serviceProviders/serviceBus"
+                    }
+                },
+                "splitOn": "@triggerOutputs()?['body']",
+                "type": "ServiceProvider"
+            }
+        }
+    },
+    "kind": "Stateful"
+}

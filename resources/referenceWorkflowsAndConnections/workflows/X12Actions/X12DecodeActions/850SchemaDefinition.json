@@ -1,0 +1,24 @@
+{
+  "properties": {
+    "schemaType": "Xml",
+    "targetNamespace": "http://schemas.microsoft.com/BizTalk/EDI/X12/2006",
+    "documentName": "X12_00401_850",
+    "contentLink": {
+      "uri": "http://127.0.0.1:7075/integrationAccounts/7efaac716593420ab0ebe7a29705400f/schemas/testschema2/contents/Value?api-version=2015-08-01-preview",
+      "contentVersion": "\"0x8D4D8615F3B4EEB\"",
+      "contentSize": 1177922,
+      "contentHash": {
+        "algorithm": "md5",
+        "value": "Y1yy1rIrji0F4FH2qa6C4Q=="
+      }
+    },
+    "createdTime": "2017-01-21T03:22:39.1287254Z",
+    "changedTime": "2018-04-26T17:27:54.3097397Z",
+    "metadata": {
+      "fileName": null
+    }
+  },
+  "id": "/integrationAccounts/7efaac716593420ab0ebe7a29705400f/schemas/testschema2",
+  "name": "testschema2",
+  "type": "Microsoft.Logic/integrationAccounts/schemas"
+}

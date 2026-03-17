@@ -1,0 +1,62 @@
+{
+  "serviceProviderConnections": {
+    "blobStorageConnection": {
+      "parameterValues": {
+        "connectionString": "@appsetting('blobStorageConnectionString')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/azureBlob"
+      }
+    },
+    "OpenAi": {
+      "parameterSetName": "KeyAndEndpointConnection",
+      "parameterValues": {
+        "openAIEndpoint": "@appsetting('openAIEndpoint')",
+        "openAIKey": "@appsetting('openAIKey')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/OpenAI"
+      }
+    },
+    "NullEndpoint": {
+      "parameterSetName": "KeyAndEndpointConnection",
+      "parameterValues": {
+        "openAIEndpoint": "",
+        "openAIKey": "@appsetting('openAIKey')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/OpenAI"
+      }
+    },
+    "OpenAiManagedIdentity": {
+      "parameterSetName": "ManagedServiceIdentity",
+      "parameterValues": {
+        "openAIEndpoint": "@appsetting('openAIEndpoint')",
+        "managedIdentityType": "SystemAssigned",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        }
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/OpenAI"
+      }
+    },
+    "OpenAiManagedAAD": {
+      "parameterSetName": "ActiveDirectoryOAuth",
+      "parameterValues": {
+        "openAIEndpoint": "@appsetting('openAIEndpoint')",
+        "authProvider": {
+          "ClientId": "@appsetting('OpenAIClientId')",
+          "CredentialType": "Certificate",
+          "pfx": "@appsetting('OpenAIClientCertPfx')",
+          "Tenant": "@appsetting('OpenAITenantId')",
+          "Type": "ActiveDirectoryOAuth",
+          "Password":  ""
+        }
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/OpenAI"
+      }
+    }
+  }
+}

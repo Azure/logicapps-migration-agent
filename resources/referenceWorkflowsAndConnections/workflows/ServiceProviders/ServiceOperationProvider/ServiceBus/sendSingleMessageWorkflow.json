@@ -1,0 +1,66 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Send_Single_Message": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "entityName": "demo",
+            "message": {
+              "contentData": "@triggerBody()",
+              "contentType": "text",
+              "UserProperties": {
+                "check": "check1",
+                "test": "test1"
+              },
+              "messageId": "MESSAGE1",
+              "to": "to",
+              "replyTo": "Reply to",
+              "label": "Label",
+              "correlationId": "23",
+              "timeToLive": "15000000"
+            }
+          },
+          "serviceProviderConfiguration": {
+            "serviceProviderId": "/serviceProviders/serviceBus",
+            "operationId": "sendMessage",
+            "connectionName": "serviceBusConnection"
+          }
+        },
+        "runAfter": {}
+      },
+      "Compose": {
+        "type": "compose",
+        "runAfter": {
+          "Send_Single_Message": [
+            "Succeeded"
+          ]
+        },
+        "inputs": "@body('Send_Single_Message')"
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('compose')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "Compose": [ "Succeeded" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

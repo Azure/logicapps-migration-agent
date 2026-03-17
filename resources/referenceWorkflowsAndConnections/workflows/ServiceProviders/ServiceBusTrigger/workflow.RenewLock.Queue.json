@@ -1,0 +1,66 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "For_each": {
+        "type": "Foreach",
+        "foreach": "@triggerOutputs()?['body']",
+        "runAfter": {},
+        "actions": {
+          "Renew_Lock": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "messageId": "@item()?['messageId']",
+                "lockToken": "@item()?['lockToken']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "renewLockMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {}
+          },
+          "Complete_the_message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "messageId": "@item()?['messageId']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "completeMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {
+              "Renew_Lock": [
+                "Succeeded"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "triggers": {
+      "When_messages_are_available_in_a_Service_Bus_queue_(peek-lock)": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "ServiceBuscit",
+            "isSessionsEnabled": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "peekLockQueueMessages",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateless"
+}

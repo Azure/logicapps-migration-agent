@@ -1,0 +1,130 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Delivered": {
+                "type": "Compose",
+                "inputs": "@body('Pickup_shipment')?['OrderNumber']",
+                "runAfter": {
+                    "Switch": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Pickup_shipment": {
+                "type": "ParseJson",
+                "inputs": {
+                    "content": "@triggerBody()",
+                    "schema": {
+                        "properties": {
+                            "Address": {
+                                "properties": {
+                                    "City": {
+                                        "type": "string"
+                                    },
+                                    "Name": {
+                                        "type": "string"
+                                    },
+                                    "State": {
+                                        "type": "string"
+                                    },
+                                    "Street": {
+                                        "type": "string"
+                                    },
+                                    "Zip": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            },
+                            "OrderNumber": {
+                                "type": "integer"
+                            },
+                            "Priority": {
+                                "type": "integer"
+                            },
+                            "TrackingID": {
+                                "type": "string"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "runAfter": {}
+            },
+            "Switch": {
+                "type": "Switch",
+                "expression": "@body('Pickup_shipment')?['Priority']",
+                "default": {
+                    "actions": {
+                        "Land_Shipping": {
+                            "type": "Wait",
+                            "inputs": {
+                                "interval": {
+                                    "count": 5,
+                                    "unit": "Minute"
+                                }
+                            }
+                        }
+                    }
+                },
+                "cases": {
+                    "High_Priority": {
+                        "actions": {
+                            "Express_Shipping": {
+                                "type": "Wait",
+                                "inputs": {
+                                    "interval": {
+                                        "count": 15,
+                                        "unit": "Second"
+                                    }
+                                }
+                            }
+                        },
+                        "case": 1
+                    },
+                    "Low_Priority": {
+                        "actions": {
+                            "Air_Shipping": {
+                                "type": "Wait",
+                                "inputs": {
+                                    "interval": {
+                                        "count": 1,
+                                        "unit": "Minute"
+                                    }
+                                }
+                            }
+                        },
+                        "case": 12
+                    }
+                },
+                "runAfter": {
+                    "Pickup_shipment": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Response": {
+                "type": "Response",
+                "kind": "Http",
+                "inputs": {
+                    "statusCode": 200
+                },
+                "runAfter": {
+                    "Delivered": [
+                        "SUCCEEDED"
+                    ]
+                }
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "triggers": {
+            "When_a_HTTP_request_is_received": {
+                "type": "Request",
+                "kind": "Http"
+            }
+        }
+    },
+    "kind": "Stateful"
+}

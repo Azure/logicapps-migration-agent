@@ -1,0 +1,96 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Response": {
+        "inputs": {
+          "body": "@body('XML_compose_with_schema')?['xml']",
+          "statusCode": 200
+        },
+        "kind": "Http",
+        "runAfter": {
+          "XML_compose_with_schema": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "Response"
+      },
+      "XML_compose_with_schema": {
+        "inputs": {
+          "content": {
+            "Customers": [
+              {
+                ":Attribute:CustomerID": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Customers']?[0]?[':Attribute:CustomerID']",
+                "CompanyName": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Customers']?[0]?['CompanyName']",
+                "ContactName": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Customers']?[0]?['ContactName']",
+                "ContactTitle": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Customers']?[0]?['ContactTitle']",
+                "Fax": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Customers']?[0]?['Fax']",
+                "FullAddress": {
+                  ":Attribute:CustomerID": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Customers']?[0]?['FullAddress']?[':Attribute:CustomerID']",
+                  "Address": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Customers']?[0]?['FullAddress']?['Address']",
+                  "City": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Customers']?[0]?['FullAddress']?['City']",
+                  "Country": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Customers']?[0]?['FullAddress']?['Country']",
+                  "PostalCode": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Customers']?[0]?['FullAddress']?['PostalCode']",
+                  "Region": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Customers']?[0]?['FullAddress']?['Region']"
+                },
+                "Phone": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Customers']?[0]?['Phone']"
+              }
+            ],
+            "Orders": [
+              {
+                "CustomerID": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Orders']?[0]?['CustomerID']",
+                "EmployeeID": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Orders']?[0]?['EmployeeID']",
+                "OrderDate": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Orders']?[0]?['OrderDate']",
+                "RequiredDate": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Orders']?[0]?['RequiredDate']",
+                "ShipInfo": {
+                  ":Attribute:ShippedDate": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Orders']?[0]?['ShipInfo']?[':Attribute:ShippedDate']",
+                  "Freight": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Orders']?[0]?['ShipInfo']?['Freight']",
+                  "ShipAddress": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Orders']?[0]?['ShipInfo']?['ShipAddress']",
+                  "ShipCity": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Orders']?[0]?['ShipInfo']?['ShipCity']",
+                  "ShipCountry": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Orders']?[0]?['ShipInfo']?['ShipCountry']",
+                  "ShipName": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Orders']?[0]?['ShipInfo']?['ShipName']",
+                  "ShipPostalCode": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Orders']?[0]?['ShipInfo']?['ShipPostalCode']",
+                  "ShipRegion": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Orders']?[0]?['ShipInfo']?['ShipRegion']",
+                  "ShipVia": "@outputs('XML_parse_with_schema_1')?['body']?['json']?['Orders']?[0]?['ShipInfo']?['ShipVia']"
+                }
+              }
+            ]
+          },
+          "schema": {
+            "name": "SampleSchema.xsd",
+            "source": "LogicApp"
+          }
+        },
+        "runAfter": {
+          "XML_parse_with_schema_1": [
+            "SUCCEEDED"
+          ]
+        },
+        "type": "XmlCompose"
+      },
+      "XML_parse_with_schema_1": {
+        "inputs": {
+          "content": "<Root>\n  <Customers>\n    <Customer CustomerID=\"CustomerID_0\">\n      <CompanyName>CompanyName_0</CompanyName>\n      <ContactName>ContactName_0</ContactName>\n      <ContactTitle>ContactTitle_0</ContactTitle>\n      <Phone>Phone_0</Phone>\n      <Fax>Fax_0</Fax>\n      <FullAddress CustomerID=\"CustomerID_0\">\n        <Address>Address_0</Address>\n        <City>City_0</City>\n        <Region>Region_0</Region>\n        <PostalCode>PostalCode_0</PostalCode>\n        <Country>Country_0</Country>\n      </FullAddress>\n    </Customer>\n    <Customer CustomerID=\"CustomerID_1\">\n      <CompanyName>CompanyName_0</CompanyName>\n      <ContactName>ContactName_0</ContactName>\n      <ContactTitle>ContactTitle_0</ContactTitle>\n      <Phone>Phone_0</Phone>\n      <Fax>Fax_0</Fax>\n      <FullAddress CustomerID=\"CustomerID_1\">\n        <Address>Address_0</Address>\n        <City>City_0</City>\n        <Region>Region_0</Region>\n        <PostalCode>PostalCode_0</PostalCode>\n        <Country>Country_0</Country>\n      </FullAddress>\n    </Customer>\n    <Customer CustomerID=\"CustomerID_2\">\n      <CompanyName>CompanyName_0</CompanyName>\n      <ContactName>ContactName_0</ContactName>\n      <ContactTitle>ContactTitle_0</ContactTitle>\n      <Phone>Phone_0</Phone>\n      <Fax>Fax_0</Fax>\n      <FullAddress CustomerID=\"CustomerID_2\">\n        <Address>Address_0</Address>\n        <City>City_0</City>\n        <Region>Region_0</Region>\n        <PostalCode>PostalCode_0</PostalCode>\n        <Country>Country_0</Country>\n      </FullAddress>\n    </Customer>\n  </Customers>\n  <Orders>\n    <Order>\n      <CustomerID>CustomerID_0</CustomerID>\n      <EmployeeID>EmployeeID_0</EmployeeID>\n      <OrderDate>1999-05-31T13:20:00.000-05:00</OrderDate>\n      <RequiredDate>1999-05-31T13:20:00.000-05:00</RequiredDate>\n      <ShipInfo ShippedDate=\"1999-05-31T13:20:00.000-05:00\">\n        <ShipVia>100</ShipVia>\n        <Freight>10.5</Freight>\n        <ShipName>ShipName_0</ShipName>\n        <ShipAddress>ShipAddress_0</ShipAddress>\n        <ShipCity>ShipCity_0</ShipCity>\n        <ShipRegion>ShipRegion_0</ShipRegion>\n        <ShipPostalCode>ShipPostalCode_0</ShipPostalCode>\n        <ShipCountry>ShipCountry_0</ShipCountry>\n      </ShipInfo>\n    </Order>\n    <Order>\n      <CustomerID>CustomerID_2</CustomerID>\n      <EmployeeID>EmployeeID_0</EmployeeID>\n      <OrderDate>1999-05-31T13:20:00.000-05:00</OrderDate>\n      <RequiredDate>1999-05-31T13:20:00.000-05:00</RequiredDate>\n      <ShipInfo ShippedDate=\"1999-05-31T13:20:00.000-05:00\">\n        <ShipVia>100</ShipVia>\n        <Freight>10.5</Freight>\n        <ShipName>ShipName_0</ShipName>\n        <ShipAddress>ShipAddress_0</ShipAddress>\n        <ShipCity>ShipCity_0</ShipCity>\n        <ShipRegion>ShipRegion_0</ShipRegion>\n        <ShipPostalCode>ShipPostalCode_0</ShipPostalCode>\n        <ShipCountry>ShipCountry_0</ShipCountry>\n      </ShipInfo>\n    </Order>\n    <Order>\n      <CustomerID>CustomerID_1</CustomerID>\n      <EmployeeID>EmployeeID_0</EmployeeID>\n      <OrderDate>1999-05-31T13:20:00.000-05:00</OrderDate>\n      <RequiredDate>1999-05-31T13:20:00.000-05:00</RequiredDate>\n      <ShipInfo ShippedDate=\"1999-05-31T13:20:00.000-05:00\">\n        <ShipVia>100</ShipVia>\n        <Freight>10.5</Freight>\n        <ShipName>ShipName_0</ShipName>\n        <ShipAddress>ShipAddress_0</ShipAddress>\n        <ShipCity>ShipCity_0</ShipCity>\n        <ShipRegion>ShipRegion_0</ShipRegion>\n        <ShipPostalCode>ShipPostalCode_0</ShipPostalCode>\n        <ShipCountry>ShipCountry_0</ShipCountry>\n      </ShipInfo>\n    </Order>\n  </Orders>\n</Root>",
+          "schema": {
+            "name": "SampleSchema.xsd",
+            "source": "LogicApp"
+          },
+          "jsonWriterSettings": {
+            "ignoreAttributes": false
+          }
+        },
+        "runAfter": {},
+        "type": "XmlParse"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "When_a_HTTP_request_is_received": {
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

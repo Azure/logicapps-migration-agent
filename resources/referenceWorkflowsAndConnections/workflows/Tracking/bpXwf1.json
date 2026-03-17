@@ -1,0 +1,98 @@
+﻿{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Add_to_time": {
+                "inputs": {
+                    "baseTime": "@{utcNow()}",
+                    "interval": 1,
+                    "timeUnit": "Hour"
+                },
+                "kind": "AddToTime",
+                "runAfter": {},
+                "trackedProperties": {},
+                "type": "Expression"
+            },
+            "Add_to_time_!1": {
+                "inputs": {
+                    "baseTime": "@utcNow()",
+                    "interval": 2,
+                    "timeUnit": "Hour"
+                },
+                "kind": "AddToTime",
+                "runAfter": {},
+                "type": "Expression"
+            },
+            "Add_to_time_2": {
+                "inputs": {
+                    "baseTime": "@body('Convert_time_zone')",
+                    "interval": 1,
+                    "timeUnit": "Hour"
+                },
+                "kind": "AddToTime",
+                "runAfter": {
+                    "Convert_time_zone": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Expression"
+            },
+            "Convert_time_zone": {
+                "inputs": {
+                    "baseTime": "@body('Add_to_time')",
+                    "destinationTimeZone": "UTC",
+                    "formatString": "d",
+                    "sourceTimeZone": "UTC"
+                },
+                "kind": "ConvertTimeZone",
+                "runAfter": {
+                    "Add_to_time": [
+                        "SUCCEEDED"
+                    ]
+                },
+                "trackedProperties": {},
+                "type": "Expression"
+            },
+            "Convert_time_zone_1": {
+                "inputs": {
+                    "baseTime": "@body('Add_to_time_!1')",
+                    "destinationTimeZone": "UTC",
+                    "formatString": "d",
+                    "sourceTimeZone": "UTC"
+                },
+                "kind": "ConvertTimezone",
+                "runAfter": {
+                    "Add_to_time_!1": [
+                        "SUCCEEDED"
+                    ]
+                },
+                "trackedProperties": {},
+                "type": "Expression"
+            },
+            "Convert_time_zone_2": {
+                "inputs": {
+                    "baseTime": "@body('Add_to_time_2')",
+                    "destinationTimeZone": "UTC-11",
+                    "formatString": "d",
+                    "sourceTimeZone": "Dateline Standard Time"
+                },
+                "kind": "ConvertTimeZone",
+                "runAfter": {
+                    "Add_to_time_2": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Expression"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "triggers": {
+            "myTrigger": {
+                "kind": "Http",
+                "type": "Request"
+            }
+        }
+    },
+    "kind": "Stateful"
+}

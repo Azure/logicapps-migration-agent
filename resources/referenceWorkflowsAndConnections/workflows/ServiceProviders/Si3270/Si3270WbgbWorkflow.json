@@ -1,0 +1,49 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Execute_Method": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "hidx": "@triggerBody()?['hidx']",
+            "method": "@triggerBody()?['method']",
+            "inputParameters": "@triggerBody()?['inputParameters']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "si3270",
+            "operationId": "executeMethod",
+            "serviceProviderId": "/serviceProviders/si3270"
+          },
+          "retryPolicy": {
+            "type": "none"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@outputs('Execute_Method')?['body']"
+        },
+        "runAfter": {
+          "Execute_Method": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

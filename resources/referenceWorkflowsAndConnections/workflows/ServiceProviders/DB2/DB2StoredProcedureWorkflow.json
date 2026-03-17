@@ -1,0 +1,47 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Execute_StoredProcedure": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "procedureName": "DB2Workflow_Query",
+            "procedureParameters": DB2Workflow_Parameters
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "DB2ConnectionString",
+            "operationId": "storedProcedure",
+            "serviceProviderId": "/serviceProviders/DB2"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@body('Execute_StoredProcedure')"
+        },
+        "runAfter": {
+          "Execute_StoredProcedure": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {}
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

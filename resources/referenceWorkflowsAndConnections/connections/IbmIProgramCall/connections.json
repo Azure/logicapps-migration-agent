@@ -1,0 +1,18 @@
+{
+  "serviceProviderConnections": {
+    "dpc": {
+      "parameterValues": {
+        "codePage": "@appsetting('dpc_codePage')",
+        "portNumber": "@appsetting('dpc_portNumber')",
+        "serverName": "@appsetting('dpc_serverName')",
+        "userName": "@appsetting('dpc_userName')",
+        "password": "@appsetting('dpc_password')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/ibmiProgramCall"
+      },
+      "displayName": "dpc_37"
+    }
+  },
+  "managedApiConnections": {}
+}

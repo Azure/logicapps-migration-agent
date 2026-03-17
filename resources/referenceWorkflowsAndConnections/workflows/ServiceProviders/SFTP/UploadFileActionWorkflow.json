@@ -1,0 +1,48 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Upload_File_Content": {
+        "inputs": {
+          "parameters": {
+            "content": "@triggerBody()?['uploadData']",
+            "filePath": "@triggerBody()?['path']",
+            "overWriteFileIfExists": "@triggerBody()?['overwrite']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Sftp",
+            "operationId": "uploadFileContent",
+            "serviceProviderId": "/serviceProviders/Sftp"
+          }
+        },
+        "runAfter": {},
+        "type": "ServiceProvider"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "uploadData": {
+                "type": "object"
+              },
+              "overwrite": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "kind": "Stateful"
+}

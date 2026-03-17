@@ -1,0 +1,40 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Complete_RabbitMQ_Message": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "deliveryTag": "@triggerOutputs()?['body']?['deliveryTag']",
+            "consumerTag": "@triggerOutputs()?['body']?['consumerTag']",
+            "acknowledgement": "Complete"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "rabbitmq",
+            "operationId": "completeMessage",
+            "serviceProviderId": "/serviceProviders/rabbitmq"
+          }
+        }
+      }
+    },
+    "triggers": {
+      "When_messages_are_available_in_a_queue": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "@newQueueName"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "rabbitmq",
+            "operationId": "peeklockRabbitMQMessages",
+            "serviceProviderId": "/serviceProviders/rabbitmq"
+          }
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateless"
+}

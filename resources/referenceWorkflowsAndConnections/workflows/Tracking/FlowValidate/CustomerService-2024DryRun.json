@@ -1,0 +1,87 @@
+{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2024-03-31/trackingdefinitionschema.json#",
+    "businessProcess": {
+        "name": "CustomerService-2024DryRun",
+        "version": "08584852002235731966",
+        "correlationPropertyName": "TicketNumber"
+    },
+    "trackingDefinitions": {
+        "CustomerService-TicketCreated": {
+            "events": {
+                "Ticket-Created": {
+                    "statuses": {
+                        "success": {
+                            "operationName": "Send_message",
+                            "operationType": "Action",
+                            "properties": {
+                                "CustomerName": "@body('Parse_JSON_-_Canonical_Message')?['int23_fullname']",
+                                "CustomerPhone": "@body('Parse_JSON_-_Canonical_Message')?['int23_phonenumber']",
+                                "CustomerEmail": "@body('Parse_JSON_-_Canonical_Message')?['int23_emailaddress']",
+                                "TicketNumber": "@triggerBody()?['int23_ticketnumber']"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "WorkManagement-WorkOrderCreated": {
+            "events": {
+                "WorkOrderCreated": {
+                    "statuses": {
+                        "success": {
+                            "operationName": "Update_Customer_Ticket_-_Work_Order_Status",
+                            "operationType": "action",
+                            "properties": {
+                                "Address": "@body('Add_a_new_row_-_Workorder')?['int23_address']",
+                                "City": "@body('Add_a_new_row_-_Workorder')?['int23_city']",
+                                "TicketNumber": "@item()?['int23_ticketnumber']",
+                                "AreaCode": "@items('int23_address')?['areacode']",
+                                "Notification": "@repeatItems(variables('Addresses'), 'SendEmail')"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "WorkManagement-TechnicianOnsite": {
+            "events": {
+                "TechnicianOnSite": {
+                    "statuses": {
+                        "failure": {
+                            "operationName": "Send_message",
+                            "operationType": "Action",
+                            "properties": {
+                                "SafetyReason": "@triggerBody()?['cred1_safetyassessment']",
+                                "TicketNumber": "@triggerBody()?['int23_ticketnumber']"
+                            }
+                        },
+                        "success": {
+                            "operationName": "Compose",
+                            "operationType": "Action",
+                            "properties": {
+                                "TicketNumber": "@outputs('Compose')"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "WorkManagement-WorkOrderCompleted": {
+            "events": {
+                "WorkOrderComplete": {
+                    "statuses": {
+                        "success": {
+                            "operationName": "Compose_-_Process_Complete",
+                            "operationType": "Action",
+                            "properties": {
+                                "MaterialsID": "@triggerBody()?['int23_materialid']",
+                                "MaterialsDescription": "@triggerBody()?['int23_materialdescription']",
+                                "TicketNumber": "@triggerBody()?['int23_ticketnumber']"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

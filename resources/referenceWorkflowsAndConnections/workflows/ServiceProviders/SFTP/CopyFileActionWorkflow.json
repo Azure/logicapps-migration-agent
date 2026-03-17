@@ -1,0 +1,82 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Copy_file": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "sourceFilePath": "@source",
+            "destinationFilePath": "@destination"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Sftp",
+            "operationId": "copyFile",
+            "serviceProviderId": "/serviceProviders/Sftp"
+          }
+        },
+        "runAfter": {}
+      },
+      "Get_file_or_directory_metadata": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "fileOrFolderPath": "@destination"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Sftp",
+            "operationId": "getMetadata",
+            "serviceProviderId": "/serviceProviders/Sftp"
+          }
+        },
+        "runAfter": {
+          "Copy_file": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Delete_File": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "filePath": "@destination",
+            "skipDelete": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Sftp",
+            "operationId": "deleteFile",
+            "serviceProviderId": "/serviceProviders/Sftp"
+          }
+        },
+        "runAfter": {
+          "Get_file_or_directory_metadata": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 202,
+          "body": "@body('Get_file_or_directory_metadata')"
+        },
+        "runAfter": {
+          "Delete_File": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

@@ -1,0 +1,44 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Compose": {
+        "type": "xslt",
+        "runAfter": {},
+        "inputs": {
+          "content": {
+            "$content": "PEFydGljbGU+PFRpdGxlPk15IEFydGljbGU8L1RpdGxlPjxBdXRob3JzPjxBdXRob3I+TXIuIFZ0ZXN0aW5nPC9BdXRob3I+PEF1dGhvcj5Nci4gTHRlc3Rpbmc8L0F1dGhvcj48L0F1dGhvcnM+PEJvZHk+VGhpcyBpcyBteSBhcnRpY2xlIHRleHQuPC9Cb2R5PjwvQXJ0aWNsZT4=",
+            "$content-type": "application/xml; charset=utf-8"
+          },
+          "map": {
+            "name": "MapWithTextOutput.xslt",
+            "source": "##source##"
+          },
+          "transformOptions": "generateTextOutput"
+        }
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('compose')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "Compose": [ "Succeeded" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "agentConnections": {
+    "agentConnection1": {
+      "type": "model",
+      "endpoint": "@appsetting('openai_openAIEndpoint')",
+      "resourceId": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.CognitiveServices/accounts/testAccount",
+      "displayName": "modelConnection1",
+      "authentication": {
+        "type": "Key",
+        "key": "@appsetting('openai_openAIKey')"
+      }
+    }
+  },
+  "managedApiConnections": {
+    "office365": {
+      "api": {
+        "id": "/subscriptions/80d4fe69-c95b-4dd2-a938-9250f1c8ab03/providers/Microsoft.Web/locations/brazilsouth/managedApis/office365"
+      },
+      "connection": {
+        "id": "/subscriptions/80d4fe69-c95b-4dd2-a938-9250f1c8ab03/resourceGroups/nikhiltest/providers/Microsoft.Web/connections/office365"
+      },
+      "connectionRuntimeUrl": "https://9d51d1ffc9f77572.00.common.logic-df.azure-apihub.net/apim/office365/04b78586a7b34465b497b64aae415e8a/",
+      "authentication": {
+        "type": "Raw",
+        "scheme": "Key",
+        "parameter": "@appsetting('office365-connectionKey')"
+      }
+    },
+    "msnweather": {
+      "api": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/providers/Microsoft.Web/locations/@{appsetting('WORKFLOWS_LOCATION_NAME')}/managedApis/msnweather"
+      },
+      "connection": {
+        "id": "/subscriptions/@{appsetting('WORKFLOWS_SUBSCRIPTION_ID')}/resourceGroups/@{appsetting('WORKFLOWS_RESOURCE_GROUP_NAME')}/providers/Microsoft.Web/connections/msnweather"
+      },
+      "connectionRuntimeUrl": "@parameters('msnweather-ConnectionRuntimeUrl')",
+      "authentication": "@parameters('msnweather-Authentication')"
+    }
+  },
+  "serviceProviderConnections": {
+    "serviceBus": {
+      "parameterValues": {
+        "connectionString": "@appsetting('servicebusconnectionstring')"
+      },
+      "parameterSetName": "connectionString",
+      "serviceProvider": {
+        "id": "/serviceProviders/serviceBus"
+      },
+      "displayName": "sb-prod-conn"
+    }
+  }
+}

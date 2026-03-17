@@ -1,0 +1,42 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Transform_XML": {
+                "type": "Xslt",
+              "inputs": {
+                "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<corpus>\n<deposition>\n    <deposition-title>Praesent vitae</deposition-title>\n    <text>\n        <seg n=\"seg1\" type=\"not_foo\">Lorem ipsum dolor sit amet, consectetur \n            adipiscing elit. Vivamus<note2 n=\"abc\">another note 2</note2><appnote>a</appnote> ultrices consequat facilisis. \n            Suspendisse a odio<note n=\"def\">foo note</note><footnote>1</footnote> in lobortis. Aenean \n            non dui scelerisque, rutrum est at, cursus sem.</seg>\n        <seg n=\"seg2\" type=\"foo\">Ut pharetra bibendum ipsum, portitor \n            velit pharetra quis. Aeneano<note n=\"ghi\">foo note</note><footnote>2</footnote> purus. Praesent \n            aliquam viverra tellus<note n=\"jkl\">another note</note><footnote>3</footnote> in condimentum.</seg><footnote>4</footnote>\n    </text>\n</deposition>\n<deposition>\n    <deposition-title>Elementum arcu non</deposition-title>\n    <text>\n        <seg n=\"seg1\" type=\"foo\">Curabitur pulvinar leo eget. Orci varius \n            natoque penatibus et magnis dis<note n=\"mno\">foo note</note><footnote>1</footnote> montes, \n            nascetur ridiculus mus.</seg><footnote>2</footnote>\n        <seg n=\"seg2\" type=\"foo\">Curabitur pulvinar leo eget. Orci varius \n            natoque penatibus<note2  n=\"pqr\">another note 2</note2><appnote>a</appnote> et \n            magnis dis<note n=\"stu\">foo note</note><footnote>3</footnote> montes, \n            nascetur ridiculus mus.</seg><footnote>4</footnote>\n        <seg n=\"seg3\" type=\"not_foo\">Morbi vehicula dolor bibendum enim mollis lobortis. \n            Nulla rutrum vel diam vel posuere. Aliquam pellentesque \n            malesuada elit sed tempor.</seg>\n    </text>\n</deposition>\n<deposition>\n    <deposition-title>Elementum arcu non</deposition-title>\n    <text>\n        <seg n=\"seg1\" type=\"foo\">Curabitur pulvinar leo eget. Orci varius \n            natoque penatibus et magnis dis<note n=\"vwx\">foo note</note><footnote>1</footnote> montes, \n            nascetur ridiculus mus.</seg><footnote>2</footnote>\n        <seg n=\"seg2\" type=\"not_foo\">Morbi vehicula dolor bibendum enim mollis lobortis. \n            Nulla rutrum vel diam vel posuere. Aliquam<note2  n=\"yz\">another note 2</note2><appnote>a</appnote> pellentesque \n            malesuada elit sed tempor.</seg>\n    </text>\n</deposition>\n</corpus>",
+                "map": {
+                  "name": "Xslt30Map.xslt",
+                  "source": "##source##"
+                },
+                "transformOptions": "@concat('Disable', 'ByteOrderMark')"
+              },
+                "runAfter": {}
+            },
+            "Response": {
+                "type": "Response",
+                "kind": "http",
+                "inputs": {
+                    "statusCode": 200,
+                    "body": "@outputs('Transform_XML')?['body']"
+                },
+                "runAfter": {
+                    "Transform_XML": [
+                        "Succeeded"
+                    ]
+                }
+            }
+        },
+        "triggers": {
+            "manual": {
+                "type": "Request",
+                "kind": "Http",
+                "inputs": {}
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {}
+    },
+    "kind": "Stateful"
+}

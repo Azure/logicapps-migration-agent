@@ -1,0 +1,31 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Get_File_Content_(V2)": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "filePath": "LogicAppTests/@filename"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "Ftp",
+            "operationId": "getFtpFileContentV2",
+            "serviceProviderId": "/serviceProviders/Ftp"
+          }
+        },
+        "runAfter": {}
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

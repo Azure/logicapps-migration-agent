@@ -1,0 +1,65 @@
+{{
+  "definition": {{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {{
+      "Get_File_Content": {{
+        "inputs": {{
+          "parameters": {{
+            "filePath": "@body('Update_File')?['path']"
+          }},
+          "serviceProviderConfiguration": {{
+            "connectionName": "Ftp",
+            "operationId": "getFtpFileContent",
+            "serviceProviderId": "/serviceProviders/Ftp"
+          }}
+        }},
+        "runAfter": {{
+          "Update_File": [
+            "Succeeded"
+          ]
+        }},
+        "type": "ServiceProvider"
+      }},
+      "Response": {{
+        "inputs": {{
+          "body": {{
+            "content": "@body('Get_File_Content')"
+          }},
+          "statusCode": 200
+        }},
+        "kind": "http",
+        "runAfter": {{
+          "Get_File_Content": [
+            "Succeeded"
+          ]
+        }},
+        "type": "Response"
+      }},
+      "Update_File": {{
+        "inputs": {{
+          "parameters": {{
+            "fileContent": "{1}",
+            "filePath": "{0}"
+          }},
+          "serviceProviderConfiguration": {{
+            "connectionName": "Ftp",
+            "operationId": "updateFile",
+            "serviceProviderId": "/serviceProviders/Ftp"
+          }}
+        }},
+        "runAfter": {{}},
+        "type": "ServiceProvider"
+      }}
+    }},
+    "contentVersion": "1.0.0.0",
+    "outputs": {{}},
+    "triggers": {{
+      "manual": {{
+        "inputs": {{}},
+        "kind": "Http",
+        "type": "Request"
+      }}
+    }}
+  }},
+  "kind": "Stateful"
+}}

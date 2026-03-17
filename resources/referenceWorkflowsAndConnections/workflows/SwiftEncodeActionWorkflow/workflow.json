@@ -1,0 +1,40 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "swiftEncode": {
+        "type": "swiftMTEncode",
+        "runAfter": {},
+        "inputs": {
+          "messageToEncode": {
+            "$content": "###content###",
+            "$content-type": "application/xml; charset=utf-8"
+          },
+          "messageValidation": "Disable"
+        }
+      },
+      "Response": {
+        "inputs": {
+          "body": {
+            "value": "@body('swiftEncode')"
+          },
+          "statusCode": 200
+        },
+        "runAfter": { "swiftEncode": [ "Succeeded", "Failed" ] },
+        "type": "Response"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  }
+}

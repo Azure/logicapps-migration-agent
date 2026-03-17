@@ -1,0 +1,95 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Custom message to add to the queue (optional)"
+              }
+            }
+          }
+        }
+      }
+    },
+    "actions": {
+      "Create_Test_Queue": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "serviceProviderConfiguration": {
+            "connectionName": "azureQueuesConnection",
+            "operationId": "putQueue",
+            "serviceProviderId": "/serviceProviders/azurequeues"
+          },
+          "parameters": {
+            "queueName": "std-sp-demo"
+          }
+        },
+        "runAfter": {}
+      },
+      "Add_Message_To_Queue": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "serviceProviderConfiguration": {
+            "connectionName": "azureQueuesConnection",
+            "operationId": "putMessage",
+            "serviceProviderId": "/serviceProviders/azurequeues"
+          },
+          "parameters": {
+            "queueName": "std-sp-demo",
+            "message": "@coalesce(triggerBody()?['message'], concat('Hello from ServiceProvider at ', utcNow()))"
+          }
+        },
+        "runAfter": {
+          "Create_Test_Queue": ["Succeeded"]
+        }
+      },
+      "Compose_Result": {
+        "type": "Compose",
+        "inputs": {
+          "status": "ServiceProvider Azure Queue operations completed successfully!",
+          "operations": {
+            "createQueue": {
+              "queueName": "std-sp-demo",
+              "status": "Created or already exists"
+            },
+            "putMessage": {
+              "messageContent": "@coalesce(triggerBody()?['message'], concat('Hello from ServiceProvider at ', utcNow()))",
+              "messageId": "@body('Add_Message_To_Queue')?['messageId']",
+              "insertedOn": "@body('Add_Message_To_Queue')?['insertedOn']",
+              "expiresOn": "@body('Add_Message_To_Queue')?['expiresOn']",
+              "popReceipt": "@body('Add_Message_To_Queue')?['popReceipt']"
+            }
+          },
+          "connection": "azureQueuesConnection (Azurite local storage)",
+          "timestamp": "@utcNow()"
+        },
+        "runAfter": {
+          "Add_Message_To_Queue": ["Succeeded"]
+        }
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@outputs('Compose_Result')",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "runAfter": {
+          "Compose_Result": ["Succeeded"]
+        }
+      }
+    }
+  },
+  "kind": "Stateful"
+}

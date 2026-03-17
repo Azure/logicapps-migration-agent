@@ -1,0 +1,19 @@
+{
+  "managedApiConnections": {
+    "outlook": {
+      "api": {
+        "id": "/subscriptions/6d3efd8f-bc01-4445-9266-8b4f8c04dc8b/providers/Microsoft.Web/locations/canadacentral/managedApis/outlook"
+      },
+      "authentication": {
+        "type": "Raw",
+        "scheme": "Key",
+        "parameter": "@appsetting('office365-connectionKey')"
+      },
+      "connection": {
+        "id": "/subscriptions/6d3efd8f-bc01-4445-9266-8b4f8c04dc8b/resourceGroups/aeldridge-rg/providers/Microsoft.Web/connections/outlook"
+      },
+      "connectionRuntimeUrl": "https://e89f731fd84964b8.03.common.logic-canadacentral.azure-apihub.net/apim/outlook/5accf59be1ec4ec798573a585fea43b5"
+    }
+  },
+  "serviceProviderConnections": {}
+}

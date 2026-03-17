@@ -1,0 +1,43 @@
+{{
+  "definition": {{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {{
+      "ChunkText": {{
+        "type": "ChunkText",
+        "inputs": {{
+          "text": "{0}",
+          "chunkingStrategy": "{1}",
+          "maxPageLength": {2},
+          "pageOverlapLength": {3},
+          "language": "{4}"
+          }},
+          "runAfter": {{}}
+      }},
+      "Response": {{
+        "type": "Response",
+        "kind": "http",
+        "inputs": {{
+          "statusCode": 200,
+          "body": "@body('ChunkText')"
+        }},
+        "runAfter": {{
+          "ChunkText": [
+            "Succeeded"
+          ]
+        }}
+      }}
+    }},
+    "triggers": {{
+      "manual": {{
+        "inputs": {{
+          "schema": {{}}
+        }},
+        "kind": "Http",
+        "type": "Request"
+      }}
+    }},
+    "contentVersion": "1.0.0.0",
+    "outputs": {{}}
+  }},
+  "kind": "Stateful"
+}}

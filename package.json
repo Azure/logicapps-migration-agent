@@ -1,0 +1,1567 @@
+{
+    "name": "logicapps-migration-assistant",
+    "displayName": "Logic Apps Migration Assistant",
+    "description": "Migrate BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard with AI-powered assistance",
+    "version": "1.3.4",
+    "publisher": "microsoft",
+    "license": "MIT",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Azure",
+        "Other"
+    ],
+    "keywords": [
+        "biztalk",
+        "mulesoft",
+        "azure",
+        "logic-apps",
+        "migration",
+        "integration"
+    ],
+    "extensionDependencies": [
+        "ms-azuretools.vscode-azurelogicapps"
+    ],
+    "icon": "resources/icons/extension-icon.png",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/microsoft/integration-migration-agent"
+    },
+    "bugs": {
+        "url": "https://github.com/microsoft/integration-migration-agent/issues"
+    },
+    "homepage": "https://github.com/microsoft/integration-migration-agent#readme",
+    "activationEvents": [
+        "onStartupFinished",
+        "workspaceContains:**/*.btproj",
+        "workspaceContains:**/*.odx",
+        "workspaceContains:**/*.btm",
+        "workspaceContains:**/pom.xml",
+        "workspaceContains:**/mule-*.xml"
+    ],
+    "main": "./dist/extension.js",
+    "contributes": {
+        "languageModelTools": [
+            {
+                "name": "migration_listArtifacts",
+                "displayName": "List Integration Artifacts",
+                "toolReferenceName": "migration_listArtifacts",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "List all discovered integration artifacts from the source project. Returns artifact IDs, names, types/categories, source paths, and file sizes. Optionally filter by category (e.g., 'orchestration', 'schema', 'map', 'send-port', 'receive-port', 'pipeline'). Use this first to understand what artifacts exist before requesting details or reading files.",
+                "userDescription": "List discovered integration artifacts",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "category": {
+                            "type": "string",
+                            "description": "Optional category filter (e.g., 'orchestration', 'schema', 'map', 'send-port', 'receive-port', 'pipeline')"
+                        },
+                        "limit": {
+                            "type": "number",
+                            "description": "Maximum number of artifacts to return"
+                        }
+                    }
+                }
+            },
+            {
+                "name": "migration_getArtifactDetails",
+                "displayName": "Get Artifact Details",
+                "toolReferenceName": "migration_getArtifactDetails",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Get rich parsed IR (Intermediate Representation) metadata for one or more artifacts by their IDs. Returns schemas (names, target namespaces), endpoints (receive/send ports with transport types), maps (source/target schema references), triggers, connections, and action summaries. Use this to understand artifact relationships and trace message flows without reading raw source files.",
+                "userDescription": "Get parsed metadata for specific artifacts",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "artifactIds": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Array of artifact IDs to get details for"
+                        }
+                    },
+                    "required": [
+                        "artifactIds"
+                    ]
+                }
+            },
+            {
+                "name": "migration_readSourceFile",
+                "displayName": "Read Artifact Source File",
+                "toolReferenceName": "migration_readSourceFile",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Read the raw source file contents (e.g., XML, JSON) of a specific artifact by its ID. Returns the full file content up to a character limit. Use this when you need to examine the actual source code of an artifact, such as an orchestration XLANG/s file, a BizTalk binding file, a schema XSD, or a map XSLT. Prefer migration_getArtifactDetails for metadata unless you need the raw content.",
+                "userDescription": "Read raw source file of an artifact",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "artifactId": {
+                            "type": "string",
+                            "description": "The artifact ID to read the source file for"
+                        },
+                        "maxChars": {
+                            "type": "number",
+                            "description": "Maximum characters to return (default: 60000)"
+                        }
+                    },
+                    "required": [
+                        "artifactId"
+                    ]
+                }
+            },
+            {
+                "name": "migration_searchArtifacts",
+                "displayName": "Search Artifacts",
+                "toolReferenceName": "migration_searchArtifacts",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Search for artifacts by text query across names, schema names/namespaces, endpoint names, map schema references, and connection names. Use this to find artifacts related to a specific schema, namespace, port name, or business domain. Returns matching artifacts with their IR metadata summaries.",
+                "userDescription": "Search artifacts by name, schema, endpoint, or connection",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Text to search for (case-insensitive)"
+                        },
+                        "searchIn": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "name",
+                                    "schema",
+                                    "endpoint",
+                                    "map",
+                                    "connection"
+                                ]
+                            },
+                            "description": "Fields to search in (default: all)"
+                        }
+                    },
+                    "required": [
+                        "query"
+                    ]
+                }
+            },
+            {
+                "name": "migration_getMigrationContext",
+                "displayName": "Get Migration Context",
+                "toolReferenceName": "migration_getMigrationContext",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Get the current migration state including the active stage, source/target platforms, inventory summary, component mapping reference, and exit criteria. Use this to understand the migration project context before giving advice or generating artifacts. Scope can be 'minimal' (stage only), 'standard' (stage + inventory + mappings), or 'full' (everything).",
+                "userDescription": "Get current migration status and context",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "scope": {
+                            "type": "string",
+                            "enum": [
+                                "minimal",
+                                "standard",
+                                "full"
+                            ],
+                            "description": "How much context to return (default: standard)"
+                        }
+                    }
+                }
+            },
+            {
+                "name": "migration_detectFlowGroups",
+                "displayName": "Detect Flow Groups",
+                "toolReferenceName": "migration_detectFlowGroups",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Builds a deterministic connection graph from all discovered integration artifacts. Returns artifact summaries (with receive/send endpoints, schemas, maps, filters) and a connection graph showing how artifacts are linked (subscription filters, schema references, map source/target, orchestration-calls via Call/Start Orchestration, etc.). Use this data to determine logical flow groups yourself. CRITICAL RULE: The connectionGraph includes 'orchestration-calls' edges when one orchestration calls or starts another via Call Orchestration or Start Orchestration shapes — orchestrations linked by these edges (directly or transitively) MUST be placed in the SAME group. If Orch-A calls Orch-B and Orch-B calls Orch-C, all three belong in ONE group. Each group should have one or more Orchestrations, related schemas/maps/pipelines, and entry/exit points. Transitively connected artifacts belong in the same group. If receiveLocationCount is 0, use fallback grouping: orchestration-root (one group per connected orchestration cluster), then trigger-capability, then connected-component. Pass the groups you determine to migration_discovery_storeFlowGroups. If you already know the groupId of a specific flow group (e.g. when generating a visualization for a specific group selected from the dropdown), pass groupId to retrieve the cached group and its artifact summaries directly — this avoids re-detecting all groups.",
+                "userDescription": "Analyze artifact connections and build connection graph",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "groupId": {
+                            "type": "string",
+                            "description": "Optional: ID of a specific cached flow group to retrieve. When provided, returns only that group's artifact summaries from cache instead of performing full detection."
+                        }
+                    }
+                }
+            },
+            {
+                "name": "migration_discovery_storeFlowGroups",
+                "displayName": "Store Flow Groups",
+                "toolReferenceName": "migration_discovery_storeFlowGroups",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Stores the detected flow groups and shows a flow group selector in the webview. Call this after determining logical flow groups from the artifact connection graph returned by migration_detectFlowGroups. Each group must have an id, name, description, category, and a non-empty artifactIds array. The user will then select individual flows from the webview to trigger detailed analysis.",
+                "userDescription": "Store detected flow groups and show flow selector",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "groups": {
+                            "type": "array",
+                            "description": "Array of detected flow groups",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string",
+                                        "description": "Unique group ID (e.g. flow-1, group-1-order-processing)"
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Human-readable group name by business purpose"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "Description of what this flow does"
+                                    },
+                                    "category": {
+                                        "type": "string",
+                                        "description": "Category: message-flow, shared-infrastructure, etc."
+                                    },
+                                    "artifactIds": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "IDs of artifacts in this group"
+                                    },
+                                    "entryPoint": {
+                                        "type": "object",
+                                        "description": "Entry point (receive location/port)",
+                                        "properties": {
+                                            "type": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "messageType": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "exitPoints": {
+                                        "type": "array",
+                                        "description": "Exit points (send ports)",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "type": {
+                                                    "type": "string"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "messageType": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "required": [
+                                    "id",
+                                    "name",
+                                    "description",
+                                    "artifactIds"
+                                ]
+                            }
+                        },
+                        "ungroupedArtifactIds": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "IDs of artifacts not belonging to any group"
+                        },
+                        "explanation": {
+                            "type": "string",
+                            "description": "Explanation of how groups were determined"
+                        }
+                    },
+                    "required": [
+                        "groups"
+                    ]
+                }
+            },
+            {
+                "name": "migration_discovery_storeMeta",
+                "displayName": "Store Discovery Meta",
+                "toolReferenceName": "migration_discovery_storeMeta",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Stores the explanation, summary, title, and notes for a specific flow group. Call this FIRST when storing discovery analysis results. The summary should have arrays for receiveLocations, receivePorts, orchestrations, maps, schemas, sendPorts. After calling this, call migration_discovery_storeArchitecture, migration_discovery_storeComponents, migration_discovery_storeMessageFlow, migration_discovery_storeGaps, migration_discovery_storePatterns, migration_discovery_storeDependencies, and finally migration_discovery_finalize.",
+                "userDescription": "Store discovery metadata (explanation, summary, title)",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "Flow group ID"
+                        },
+                        "explanation": {
+                            "type": "string",
+                            "description": "Plain-language explanation of the architecture"
+                        },
+                        "summary": {
+                            "type": "object",
+                            "description": "Summary of components by type (receiveLocations, receivePorts, orchestrations, maps, schemas, sendPorts arrays)"
+                        },
+                        "title": {
+                            "type": "string",
+                            "description": "Title for the visualization"
+                        },
+                        "notes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Additional notes"
+                        }
+                    },
+                    "required": [
+                        "flowId"
+                    ]
+                }
+            },
+            {
+                "name": "migration_discovery_storeArchitecture",
+                "displayName": "Store Discovery Architecture",
+                "toolReferenceName": "migration_discovery_storeArchitecture",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Stores the Mermaid architecture diagram for a specific flow group. The mermaid field must be a valid 'flowchart TB' diagram string with subgraphs for INBOUND, MESSAGE SCHEMAS, MESSAGEBOX, ORCHESTRATION, OUTBOUND. ELABORATE EACH NODE with actual config from source files. ZERO HALLUCINATION. CRITICAL RULES: (1) ONE MessageBox subgraph with cylinder shape Publish nodes. (2) SUB1 activates ORCH1 not RCV1. (3) Outbound subscription uses 'Orchestration Port Binding / Routed to [name]'.",
+                "userDescription": "Store architecture Mermaid diagram for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "Flow group ID"
+                        },
+                        "mermaid": {
+                            "type": "string",
+                            "description": "Mermaid flowchart TB diagram string"
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "mermaid"
+                    ]
+                }
+            },
+            {
+                "name": "migration_discovery_storeMessageFlow",
+                "displayName": "Store Discovery Message Flow",
+                "toolReferenceName": "migration_discovery_storeMessageFlow",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Stores the message flow steps for a specific flow group. Each step should have: step (number), component (name), componentType, action, messageType, description. Optionally include pipelineComponents (name, stage, description), properties (name, type like promoted/written, value), subscriptionFilter (expression, conditions), and additionalDetails (shapeType, mapName, etc).",
+                "userDescription": "Store message flow steps for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "Flow group ID"
+                        },
+                        "messageFlow": {
+                            "type": "array",
+                            "description": "Array of message flow steps",
+                            "items": {
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "messageFlow"
+                    ]
+                }
+            },
+            {
+                "name": "migration_discovery_storeComponents",
+                "displayName": "Store Discovery Components",
+                "toolReferenceName": "migration_discovery_storeComponents",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Stores the component details for a specific flow group. Each component should have: id, name, type (adapter/receiveLocation/receivePort/receivePipeline/schema/messageBox/orchestration/orchestrationShape/map/sendPort/sendPipeline), description, purpose, connectedTo array, azureEquivalent, isLogicAppsNative (true/false). Follow the Priority Ladder for azureEquivalent: (1) built-in actions (XML Parse, Validate XML, Compose, Parse JSON, Flat File Decode/Encode) first, (2) workflow expressions only when no built-in action exists, (3) Data Mapper/Liquid, (4) Inline Code, (5) .NET local functions, (6) Azure Functions last resort. CRITICAL: source custom code (scripting functoids, external assemblies, custom pipeline components) must ALWAYS map to .NET local functions to preserve source design.",
+                "userDescription": "Store component details for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "Flow group ID"
+                        },
+                        "componentDetails": {
+                            "type": "array",
+                            "description": "Array of component detail objects",
+                            "items": {
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "componentDetails"
+                    ]
+                }
+            },
+            {
+                "name": "migration_discovery_storeGaps",
+                "displayName": "Store Discovery Gaps",
+                "toolReferenceName": "migration_discovery_storeGaps",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Stores the gap analysis for a specific flow group. Each gap should have: component, componentType, gap (description), severity (high/medium/low), options (array of resolution options), recommendation. Include a gap for each component that is NOT natively supported in Logic Apps Standard.",
+                "userDescription": "Store gap analysis for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "Flow group ID"
+                        },
+                        "gapAnalysis": {
+                            "type": "array",
+                            "description": "Array of gap analysis entries",
+                            "items": {
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "required": [
+                        "flowId"
+                    ]
+                }
+            },
+            {
+                "name": "migration_discovery_storePatterns",
+                "displayName": "Store Discovery Patterns",
+                "toolReferenceName": "migration_discovery_storePatterns",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Stores the detected migration patterns for a specific flow group. Each pattern should have: pattern (name), description, complexity (high/medium/low), biztalkApproach, logicAppsApproach, components (array of component names involved).",
+                "userDescription": "Store migration patterns for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "Flow group ID"
+                        },
+                        "migrationPatterns": {
+                            "type": "array",
+                            "description": "Array of migration pattern entries",
+                            "items": {
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "required": [
+                        "flowId"
+                    ]
+                }
+            },
+            {
+                "name": "migration_discovery_storeDependencies",
+                "displayName": "Store Discovery Dependencies",
+                "toolReferenceName": "migration_discovery_storeDependencies",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Stores the missing dependency analysis for a specific flow group. This identifies every DLL, assembly, schema, map, pipeline, connector, or other resource that is referenced by the flow but not found in the scanned source files. Each missing dependency blocks concrete (non-stub) implementation by the conversion agent. Each dependency should have: id, name, type (dll/assembly/jar/schema/map/pipeline/orchestration/binding/connector/library/module/subflow/custom-code/other), origin (standard-framework/standard-biztalk/standard-platform/third-party/custom/unknown), severity (critical/warning/info), referencedBy (array of artifact names), reason (why it is needed), blocksMigration (boolean — true if this prevents complete non-stub implementation), migrationRelevant (boolean — false for build-only or design-time-only dependencies), and optionally: resolution (suggested fix), expectedLocation, version, platform, affectedFlowGroups. IMPORTANT: For DLLs present in the source folder, first attempt to decompile them using 'ilspycmd <DllPath> -o <OutputDir>' to extract the business logic and include the decompiled code details. Mark DLLs that could not be decompiled or whose source logic is still incomplete as critical missing dependencies.",
+                "userDescription": "Store missing dependency analysis for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "Flow group ID"
+                        },
+                        "missingDependencies": {
+                            "type": "array",
+                            "description": "Array of missing dependency entries",
+                            "items": {
+                                "type": "object"
+                            }
+                        },
+                        "summary": {
+                            "type": "string",
+                            "description": "Overall health summary of dependencies"
+                        },
+                        "allCriticalResolved": {
+                            "type": "boolean",
+                            "description": "Whether all critical dependencies are resolved"
+                        },
+                        "counts": {
+                            "type": "object",
+                            "description": "Count by severity: { critical, warning, info }",
+                            "properties": {
+                                "critical": {
+                                    "type": "number"
+                                },
+                                "warning": {
+                                    "type": "number"
+                                },
+                                "info": {
+                                    "type": "number"
+                                }
+                            }
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "missingDependencies"
+                    ]
+                }
+            },
+            {
+                "name": "migration_discovery_finalize",
+                "displayName": "Finalize Discovery Analysis",
+                "toolReferenceName": "migration_discovery_finalize",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Assembles all stored partial files (meta, messageFlow, components, gaps, patterns, dependencies) into the final analysis.json and opens the flow visualization webview. Call this LAST after all other migration_discovery_store* tools have been called for the flow. Validates that required files exist (meta, messageFlow, components) before assembling.",
+                "userDescription": "Finalize discovery analysis and open visualization",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "Flow group ID to finalize"
+                        }
+                    },
+                    "required": [
+                        "flowId"
+                    ]
+                }
+            },
+            {
+                "name": "migration_readReferenceDoc",
+                "displayName": "Read Reference Documentation",
+                "toolReferenceName": "migration_readReferenceDoc",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Access embedded reference documentation for BizTalk Server and Azure Logic Apps Standard. Three actions: (1) 'list' — returns metadata (id, title, platform, category) for all docs, optionally filtered by platform ('biztalk' or 'logic-apps') and/or category (e.g. '01-overview', '04-development', '10-migration', '02-how-to-guides'). (2) 'read' — returns the full markdown content of a specific doc by its id (e.g. 'biztalk/10-migration/migration-approaches'). (3) 'search' — searches using a pre-built inverted keyword index with TF-based relevance ranking. Returns top 10 results sorted by relevance score, each with a text snippet (~200 chars) showing context around the match. Use the snippet to decide if you need to 'read' the full doc. Multi-word queries match docs containing ALL terms. Covers: BizTalk architecture, adapters, pipelines, orchestrations, EDI/AS2, migration approaches, and Logic Apps Standard workflows, connectors, deployment, testing, AI agents, pricing, and more.",
+                "userDescription": "Access BizTalk and Logic Apps reference documentation",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": [
+                                "list",
+                                "read",
+                                "search"
+                            ],
+                            "description": "Action to perform: 'list' available docs, 'read' a specific doc, or 'search' by keyword"
+                        },
+                        "docId": {
+                            "type": "string",
+                            "description": "Doc ID to read (required when action='read'). Format: 'platform/category/doc-name', e.g. 'biztalk/10-migration/migration-approaches'"
+                        },
+                        "platform": {
+                            "type": "string",
+                            "enum": [
+                                "biztalk",
+                                "logic-apps"
+                            ],
+                            "description": "Optional platform filter for 'list' action"
+                        },
+                        "category": {
+                            "type": "string",
+                            "description": "Optional category filter for 'list' action (e.g. '01-overview', '10-migration', '02-how-to-guides')"
+                        },
+                        "query": {
+                            "type": "string",
+                            "description": "Search keyword (required when action='search')"
+                        }
+                    },
+                    "required": [
+                        "action"
+                    ]
+                }
+            },
+            {
+                "name": "migration_getDiscoveryAnalysis",
+                "displayName": "Get Discovery Analysis",
+                "toolReferenceName": "migration_getDiscoveryAnalysis",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Retrieve cached discovery analysis results for a specific flow group. Returns the source architecture (Mermaid diagram, explanation, component summary), step-by-step message flow sequence, component details (with Azure equivalents), gap analysis, and migration patterns that were already produced during the discovery stage. Use this FIRST during planning to leverage existing analysis instead of re-reading all source files. Only fall back to migration_getArtifactDetails and migration_readSourceFile if this tool returns no cached data or you need additional detail not covered by the cached analysis.",
+                "userDescription": "Get cached discovery analysis (architecture, message flow, components, gaps, patterns) for a flow group",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "groupId": {
+                            "type": "string",
+                            "description": "The flow group ID to retrieve discovery analysis for"
+                        },
+                        "aspects": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "architecture",
+                                    "messageFlow",
+                                    "components",
+                                    "gaps",
+                                    "patterns"
+                                ]
+                            },
+                            "description": "Which aspects of the analysis to return. Defaults to all if omitted. 'architecture' = mermaid + explanation + summary; 'messageFlow' = step-by-step message flow; 'components' = component details with Azure equivalents; 'gaps' = gap analysis; 'patterns' = migration patterns."
+                        }
+                    },
+                    "required": [
+                        "groupId"
+                    ]
+                }
+            },
+            {
+                "name": "migration_searchReferenceWorkflows",
+                "displayName": "Search Reference Workflows",
+                "toolReferenceName": "migration_searchReferenceWorkflows",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Search a catalog of 113 real Logic Apps Standard reference workflow.json and connections.json files. Use this to find examples of how specific connectors, triggers, or action types are used in real workflows before generating your own workflow.json. Search by keyword: connector names (e.g. 'serviceBus', 'eventHub', 'SAP', 'sql', 'ftp'), action types ('Foreach', 'Switch', 'If', 'XmlParse', 'ServiceProvider'), trigger types ('Request', 'ServiceProvider', 'Recurrence'), patterns ('loop', 'branching', 'xml', 'json'), or folder names. Returns matching entries with metadata including trigger types, action types, serviceProviderIds, operationIds, and relevance score. Use the entry 'id' with migration_readReferenceWorkflow to read the full JSON content of the most relevant match. IMPORTANT: Call this BEFORE generating workflow.json to ensure correct serviceProviderConfiguration structure, operationIds, and connection patterns.",
+                "userDescription": "Search reference workflow/connection catalog for real Logic Apps Standard examples",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search query — matches against action types, trigger types, connector IDs, folder names, tags. Examples: 'serviceBus', 'xml transform', 'foreach loop', 'SAP connector', 'ApiConnection'"
+                        },
+                        "category": {
+                            "type": "string",
+                            "enum": [
+                                "workflow",
+                                "connection"
+                            ],
+                            "description": "Optional category filter: 'workflow' for workflow.json files with triggers and actions, 'connection' for connections.json files with serviceProviderConnections format"
+                        },
+                        "limit": {
+                            "type": "number",
+                            "description": "Max results to return (default: 10)"
+                        }
+                    },
+                    "required": [
+                        "query"
+                    ]
+                }
+            },
+            {
+                "name": "migration_readReferenceWorkflow",
+                "displayName": "Read Reference Workflow",
+                "toolReferenceName": "migration_readReferenceWorkflow",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Read the full JSON content of a specific reference workflow.json or connections.json file by its catalog ID. Use this after migration_searchReferenceWorkflows to get the exact JSON structure, serviceProviderConfiguration, operationIds, and connection patterns from a real working Logic Apps Standard workflow. For workflow entries (e.g. 'workflows/sb-trigger' or 'workflows/v4/FileSystem/createFile'), returns the complete workflow.json. For connection entries (e.g. 'connections/FileSystem'), returns the connections.json.",
+                "userDescription": "Read a specific reference workflow or connection JSON file",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "entryId": {
+                            "type": "string",
+                            "description": "Catalog entry ID from search results (e.g. 'workflows/PurchaseOrder', 'connections/ServiceBusServiceProvider', 'ServiceProviders/v4/ServiceBusTrigger')"
+                        },
+                        "fileName": {
+                            "type": "string",
+                            "description": "For entries with multiple files, specify which file to read. Optional — defaults to the first file."
+                        }
+                    },
+                    "required": [
+                        "entryId"
+                    ]
+                }
+            },
+            {
+                "name": "migration_planning_storeMeta",
+                "displayName": "Store Planning Metadata",
+                "toolReferenceName": "migration_planning_storeMeta",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Store the planning metadata for a flow. This creates the planning folder and writes plan-meta.json with flowId, flowName, explanation, and summary. Call this FIRST when starting planning for a flow, before storing individual artifact files (architecture, workflow definition, action mappings, gaps, patterns). Each planning artifact is stored as a separate file.",
+                "userDescription": "Store planning metadata (flow info, explanation, summary) to disk",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "The flow ID being planned"
+                        },
+                        "flowName": {
+                            "type": "string",
+                            "description": "Display name of the flow"
+                        },
+                        "explanation": {
+                            "type": "string",
+                            "description": "Plain-language explanation of the target architecture"
+                        },
+                        "summary": {
+                            "type": "string",
+                            "description": "Brief summary of the migration plan"
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "flowName",
+                        "explanation",
+                        "summary"
+                    ]
+                }
+            },
+            {
+                "name": "migration_planning_storeArchitecture",
+                "displayName": "Store Architecture Diagram",
+                "toolReferenceName": "migration_planning_storeArchitecture",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Store the Mermaid architecture diagram for a flow. Writes architecture.mmd to the flow's planning folder. The diagram must be a valid Mermaid flowchart (typically 'flowchart TB') showing the target Logic Apps Standard architecture. Call migration_planning_storeMeta first.",
+                "userDescription": "Store architecture diagram (Mermaid) for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "The flow ID being planned"
+                        },
+                        "mermaid": {
+                            "type": "string",
+                            "description": "Mermaid flowchart TB diagram showing the target Logic Apps Standard architecture"
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "mermaid"
+                    ]
+                }
+            },
+            {
+                "name": "migration_planning_storeWorkflowDefinition",
+                "displayName": "Store Workflow Definition",
+                "toolReferenceName": "migration_planning_storeWorkflowDefinition",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Store a Logic Apps Standard workflow.json definition for a flow. Supports multiple workflows per flow — call this tool once per workflow with a unique 'name'. Writes workflow-{name}.json to the flow's planning folder. The workflowDefinition must contain a 'definition' key with 'triggers', 'actions', 'contentVersion', and '$schema'. Each action in 'definition.actions' must have a 'type' (e.g. 'Switch', 'If', 'Compose', 'ServiceProvider', 'ApiConnection', 'Xslt', 'Response', 'Foreach', 'Scope') and 'runAfter' (object mapping predecessor action names to status arrays). Switch actions must have 'cases'. If actions must have 'actions' (true) and optionally 'else.actions' (false). Optionally include a 'mermaid' field with a Mermaid architecture diagram for this specific workflow. PREREQUISITE — You MUST call these tools BEFORE calling this tool: (1) migration_readReferenceDoc (action='search') to check built-in ServiceProvider connector availability for each service. (2) migration_searchReferenceWorkflows to find real reference workflow examples for the connectors/patterns you will use. (3) migration_readReferenceWorkflow to read the full JSON of the best-matching reference workflow and copy its exact serviceProviderConfiguration structure, operationId values, and inputs format. Do NOT invent operationId values or serviceProviderConfiguration structures — always copy them from the reference. Prefer 'ServiceProvider' type with 'serviceProviderConfiguration' over 'ApiConnection' (managed connector) whenever a built-in equivalent exists. Built-in connectors run in-process with lower latency and no connection overhead. This enables the Designer View to render the workflow accurately with proper branching.",
+                "userDescription": "Store workflow.json definition for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "The flow ID being planned"
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Workflow name"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "What this workflow does"
+                        },
+                        "triggerType": {
+                            "type": "string",
+                            "description": "Trigger type (e.g. File System, HTTP Request)"
+                        },
+                        "actions": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Action names in this workflow"
+                        },
+                        "sourceArtifactIds": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Source artifact IDs mapped to this workflow"
+                        },
+                        "workflowDefinition": {
+                            "type": "object",
+                            "description": "Full Logic Apps Standard workflow.json definition object. Must contain a 'definition' key with 'triggers', 'actions', 'contentVersion', and '$schema'. Actions should use 'runAfter' to define execution order. Switch actions use 'cases' with nested 'actions'. If/Condition actions use 'actions' (true) and 'else.actions' (false). Foreach/Until loops nest 'actions'."
+                        },
+                        "mermaid": {
+                            "type": "string",
+                            "description": "Optional Mermaid architecture diagram for this specific workflow showing its actions, connectors, and data flow"
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "name",
+                        "workflowDefinition"
+                    ]
+                }
+            },
+            {
+                "name": "migration_planning_storeAzureComponents",
+                "displayName": "Store Azure Components",
+                "toolReferenceName": "migration_planning_storeAzureComponents",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Store the required Azure components for a flow. Writes azure-components.json to the flow's planning folder. List additional Azure components beyond Logic Apps that are needed (e.g. Service Bus, Integration Account, Key Vault, Storage Account).",
+                "userDescription": "Store required Azure components for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "The flow ID being planned"
+                        },
+                        "components": {
+                            "type": "array",
+                            "description": "Required Azure components",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Component name (e.g. Azure Service Bus)"
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "description": "Type of component"
+                                    },
+                                    "reason": {
+                                        "type": "string",
+                                        "description": "Why this component is needed"
+                                    },
+                                    "configNotes": {
+                                        "type": "string",
+                                        "description": "Configuration notes"
+                                    }
+                                },
+                                "required": [
+                                    "name",
+                                    "type",
+                                    "reason"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "components"
+                    ]
+                }
+            },
+            {
+                "name": "migration_planning_storeActionMappings",
+                "displayName": "Store Action Mappings",
+                "toolReferenceName": "migration_planning_storeActionMappings",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Store the action mappings (source shape → Logic Apps action) for a flow. Writes action-mappings.json to the flow's planning folder. Each mapping describes how a source component/action maps to a Logic Apps Standard action.",
+                "userDescription": "Store source-to-Logic Apps action mappings for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "The flow ID being planned"
+                        },
+                        "mappings": {
+                            "type": "array",
+                            "description": "Source to Logic Apps action mappings",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "source": {
+                                        "type": "string",
+                                        "description": "Source action/shape name"
+                                    },
+                                    "target": {
+                                        "type": "string",
+                                        "description": "Logic Apps action name"
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "description": "Mapping notes"
+                                    },
+                                    "workflowName": {
+                                        "type": "string",
+                                        "description": "Which workflow this mapping belongs to (for multi-workflow flows)"
+                                    }
+                                },
+                                "required": [
+                                    "source",
+                                    "target"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "mappings"
+                    ]
+                }
+            },
+            {
+                "name": "migration_planning_storeGaps",
+                "displayName": "Store Migration Gaps",
+                "toolReferenceName": "migration_planning_storeGaps",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Store the migration gap analysis for a flow. Writes gaps.json to the flow's planning folder. Each gap identifies a component or capability that cannot be directly migrated to Logic Apps Standard, along with severity and recommendation. Pass an empty array if there are no gaps.",
+                "userDescription": "Store migration gap analysis for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "The flow ID being planned"
+                        },
+                        "gaps": {
+                            "type": "array",
+                            "description": "Migration gaps (pass empty array if none)",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "component": {
+                                        "type": "string",
+                                        "description": "Component with the gap"
+                                    },
+                                    "gap": {
+                                        "type": "string",
+                                        "description": "Description of the gap"
+                                    },
+                                    "severity": {
+                                        "type": "string",
+                                        "enum": [
+                                            "high",
+                                            "medium",
+                                            "low"
+                                        ],
+                                        "description": "Gap severity"
+                                    },
+                                    "recommendation": {
+                                        "type": "string",
+                                        "description": "Recommended resolution"
+                                    }
+                                },
+                                "required": [
+                                    "component",
+                                    "gap",
+                                    "severity",
+                                    "recommendation"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "gaps"
+                    ]
+                }
+            },
+            {
+                "name": "migration_planning_storePatterns",
+                "displayName": "Store Integration Patterns",
+                "toolReferenceName": "migration_planning_storePatterns",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Store the detected integration patterns for a flow. Writes patterns.json to the flow's planning folder. Each pattern describes how a source integration pattern maps to a Logic Apps Standard approach. Pass an empty array if no specific patterns detected.",
+                "userDescription": "Store detected integration patterns for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "The flow ID being planned"
+                        },
+                        "patterns": {
+                            "type": "array",
+                            "description": "Integration patterns (pass empty array if none)",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Pattern name"
+                                    },
+                                    "sourceApproach": {
+                                        "type": "string",
+                                        "description": "How source platform handles this"
+                                    },
+                                    "logicAppsApproach": {
+                                        "type": "string",
+                                        "description": "How Logic Apps handles this"
+                                    },
+                                    "complexity": {
+                                        "type": "string",
+                                        "enum": [
+                                            "high",
+                                            "medium",
+                                            "low"
+                                        ],
+                                        "description": "Migration complexity"
+                                    }
+                                },
+                                "required": [
+                                    "name",
+                                    "sourceApproach",
+                                    "logicAppsApproach",
+                                    "complexity"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "patterns"
+                    ]
+                }
+            },
+            {
+                "name": "migration_planning_storeArtifactDispositions",
+                "displayName": "Store Artifact Dispositions",
+                "toolReferenceName": "migration_planning_storeArtifactDispositions",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Store the artifact disposition assessment for a flow. Writes artifact-dispositions.json. ONLY include artifacts that need conversion or upload for Logic Apps Standard: schemas (.xsd), maps (.btm → XSLT, DataWeave → Liquid), EDI agreements, custom code (.cs/.dll → local function/Azure Function), and certificates. Do NOT include orchestrations (.odx), pipelines (.btp), or bindings — those are handled by workflow generation. Each entry specifies whether conversion is needed (e.g., .btm → XSLT, .xsd annotation stripping), with conversionNotes (REQUIRED when conversionRequired=true), and WHERE to upload (Integration Account, Logic App Artifacts folder, Azure Function, or not-applicable) with uploadNotes (ALWAYS required).",
+                "userDescription": "Store artifact conversion & upload disposition assessment for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "The flow ID being planned"
+                        },
+                        "dispositions": {
+                            "type": "array",
+                            "description": "Artifact dispositions — one entry per deployable artifact (schemas, maps, EDI agreements, custom code). Do NOT include orchestrations, pipelines, or bindings.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "artifactName": {
+                                        "type": "string",
+                                        "description": "Artifact file name (e.g., 'TransformOrder.btm', 'OrderSchema.xsd')"
+                                    },
+                                    "artifactType": {
+                                        "type": "string",
+                                        "description": "Artifact file type/extension (e.g., '.btm', '.xsd', '.dwl', '.cs', '.dll', 'edi-agreement')"
+                                    },
+                                    "conversionRequired": {
+                                        "type": "boolean",
+                                        "description": "Whether this artifact needs to be converted before deployment"
+                                    },
+                                    "conversionFrom": {
+                                        "type": "string",
+                                        "description": "Source format (e.g., '.btm', 'BizTalk .xsd with annotations')"
+                                    },
+                                    "conversionTo": {
+                                        "type": "string",
+                                        "description": "Target format (e.g., '.xslt', 'clean .xsd')"
+                                    },
+                                    "conversionNotes": {
+                                        "type": "string",
+                                        "description": "Explanation of why conversion is or isn't needed (REQUIRED when conversionRequired=true)"
+                                    },
+                                    "uploadDestination": {
+                                        "type": "string",
+                                        "enum": [
+                                            "integration-account",
+                                            "logic-app-artifact-folder",
+                                            "azure-function",
+                                            "not-applicable"
+                                        ],
+                                        "description": "Where this artifact should be deployed/uploaded"
+                                    },
+                                    "uploadPath": {
+                                        "type": "string",
+                                        "description": "Specific sub-path within the destination (e.g., 'Artifacts/Maps', 'Artifacts/Schemas')"
+                                    },
+                                    "uploadNotes": {
+                                        "type": "string",
+                                        "description": "Explanation of why this upload destination was chosen (REQUIRED)"
+                                    }
+                                },
+                                "required": [
+                                    "artifactName",
+                                    "artifactType",
+                                    "conversionRequired",
+                                    "uploadDestination",
+                                    "uploadNotes"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "dispositions"
+                    ]
+                }
+            },
+            {
+                "name": "migration_planning_finalize",
+                "displayName": "Finalize Migration Plan",
+                "toolReferenceName": "migration_planning_finalize",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Finalize the migration plan for a flow. Validates that all required planning files exist (plan-meta.json, architecture.mmd, workflow-definition.json, action-mappings.json, gaps.json, patterns.json, artifact-dispositions.json), assembles the complete plan, and displays it in the Planning webview. Call this LAST after all individual planning files have been stored using the other migration_planning_store* tools. If any files are missing, an error is returned listing the missing files.",
+                "userDescription": "Validate all planning files and display the plan in the Planning webview",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "The flow ID to finalize"
+                        },
+                        "flowName": {
+                            "type": "string",
+                            "description": "Optional display name override"
+                        }
+                    },
+                    "required": [
+                        "flowId"
+                    ]
+                }
+            },
+            {
+                "name": "migration_conversion_getPlanningResults",
+                "displayName": "Get Planning Results for Conversion",
+                "toolReferenceName": "migration_conversion_getPlanningResults",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Retrieve the finalized planning results for a specific flow. Returns the complete FlowPlanningResult including: target architecture (Mermaid diagram), planned Logic Apps Standard workflow definitions, required Azure components, action mappings (source → target), gap analysis, detected patterns, and artifact dispositions (what needs conversion/upload and where). This is the primary input for the conversion stage — call this FIRST to understand what needs to be converted.",
+                "userDescription": "Read finalized planning results for a flow to guide conversion",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "The flow ID to retrieve planning results for"
+                        }
+                    },
+                    "required": [
+                        "flowId"
+                    ]
+                }
+            },
+            {
+                "name": "migration_conversion_storeTaskPlan",
+                "displayName": "Store Conversion Task Plan",
+                "toolReferenceName": "migration_conversion_storeTaskPlan",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Store the ordered conversion task plan for a flow. The task plan is determined by the agent based on the specific flow's planning results — there is no fixed list of task types. Each task has: id (unique string), type (short label like 'create-integration-account', 'convert-schemas', 'generate-workflow'), name (human-readable), description (short UI card text), executionPrompt (detailed agent instructions for execution), dependsOn (array of prerequisite task IDs), order (1-based execution sequence), and optionally estimatedMinutes and artifactIds. Tasks are displayed in the Conversion webview as an ordered checklist.",
+                "userDescription": "Store the conversion task plan for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "The flow ID"
+                        },
+                        "flowName": {
+                            "type": "string",
+                            "description": "Optional display name"
+                        },
+                        "summary": {
+                            "type": "string",
+                            "description": "Summary of the conversion approach"
+                        },
+                        "prerequisites": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Optional prerequisites or assumptions"
+                        },
+                        "tasks": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string",
+                                        "description": "Unique task ID"
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "description": "Short task type label"
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Human-readable task name"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "Short user-facing summary shown on the task card"
+                                    },
+                                    "executionPrompt": {
+                                        "type": "string",
+                                        "description": "Detailed agent-only instructions used during task execution"
+                                    },
+                                    "dependsOn": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "IDs of prerequisite tasks"
+                                    },
+                                    "order": {
+                                        "type": "number",
+                                        "description": "Execution order (1-based)"
+                                    },
+                                    "artifactIds": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Optional artifact IDs this task operates on"
+                                    },
+                                    "estimatedMinutes": {
+                                        "type": "number",
+                                        "description": "Optional effort estimate in minutes"
+                                    }
+                                },
+                                "required": [
+                                    "id",
+                                    "type",
+                                    "name",
+                                    "description",
+                                    "dependsOn",
+                                    "order"
+                                ]
+                            },
+                            "description": "Ordered list of conversion tasks"
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "summary",
+                        "tasks"
+                    ]
+                }
+            },
+            {
+                "name": "migration_conversion_storeTaskOutput",
+                "displayName": "Store Conversion Task Output",
+                "toolReferenceName": "migration_conversion_storeTaskOutput",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Store the output/result for a specific completed conversion task. Marks the task as completed and records what was done, which files were generated, and any warnings. Call this after executing each conversion task.",
+                "userDescription": "Record the output of a completed conversion task",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "The flow ID"
+                        },
+                        "taskId": {
+                            "type": "string",
+                            "description": "The task ID to mark as completed"
+                        },
+                        "summary": {
+                            "type": "string",
+                            "description": "Summary of what was done"
+                        },
+                        "generatedFiles": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Workspace-relative paths of files generated or modified"
+                        },
+                        "warnings": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Any warnings or notes"
+                        },
+                        "data": {
+                            "type": "object",
+                            "description": "Arbitrary structured data to persist"
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "taskId",
+                        "summary"
+                    ]
+                }
+            },
+            {
+                "name": "migration_conversion_finalize",
+                "displayName": "Finalize Conversion",
+                "toolReferenceName": "migration_conversion_finalize",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Finalize the conversion for a flow. Verifies all conversion tasks are completed (or skipped), marks the flow as completed, and refreshes the Conversion webview. Call this LAST after all tasks have been completed via migration_conversion_storeTaskOutput.",
+                "userDescription": "Mark flow conversion as complete and refresh the webview",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "The flow ID to finalize"
+                        }
+                    },
+                    "required": [
+                        "flowId"
+                    ]
+                }
+            }
+        ],
+        "commands": [
+            {
+                "command": "logicAppsMigrationAssistant.start",
+                "title": "Start Migration",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.openSidebar",
+                "title": "Open Migration Sidebar",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.selectSourceFolder",
+                "title": "Select Source Folder",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.viewMigrationPlan",
+                "title": "View Migration Plan",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.resetMigration",
+                "title": "Reset Migration",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.showLogs",
+                "title": "Show Extension Logs",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.runDiscovery",
+                "title": "Run Discovery",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.rescanArtifacts",
+                "title": "Rescan Artifacts",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.viewFlowVisualization",
+                "title": "View Details",
+                "category": "Logic Apps Migration Assistant",
+                "icon": "$(preview)"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.viewDependencyGraph",
+                "title": "View Dependency Graph",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.openPlanningView",
+                "title": "Open Planning View",
+                "category": "Logic Apps Migration Assistant",
+                "icon": "$(calendar)"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.generatePlanForFlow",
+                "title": "Generate Plan for Flow",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.openConversionView",
+                "title": "Open Conversion View",
+                "category": "Logic Apps Migration Assistant",
+                "icon": "$(tools)"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.generateConversionForFlow",
+                "title": "Generate Conversion for Flow",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.executeConversionTask",
+                "title": "Execute Conversion Task",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.executeAllConversionTasks",
+                "title": "Execute All Conversion Tasks",
+                "category": "Logic Apps Migration Assistant"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "logicAppsMigration",
+                    "title": "Logic Apps Migration Assistant",
+                    "icon": "resources/icons/migration-icon.svg"
+                }
+            ]
+        },
+        "views": {
+            "logicAppsMigration": [
+                {
+                    "id": "logicAppsMigrationAssistant.home",
+                    "name": "Home"
+                },
+                {
+                    "id": "logicAppsMigrationAssistant.discovery",
+                    "name": "Discovery Results"
+                },
+                {
+                    "id": "logicAppsMigrationAssistant.inventory",
+                    "name": "Artifact Inventory"
+                },
+                {
+                    "id": "logicAppsMigrationAssistant.actions",
+                    "name": "Actions"
+                }
+            ]
+        },
+        "viewsWelcome": [
+            {
+                "view": "logicAppsMigrationAssistant.inventory",
+                "contents": "No artifacts discovered yet.\n\n[Select Source Folder](command:logicAppsMigrationAssistant.selectSourceFolder) to scan for integration artifacts."
+            },
+            {
+                "view": "logicAppsMigrationAssistant.actions",
+                "contents": "Quick Actions:\n\n[Start Migration](command:logicAppsMigrationAssistant.selectSourceFolder)\n[View Logs](command:logicAppsMigrationAssistant.showLogs)"
+            }
+        ],
+        "menus": {
+            "view/title": [],
+            "view/item/context": [],
+            "commandPalette": [
+                {
+                    "command": "logicAppsMigrationAssistant.start",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.openSidebar",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.selectSourceFolder",
+                    "when": "true"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.viewMigrationPlan",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.resetMigration",
+                    "when": "true"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.showLogs",
+                    "when": "true"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.runDiscovery",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.rescanArtifacts",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.viewFlowVisualization",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.viewDependencyGraph",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.openPlanningView",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.generatePlanForFlow",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.openConversionView",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.generateConversionForFlow",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.executeConversionTask",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAssistant.executeAllConversionTasks",
+                    "when": "false"
+                }
+            ]
+        },
+        "configuration": {
+            "title": "Logic Apps Migration Assistant",
+            "properties": {
+                "logicAppsMigrationAssistant.deploymentModel": {
+                    "type": "string",
+                    "enum": [
+                        "workflow-service-plan",
+                        "ase-v3",
+                        "hybrid"
+                    ],
+                    "enumDescriptions": [
+                        "Workflow Service Plan (Supported)",
+                        "App Service Environment V3 (TBD)",
+                        "Hybrid (TBD)"
+                    ],
+                    "default": "workflow-service-plan",
+                    "markdownDescription": "Target platform deployment model for Logic Apps Standard"
+                },
+                "logicAppsMigrationAssistant.azure.subscriptionId": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Azure subscription ID for deployment"
+                },
+                "logicAppsMigrationAssistant.azure.resourceGroup": {
+                    "type": "string",
+                    "default": "integration-migration-tool-test-rg",
+                    "description": "Azure resource group for provisioning and testing resources"
+                },
+                "logicAppsMigrationAssistant.azure.location": {
+                    "type": "string",
+                    "default": "eastus",
+                    "description": "Azure region for provisioning resources"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "node scripts/build-reference-workflow-catalog.js && npm run build",
+        "build": "node esbuild.js --production",
+        "watch": "node esbuild.js --watch",
+        "compile": "tsc -p ./",
+        "lint": "eslint src",
+        "lint:fix": "eslint src --fix",
+        "format": "prettier --write \"src/**/*.ts\"",
+        "format:check": "prettier --check \"src/**/*.ts\"",
+        "test": "npm run compile && npm run test:unit && npm run test:integration",
+        "test:unit": "node ./out/test/runTest.js unit",
+        "test:integration": "node ./out/test/runTest.js integration",
+        "package": "vsce package",
+        "publish": "vsce publish",
+        "prepare": "husky"
+    },
+    "devDependencies": {
+        "@types/glob": "^8.1.0",
+        "@types/mocha": "^10.0.6",
+        "@types/node": "^22.0.0",
+        "@types/uuid": "^10.0.0",
+        "@types/vscode": "^1.85.0",
+        "@typescript-eslint/eslint-plugin": "^8.0.0",
+        "@typescript-eslint/parser": "^8.0.0",
+        "@vscode/test-electron": "^2.3.8",
+        "@vscode/vsce": "^3.0.0",
+        "esbuild": "^0.27.0",
+        "eslint": "^9.0.0",
+        "glob": "^13.0.0",
+        "husky": "^9.0.0",
+        "lint-staged": "^16.0.0",
+        "mocha": "^11.0.0",
+        "prettier": "^3.2.4",
+        "ts-unused-exports": "^11.0.1",
+        "typescript": "^5.3.3",
+        "typescript-eslint": "^8.54.0"
+    },
+    "dependencies": {
+        "@azure/arm-logic": "^8.2.0",
+        "@azure/arm-resources": "^7.0.0",
+        "@azure/identity": "^4.0.1",
+        "@vscode/extension-telemetry": "^1.0.0",
+        "@xmldom/xmldom": "^0.8.11",
+        "fast-xml-parser": "^5.3.4",
+        "immer": "^11.0.0",
+        "xstate": "^5.5.0"
+    },
+    "lint-staged": {
+        "*.ts": [
+            "eslint --fix",
+            "prettier --write"
+        ]
+    }
+}

@@ -1,0 +1,25 @@
+{
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit"
+    },
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true,
+    "files.exclude": {
+        "out": true,
+        "dist": true,
+        "node_modules": true,
+        "**/*.js": {
+            "when": "$(basename).ts"
+        },
+        "**/*.map": true
+    },
+    "search.exclude": {
+        "out": true,
+        "dist": true,
+        "node_modules": true
+    },
+    "markdown.validate.enabled": false,
+    "markdown.validate.fragmentLinks.enabled": "ignore"
+}

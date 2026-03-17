@@ -1,0 +1,57 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "get_messages_from_topic": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "topicName": "ServiceBuscit",
+            "subscriptionName": "subscription"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "getMessagesFromTopic",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {}
+      },
+      "For_each": {
+        "type": "Foreach",
+        "foreach": "@body('get_messages_from_topic')",
+        "actions": {
+          "Complete_the_message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "messageId": "@item()?['messageId']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "completeMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "runAfter": {
+          "get_messages_from_topic": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

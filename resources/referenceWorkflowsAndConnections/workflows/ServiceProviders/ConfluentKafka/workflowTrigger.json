@@ -1,0 +1,26 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "triggers": {
+            "Read_messages_from_a_Kafka_topic": {
+                "type": "ServiceProvider",
+                "inputs": {
+                    "parameters": {
+                        "topic": "topic_0011",
+                        "ConsumerGroup": "consumergroup10",
+                        "Protocol": "SaslSsl",
+                        "AuthenticationMode" : "Plain"
+                    },
+                    "serviceProviderConfiguration": {
+                        "connectionName": "confluentKafka",
+                        "operationId": "ReceiveMessage",
+                        "serviceProviderId": "/serviceProviders/confluentKafka"
+                    }
+                }
+            }
+        }
+    },
+    "kind": "Stateful"
+}

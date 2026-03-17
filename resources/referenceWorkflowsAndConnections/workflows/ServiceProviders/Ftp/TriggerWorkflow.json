@@ -1,0 +1,30 @@
+{{
+  "definition": {{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {{}},
+    "triggers": {{
+      "When_a_file_is_added_or_updated": {{
+        "type": "ServiceProvider",
+        "kind": "Polling",
+        "inputs": {{
+          "parameters": {{
+            "folderPath": "{0}",
+            "maxFileCount": 4
+          }},
+          "serviceProviderConfiguration": {{
+            "connectionName": "Ftp",
+            "operationId": "whenFtpFilesAreAddedOrModified",
+            "serviceProviderId": "/serviceProviders/Ftp"
+          }}
+        }},
+        "recurrence": {{
+          "frequency": "Minute",
+          "interval": 1
+        }}
+      }}
+    }},
+    "contentVersion": "1.0.0.0",
+    "outputs": {{}}
+  }},
+  "kind": "Stateful"
+}}

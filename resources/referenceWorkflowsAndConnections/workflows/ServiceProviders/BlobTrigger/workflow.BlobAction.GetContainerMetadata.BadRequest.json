@@ -1,0 +1,42 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Response": {
+        "inputs": {
+          "body": "@outputs('Get_Container_Metadata')",
+          "statusCode": 200
+        },
+        "kind": "http",
+        "runAfter": {
+          "Get_Container_Metadata": [
+            "Succeeded"
+          ]
+        },
+        "type": "Response"
+      },
+      "Get_Container_Metadata": {
+        "inputs": {
+          "parameters": {
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "blobStorageConnection",
+            "operationId": "getContainerMetadata",
+            "serviceProviderId": "/serviceProviders/AzureBlob"
+          }
+        },
+        "runAfter": {},
+        "type": "ServiceProvider"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "manual": {
+        "kind": "http",
+        "type": "request"
+      }
+    }
+  },
+  "kind": "Stateless"
+}

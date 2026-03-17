@@ -1,0 +1,37 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Compose": {
+        "inputs": "@triggerBody()",
+        "runAfter": {},
+        "type": "Compose"
+      },
+      "HTTP": {
+        "inputs": {
+          "body": "@outputs('Compose')",
+          "method": "POST",
+          "uri": "REPLACE_WITH_LOCALHOST_ENDPOINT"
+        },
+        "runAfter": {
+          "Compose": [
+            "Succeeded"
+          ]
+        },
+        "type": "Http"
+      }
+    },
+    "triggers": {
+      "Batch_messages": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {}
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

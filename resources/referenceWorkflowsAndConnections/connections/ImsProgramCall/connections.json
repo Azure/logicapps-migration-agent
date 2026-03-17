@@ -1,0 +1,18 @@
+{
+  "serviceProviderConnections": {
+    "imsConnect": {
+      "parameterValues": {
+        "codePage": "@appsetting('imsConnect_codePage')",
+        "portNumber": "@appsetting('imsConnect_portNumber')",
+        "serverName": "@appsetting('imsConnect_serverName')",
+        "itocExitName": "@appsetting('imsConnect_itocExitName')",
+        "imsSystemId": "@appsetting('imsConnect_imsSystemId')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/imsProgramCall"
+      },
+      "displayName": "mainframe_37"
+    }
+  },
+  "managedApiConnections": {}
+}

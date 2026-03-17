@@ -1,0 +1,24 @@
+{
+  "serviceProviderConnections": {
+    "AzureBlob": {
+      "parameterValues": {
+        "connectionString": "@appsetting('AzureBlob_connectionString')"
+      },
+      "parameterSetName": "connectionString",
+      "serviceProvider": {
+        "id": "/serviceProviders/AzureBlob"
+      },
+      "displayName": "connInAppStor"
+    },
+    "azurequeues": {
+      "parameterValues": {
+        "connectionString": "@appsetting('azurequeues_connectionString')"
+      },
+      "parameterSetName": "connectionString",
+      "serviceProvider": {
+        "id": "/serviceProviders/azurequeues"
+      },
+      "displayName": "test-queue-conn"
+    }
+  }
+}

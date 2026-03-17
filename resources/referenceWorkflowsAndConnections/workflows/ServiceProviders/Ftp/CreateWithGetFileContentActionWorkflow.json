@@ -1,0 +1,63 @@
+{{
+  "definition": {{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {{
+      "Creates_a_file_on_the_FTP_server": {{
+        "inputs": {{
+          "parameters": {{
+            "fileContent": "@body('Get_File_Content')",
+            "filePath": "{1}"
+          }},
+          "serviceProviderConfiguration": {{
+            "connectionName": "Ftp",
+            "operationId": "createFile",
+            "serviceProviderId": "/serviceProviders/Ftp"
+          }}
+        }},
+        "runAfter": {{
+          "Get_File_Content": [
+            "Succeeded"
+          ]
+        }},
+        "type": "ServiceProvider"
+      }},
+      "Get_File_Content": {{
+        "inputs": {{
+          "parameters": {{
+            "filePath": "{0}"
+          }},
+          "serviceProviderConfiguration": {{
+            "connectionName": "Ftp",
+            "operationId": "getFtpFileContent",
+            "serviceProviderId": "/serviceProviders/Ftp"
+          }}
+        }},
+        "runAfter": {{}},
+        "type": "ServiceProvider"
+      }},
+      "Response": {{
+        "inputs": {{
+          "body": {{}},
+          "statusCode": 200
+        }},
+        "kind": "http",
+        "runAfter": {{
+          "Creates_a_file_on_the_FTP_server": [
+            "Succeeded"
+          ]
+        }},
+        "type": "Response"
+      }}
+    }},
+    "contentVersion": "1.0.0.0",
+    "outputs": {{}},
+    "triggers": {{
+      "manual": {{
+        "inputs": {{}},
+        "kind": "Http",
+        "type": "Request"
+      }}
+    }}
+  }},
+  "kind": "Stateful"
+}}

@@ -1,0 +1,91 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "For_each": {
+        "type": "Foreach",
+        "foreach": "@triggerOutputs()?['body']",
+        "runAfter": {},
+        "actions": {
+          "Defer_Message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "messageId": "@item()?['messageId']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "deferMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {}
+          },
+          "Get_Deferred_Message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "topicName": "ServiceBuscit",
+                "subscriptionName": "subscription",
+                "sessionId": "@item()?['sessionId']",
+                "sequenceNumber": "@item()?['sequenceNumber']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "getDeferredMessageFromTopicSession",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {
+              "Defer_Message": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Dead_Letter": {
+            "inputs": {
+              "parameters": {
+                "messageId": "@body('Get_deferred_message')?['messageId']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBusConnectionString",
+                "operationId": "deadLetterMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {
+              "Get_Deferred_Message": [
+                "Succeeded"
+              ]
+            },
+            "type": "ServiceProvider"
+          }
+        }
+      }
+    },
+    "triggers": {
+      "When_messages_are_available_in_a_topic_subscription_Session_(peek-lock)": {
+        "type": "ServiceProvider",
+        "kind": "Polling",
+        "recurrence": {
+          "frequency": "Second",
+          "interval": 1
+        },
+        "inputs": {
+          "parameters": {
+            "topicName": "ServiceBuscit",
+            "subscriptionName": "subscription"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBusConnectionString",
+            "operationId": "onNewMessagesFromTopicSession",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

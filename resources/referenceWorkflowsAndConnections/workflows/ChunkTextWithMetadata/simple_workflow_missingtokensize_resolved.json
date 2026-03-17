@@ -1,0 +1,54 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "ChunkTextWithMetadata": {
+        "type": "ChunkTextWithMetadata",
+        "inputs": {
+          "chunkOverlapLength": "10",
+          "pageText": [
+            {
+              "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+              "metadata": {
+                "pageNumber": "1",
+                "totalPages": "1",
+                "sentencesAreComplete": "true",
+                "excel": {
+                  "sheetName": "sheet1",
+                  "sheetNumber": "1",
+                  "totalSheets": "1"
+                }
+              }
+            }
+          ]
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@body('ChunkTextWithMetadata')"
+        },
+        "runAfter": {
+          "ChunkTextWithMetadata": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {}
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

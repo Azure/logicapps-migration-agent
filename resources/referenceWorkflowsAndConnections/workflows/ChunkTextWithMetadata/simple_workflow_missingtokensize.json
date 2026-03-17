@@ -1,0 +1,40 @@
+﻿{{
+  "definition": {{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {{
+      "ChunkTextWithMetadata": {{
+        "type": "ChunkTextWithMetadata",
+        "inputs": {{
+          "chunkOverlapLength": "{1}",
+          "pageText": {2}
+          }},
+          "runAfter": {{}}
+      }},
+      "Response": {{
+        "type": "Response",
+        "kind": "http",
+        "inputs": {{
+          "statusCode": 200,
+          "body": "@body('ChunkTextWithMetadata')"
+        }},
+        "runAfter": {{
+          "ChunkTextWithMetadata": [
+            "Succeeded"
+          ]
+        }}
+      }}
+    }},
+    "triggers": {{
+      "manual": {{
+        "inputs": {{
+          "schema": {{}}
+        }},
+        "kind": "Http",
+        "type": "Request"
+      }}
+    }},
+    "contentVersion": "1.0.0.0",
+    "outputs": {{}}
+  }},
+  "kind": "Stateful"
+}}

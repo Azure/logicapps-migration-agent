@@ -1,0 +1,21 @@
+{
+  "managedApiConnections": {},
+  "serviceProviderConnections": {
+    "mq": {
+      "displayName": "MQ_SYS1",
+      "parameterValues": {
+        "channelName": "@appsetting('mq_channelName')",
+        "connectAs": "@appsetting('mq_connectAs')",
+        "connectionTimeoutSeconds": "@appsetting('mq_connectionTimeoutSeconds')",
+        "portNumber": "@appsetting('mq_portNumber')",
+        "queueManagerName": "@appsetting('mq_queueManagerName')",
+        "serverName": "@appsetting('mq_serverName')",
+        "useTLS": "@appsetting('mq_useTLS')",
+        "userName": "@appsetting('mq_userName')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/mq"
+      }
+    }
+  }
+}

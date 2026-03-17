@@ -1,0 +1,330 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "ApprovedPO": {
+                "type": "Compose",
+                "inputs": "@setProperty(setProperty(outputs('Assign_POAmount'), 'ApproverName', 'pariksg'), 'ApprovalStatus','Approve')",
+                "runAfter": {
+                    "Condition": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Assign_POAmount": {
+                "type": "Compose",
+                "inputs": "@setProperty(body('PO_Received'),'POamount', variables('POAmount'))",
+                "runAfter": {
+                    "Compute_POAmount": [
+                        "Succeeded"
+                    ]
+                },
+                "trackedProperties": {
+                    "Sanjiv1": "@action()['inputs']['POamount']",
+                    "Sanjiv2": "@trigger().outputs.body.OrderNumber"
+                }
+            },
+            "Compute_POAmount": {
+                "type": "Switch",
+                "expression": "@triggerBody()?['Product']",
+                "cases": {
+                    "SKU101": {
+                        "case": "SKU101",
+                        "actions": {
+                            "Compute_SKU101": {
+                                "type": "SetVariable",
+                                "inputs": {
+                                    "name": "POAmount",
+                                    "value": "@mul(20, triggerBody()?['Quantity'])"
+                                },
+                                "runAfter": {}
+                            }
+                        }
+                    },
+                    "SKU105": {
+                        "case": "SKU105",
+                        "actions": {
+                            "Compute_SKU105": {
+                                "type": "SetVariable",
+                                "inputs": {
+                                    "name": "POAmount",
+                                    "value": "@mul(30, triggerBody()?['Quantity'])"
+                                },
+                                "runAfter": {}
+                            }
+                        }
+                    },
+                    "SKU109": {
+                        "case": "SKU109",
+                        "actions": {
+                            "Compute_SKU109": {
+                                "type": "SetVariable",
+                                "inputs": {
+                                    "name": "POAmount",
+                                    "value": "@mul(50, triggerBody()?['Quantity'])"
+                                },
+                                "runAfter": {}
+                            }
+                        }
+                    }
+                },
+                "default": {
+                    "actions": {
+                        "Response_4": {
+                            "type": "Response",
+                            "kind": "http",
+                            "inputs": {
+                                "statusCode": 200,
+                                "body": "Product unavailable"
+                            },
+                            "runAfter": {}
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Initialize_OrderPriority": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Condition": {
+                "type": "If",
+                "expression": {
+                    "and": [
+                        {
+                            "greater": [
+                                "@variables('POAmount')",
+                                100
+                            ]
+                        }
+                    ]
+                },
+                "actions": {},
+                "runAfter": {
+                    "Assign_POAmount": [
+                        "Succeeded"
+                    ]
+                },
+                "else": {
+                    "actions": {
+                        "OrderDenied": {
+                            "type": "Terminate",
+                            "inputs": {
+                                "runStatus": "Succeeded"
+                            },
+                            "runAfter": {
+                                "Response_2": [
+                                    "Succeeded"
+                                ]
+                            }
+                        },
+                        "Response_2": {
+                            "type": "Response",
+                            "kind": "http",
+                            "inputs": {
+                                "statusCode": 400
+                            },
+                            "runAfter": {}
+                        }
+                    }
+                }
+            },
+            "Initialize_OrderPriority": {
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "OrderPriority",
+                            "type": "integer",
+                            "value": 0
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Initialize_POAmount": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "Initialize_POAmount": {
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "POAmount",
+                            "type": "float",
+                            "value": 999
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "PO_Received": [
+                        "Succeeded"
+                    ]
+                }
+            },
+            "PO_Received": {
+                "type": "ParseJson",
+                "inputs": {
+                    "content": "@triggerBody()",
+                    "schema": {
+                        "properties": {
+                            "Address": {
+                                "properties": {
+                                    "City": {
+                                        "type": "string"
+                                    },
+                                    "Name": {
+                                        "type": "string"
+                                    },
+                                    "State": {
+                                        "type": "string"
+                                    },
+                                    "Street": {
+                                        "type": "string"
+                                    },
+                                    "Zip": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            },
+                            "ApprovalStatus": {
+                                "type": "string"
+                            },
+                            "ApproverName": {
+                                "type": "string"
+                            },
+                            "OrderNumber": {
+                                "type": "integer"
+                            },
+                            "OrderPriority": {
+                                "type": "integer"
+                            },
+                            "POamount": {
+                                "type": "integer"
+                            },
+                            "Product": {
+                                "type": "string"
+                            },
+                            "Quantity": {
+                                "type": "integer"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "runAfter": {}
+            },
+            "setPriority": {
+                "type": "If",
+                "expression": {
+                    "and": [
+                        {
+                            "greater": [
+                                "@variables('POAmount')",
+                                500
+                            ]
+                        }
+                    ]
+                },
+                "actions": {
+                    "High_Priority": {
+                        "type": "SetVariable",
+                        "inputs": {
+                            "name": "OrderPriority",
+                            "value": "@int(1)"
+                        },
+                        "runAfter": {}
+                    }
+                },
+                "runAfter": {
+                    "ApprovedPO": [
+                        "Succeeded"
+                    ]
+                },
+                "else": {
+                    "actions": {
+                        "Low_Priority": {
+                            "type": "SetVariable",
+                            "inputs": {
+                                "name": "OrderPriority",
+                                "value": "@int(12)"
+                            },
+                            "runAfter": {}
+                        }
+                    }
+                }
+            },
+            "Response": {
+                "type": "Response",
+                "kind": "http",
+                "inputs": {
+                    "statusCode": 200
+                },
+                "runAfter": {
+                    "setPriority": [
+                        "Succeeded"
+                    ]
+                }
+            }
+        },
+        "triggers": {
+            "manual": {
+                "type": "Request",
+                "kind": "Http",
+                "inputs": {
+                    "schema": {
+                        "properties": {
+                            "Address": {
+                                "properties": {
+                                    "City": {
+                                        "type": "string"
+                                    },
+                                    "Name": {
+                                        "type": "string"
+                                    },
+                                    "State": {
+                                        "type": "string"
+                                    },
+                                    "Street": {
+                                        "type": "string"
+                                    },
+                                    "Zip": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            },
+                            "ApprovalStatus": {
+                                "type": "string"
+                            },
+                            "ApproverName": {
+                                "type": "string"
+                            },
+                            "OrderNumber": {
+                                "type": "integer"
+                            },
+                            "OrderPriority": {
+                                "type": "integer"
+                            },
+                            "POamount": {
+                                "type": "integer"
+                            },
+                            "Product": {
+                                "type": "string"
+                            },
+                            "Quantity": {
+                                "type": "integer"
+                            }
+                        },
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {}
+    },
+    "kind": "Stateful"
+}

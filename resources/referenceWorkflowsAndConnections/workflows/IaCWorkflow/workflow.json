@@ -1,0 +1,33 @@
+{
+  "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "actions": {
+          "Get_current_weather": {
+              "type": "ApiConnection",
+              "inputs": {
+                  "host": {
+                      "connection": {
+                          "referenceName": "msnweather"
+                      }
+                  },
+                  "method": "get",
+                  "path": "/current/@{encodeURIComponent('98034')}",
+                  "queries": {
+                      "units": "I"
+                  }
+              },
+              "runAfter": {}
+          }
+      },
+      "contentVersion": "1.0.0.0",
+      "outputs": {},
+      "triggers": {
+          "When_a_HTTP_request_is_received": {
+              "type": "Request",
+              "kind": "Http"
+          }
+      },
+      "parameters": {}
+  },
+  "kind": "Stateless"
+}

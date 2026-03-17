@@ -1,0 +1,15 @@
+{
+  "managedApiConnections": {},
+  "serviceProviderConnections": {
+    "mllp": {
+      "parameterValues": {
+        "host": "@appsetting('MLLP_HOST')",
+        "port": "@appsetting('MLLP_PORT')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/mllp"
+      },
+      "displayName": "mllp"
+    }
+  }
+}

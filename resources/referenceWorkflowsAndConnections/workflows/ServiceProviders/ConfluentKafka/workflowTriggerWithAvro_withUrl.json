@@ -1,0 +1,27 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "Read_messages_from_a_Kafka_topic": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "topic": "topic_avro1",
+            "ConsumerGroup": "consumergroup107",
+            "Protocol": "SaslSsl",
+            "AuthenticationMode": "Plain",
+            "AvroSchema": "\"{\\\"doc\\\":\\\"Sample schema to help you get started.\\\",\\\"fields\\\":[{\\\"doc\\\":\\\"The int type is a 32-bit signed integer.\\\",\\\"name\\\":\\\"my_field1\\\",\\\"type\\\":\\\"int\\\"},{\\\"doc\\\":\\\"The double type is a double precision (64-bit) IEEE 754 floating-point number.\\\",\\\"name\\\":\\\"my_field2\\\",\\\"type\\\":\\\"string\\\"},{\\\"doc\\\":\\\"The string is a unicode character sequence.\\\",\\\"name\\\":\\\"my_field3\\\",\\\"type\\\":\\\"string\\\"},{\\\"doc\\\":\\\"The string is a unicode character sequence.\\\",\\\"name\\\":\\\"my_field4\\\",\\\"type\\\":\\\"string\\\"}],\\\"name\\\":\\\"sampleRecord\\\",\\\"namespace\\\":\\\"com.mycorp.mynamespace\\\",\\\"type\\\":\\\"record\\\"}\""
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "confluentKafka",
+            "operationId": "ReceiveMessage",
+            "serviceProviderId": "/serviceProviders/confluentKafka"
+          }
+        }
+      }
+    }
+  },
+  "kind": "Stateful"
+}

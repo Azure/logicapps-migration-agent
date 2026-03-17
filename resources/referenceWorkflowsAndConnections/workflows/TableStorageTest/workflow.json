@@ -1,0 +1,90 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "method": "POST"
+        }
+      }
+    },
+    "actions": {
+      "Create_Table": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "tableName": "stddemo"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "azureTableConnection",
+            "operationId": "createTable",
+            "serviceProviderId": "/serviceProviders/azureTables"
+          }
+        },
+        "runAfter": {}
+      },
+      "Insert_Entity": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "tableName": "stddemo",
+            "entity": {
+              "PartitionKey": "std",
+              "RowKey": "@{utcNow()}",
+              "Message": "Hello from StandardRuntimeHost Table Storage Test!",
+              "Timestamp": "@{utcNow()}",
+              "Source": "ServiceProviderTest",
+              "RandomValue": "@{rand(1, 1000)}"
+            }
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "azureTableConnection",
+            "operationId": "upsertEntity",
+            "serviceProviderId": "/serviceProviders/azureTables"
+          }
+        },
+        "runAfter": {
+          "Create_Table": ["SUCCEEDED"]
+        }
+      },
+      "Query_All_Entities": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "tableName": "stddemo",
+            "filter": "PartitionKey eq 'std'"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "azureTableConnection",
+            "operationId": "queryEntities",
+            "serviceProviderId": "/serviceProviders/azureTables"
+          }
+        },
+        "runAfter": {
+          "Insert_Entity": ["SUCCEEDED"]
+        }
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 200,
+          "body": {
+            "status": "Table Storage Test completed successfully!",
+            "tableName": "stddemo",
+            "insertedEntity": "@body('Insert_Entity')",
+            "allEntities": "@body('Query_All_Entities')?['entities']",
+            "entityCount": "@length(body('Query_All_Entities')?['entities'])"
+          }
+        },
+        "runAfter": {
+          "Query_All_Entities": ["SUCCEEDED"]
+        }
+      }
+    }
+  },
+  "kind": "Stateful"
+}
