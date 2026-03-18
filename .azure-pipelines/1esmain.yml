@@ -73,16 +73,16 @@ extends:
                         - script: git checkout v${{ parameters.publishVersion }}
                           displayName: 'Checkout release tag'
 
-                        - template: .azure-pipelines/templates/setup.yml
+                        - template: .azure-pipelines/templates/setup.yml@self
 
-                        - template: .azure-pipelines/templates/build.yml
+                        - template: .azure-pipelines/templates/build.yml@self
 
-                        - template: .azure-pipelines/templates/package.yml
+                        - template: .azure-pipelines/templates/package.yml@self
                           parameters:
                               publishVersion: ${{ parameters.publishVersion }}
 
-                        - template: .azure-pipelines/templates/sign.yml
+                        - template: .azure-pipelines/templates/sign.yml@self
 
-                        - template: .azure-pipelines/templates/stage-artifacts.yml
+                        - template: .azure-pipelines/templates/stage-artifacts.yml@self
                           parameters:
                               publishVersion: ${{ parameters.publishVersion }}
