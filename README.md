@@ -10,9 +10,9 @@
 
 See the extension in action before you install it.
 
-<video src="docs/media/logic-apps-migration-assistant-demo.mp4" controls muted playsinline width="100%">
-    Your browser does not support embedded video. <a href="docs/media/logic-apps-migration-assistant-demo.mp4">Download the demo video</a>.
-</video>
+[![Watch the Logic Apps Migration Assistant demo](docs/media/logic-apps-migration-assistant-demo-poster.png)](docs/media/logic-apps-migration-assistant-demo.mp4)
+
+Click the preview image above to open the demo video: [logic-apps-migration-assistant-demo.mp4](docs/media/logic-apps-migration-assistant-demo.mp4)
 
 ## Overview
 
