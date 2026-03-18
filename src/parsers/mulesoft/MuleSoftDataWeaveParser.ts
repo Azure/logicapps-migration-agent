@@ -126,7 +126,7 @@ export class MuleSoftDataWeaveParser extends AbstractParser implements IArtifact
     readonly capabilities: ParserCapabilities = {
         platform: 'mulesoft',
         fileExtensions: ['.dwl'],
-        fileTypes: ['dataweave'],
+        fileTypes: ['transform'],
         supportsFolder: false,
         description: 'Parses MuleSoft DataWeave (.dwl) transformation files into IR maps',
     };

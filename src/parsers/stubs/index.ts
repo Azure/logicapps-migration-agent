@@ -101,7 +101,7 @@ export class MuleSoftAPISpecParser extends StubParser {
     readonly capabilities: ParserCapabilities = {
         platform: 'mulesoft',
         fileExtensions: ['.raml', '.yaml', '.yml', '.json'],
-        fileTypes: ['api'],
+        fileTypes: ['api-spec'],
         supportsFolder: false,
         description: 'Parses MuleSoft RAML/OAS API specifications (Work in Progress)',
     };
