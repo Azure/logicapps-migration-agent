@@ -6,6 +6,14 @@
 [![Azure](https://img.shields.io/badge/Azure-Logic%20Apps-0078D4?logo=microsoft-azure)](https://azure.microsoft.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+## Watch the Demo
+
+See the extension in action before you install it.
+
+<video src="docs/media/logic-apps-migration-assistant-demo.mp4" controls muted playsinline width="100%">
+    Your browser does not support embedded video. <a href="docs/media/logic-apps-migration-assistant-demo.mp4">Download the demo video</a>.
+</video>
+
 ## Overview
 
 The **Logic Apps Migration Assistant** is a VS Code extension that automates the migration of enterprise integration solutions to Azure Logic Apps Standard. It uses AI-powered analysis via GitHub Copilot to guide you through a structured migration workflow — all running locally within VS Code.
