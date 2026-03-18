@@ -87,7 +87,7 @@ export interface MessageFlowStep {
     /** Subscription filter details (for steps that subscribe to MessageBox) */
     subscriptionFilter?: SubscriptionFilterDetail;
     /** Additional details specific to this step type */
-    additionalDetails?: Record<string, unknown>;
+    additionalDetails: Record<string, unknown>;
 }
 
 /**

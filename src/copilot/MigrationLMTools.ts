@@ -31,6 +31,7 @@ import { PlanningFileService, PLANNING_FILES } from '../stages/planning/Planning
 import { validateWorkflowDefinition } from '../workflowSchema';
 import { ConversionService } from '../stages/conversion/ConversionService';
 import { ConversionFileService } from '../stages/conversion/ConversionFileService';
+import { MermaidValidationService } from '../services/MermaidValidationService';
 import type { ConversionTask, ConversionTaskOutput } from '../stages/conversion/types';
 
 // ============================================================================
@@ -384,9 +385,220 @@ function buildCompactSummary(a: ParsedArtifact): Record<string, unknown> {
     return summary;
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function describeValueShape(value: unknown): string {
+    if (Array.isArray(value)) {
+        return 'array';
+    }
+    if (value === null) {
+        return 'null';
+    }
+    return typeof value;
+}
+
+function getMessageFlowStepLabel(step: Record<string, unknown>, index: number): string {
+    const stepNumber = typeof step.step === 'number' ? step.step : index + 1;
+    const componentName =
+        typeof step.component === 'string' && step.component.trim().length > 0
+            ? ` (${step.component.trim()})`
+            : '';
+    return `step ${stepNumber}${componentName}`;
+}
+
+function validateMessageFlowStepShape(step: unknown, index: number): string[] {
+    if (!isPlainObject(step)) {
+        return [`messageFlow[${index}] must be an object, not ${describeValueShape(step)}.`];
+    }
+
+    const label = getMessageFlowStepLabel(step, index);
+    const issues: string[] = [];
+
+    if (typeof step.step !== 'number' || Number.isNaN(step.step)) {
+        issues.push(`${label}: "step" must be a number.`);
+    }
+    if (typeof step.component !== 'string' || step.component.trim().length === 0) {
+        issues.push(`${label}: "component" must be a non-empty string.`);
+    }
+    if (typeof step.componentType !== 'string' || step.componentType.trim().length === 0) {
+        issues.push(`${label}: "componentType" must be a non-empty string.`);
+    }
+    if (typeof step.action !== 'string' || step.action.trim().length === 0) {
+        issues.push(`${label}: "action" must be a non-empty string.`);
+    }
+    if (typeof step.description !== 'string' || step.description.trim().length === 0) {
+        issues.push(`${label}: "description" must be a non-empty string.`);
+    }
+    if (step.messageType !== undefined && typeof step.messageType !== 'string') {
+        issues.push(`${label}: "messageType" must be a string when provided.`);
+    }
+
+    if (step.pipelineComponents !== undefined) {
+        if (!Array.isArray(step.pipelineComponents)) {
+            issues.push(`${label}: "pipelineComponents" must be an array.`);
+        } else {
+            step.pipelineComponents.forEach((component, componentIndex) => {
+                if (!isPlainObject(component)) {
+                    issues.push(
+                        `${label}: pipelineComponents[${componentIndex}] must be an object, not ${describeValueShape(component)}.`
+                    );
+                    return;
+                }
+
+                if (typeof component.name !== 'string' || component.name.trim().length === 0) {
+                    issues.push(
+                        `${label}: pipelineComponents[${componentIndex}].name must be a non-empty string.`
+                    );
+                }
+                if (typeof component.stage !== 'string' || component.stage.trim().length === 0) {
+                    issues.push(
+                        `${label}: pipelineComponents[${componentIndex}].stage must be a non-empty string.`
+                    );
+                }
+                if (
+                    typeof component.description !== 'string' ||
+                    component.description.trim().length === 0
+                ) {
+                    issues.push(
+                        `${label}: pipelineComponents[${componentIndex}].description must be a non-empty string.`
+                    );
+                }
+            });
+        }
+    }
+
+    if (step.properties !== undefined) {
+        if (!Array.isArray(step.properties)) {
+            issues.push(`${label}: "properties" must be an array.`);
+        } else {
+            step.properties.forEach((property, propertyIndex) => {
+                if (!isPlainObject(property)) {
+                    issues.push(
+                        `${label}: properties[${propertyIndex}] must be an object, not ${describeValueShape(property)}.`
+                    );
+                    return;
+                }
+
+                if (typeof property.name !== 'string' || property.name.trim().length === 0) {
+                    issues.push(
+                        `${label}: properties[${propertyIndex}].name must be a non-empty string.`
+                    );
+                }
+                if (typeof property.type !== 'string' || property.type.trim().length === 0) {
+                    issues.push(
+                        `${label}: properties[${propertyIndex}].type must be a non-empty string.`
+                    );
+                }
+                if (property.namespace !== undefined && typeof property.namespace !== 'string') {
+                    issues.push(
+                        `${label}: properties[${propertyIndex}].namespace must be a string when provided.`
+                    );
+                }
+                if (property.source !== undefined && typeof property.source !== 'string') {
+                    issues.push(
+                        `${label}: properties[${propertyIndex}].source must be a string when provided.`
+                    );
+                }
+                if (property.value !== undefined && typeof property.value !== 'string') {
+                    issues.push(
+                        `${label}: properties[${propertyIndex}].value must be a string when provided.`
+                    );
+                }
+            });
+        }
+    }
+
+    if (step.subscriptionFilter !== undefined) {
+        if (!isPlainObject(step.subscriptionFilter)) {
+            issues.push(`${label}: "subscriptionFilter" must be an object.`);
+        } else {
+            const hasExpression =
+                typeof step.subscriptionFilter.expression === 'string' &&
+                step.subscriptionFilter.expression.trim().length > 0;
+            const hasReadableExpression =
+                typeof step.subscriptionFilter.readableExpression === 'string' &&
+                step.subscriptionFilter.readableExpression.trim().length > 0;
+
+            if (!hasExpression && !hasReadableExpression) {
+                issues.push(
+                    `${label}: "subscriptionFilter" must include "expression" or "readableExpression".`
+                );
+            }
+
+            if (step.subscriptionFilter.conditions !== undefined) {
+                if (!Array.isArray(step.subscriptionFilter.conditions)) {
+                    issues.push(`${label}: subscriptionFilter.conditions must be an array.`);
+                } else {
+                    step.subscriptionFilter.conditions.forEach((condition, conditionIndex) => {
+                        if (!isPlainObject(condition)) {
+                            issues.push(
+                                `${label}: subscriptionFilter.conditions[${conditionIndex}] must be an object, not ${describeValueShape(condition)}.`
+                            );
+                            return;
+                        }
+
+                        if (
+                            typeof condition.property !== 'string' ||
+                            condition.property.trim().length === 0
+                        ) {
+                            issues.push(
+                                `${label}: subscriptionFilter.conditions[${conditionIndex}].property must be a non-empty string.`
+                            );
+                        }
+                        if (
+                            typeof condition.operator !== 'string' ||
+                            condition.operator.trim().length === 0
+                        ) {
+                            issues.push(
+                                `${label}: subscriptionFilter.conditions[${conditionIndex}].operator must be a non-empty string.`
+                            );
+                        }
+                        if (typeof condition.value !== 'string') {
+                            issues.push(
+                                `${label}: subscriptionFilter.conditions[${conditionIndex}].value must be a string.`
+                            );
+                        }
+                    });
+                }
+            }
+        }
+    }
+
+    if (step.additionalDetails === undefined) {
+        issues.push(
+            `${label}: "additionalDetails" is required. Use an object of key/value pairs, or use {} when there are no extra structured details.`
+        );
+    } else if (!isPlainObject(step.additionalDetails)) {
+        const suggestedNote =
+            typeof step.additionalDetails === 'string' && step.additionalDetails.trim().length > 0
+                ? ` Use additionalDetails: { note: ${JSON.stringify(step.additionalDetails)} } instead, or move that text to "description".`
+                : ' Use {} when there are no extra structured details.';
+        issues.push(
+            `${label}: "additionalDetails" must be an object of key/value pairs, not ${describeValueShape(step.additionalDetails)}.${suggestedNote}`
+        );
+    }
+
+    return issues;
+}
+
+function getMessageFlowCorrectionGuidance(): string {
+    return (
+        'Each messageFlow step must be an object like ' +
+        '{ step: 1, component: "...", componentType: "...", action: "...", description: "...", ' +
+        'messageType?: "...", pipelineComponents?: [{ name: "...", stage: "Decode|Disassemble|Validate|ResolveParty|PreAssemble|Assemble|Encode", description: "..." }], ' +
+        'properties?: [{ name: "...", type: "promoted|written|demoted", source?: "...", value?: "..." }], ' +
+        'subscriptionFilter?: { expression?: "...", readableExpression?: "...", conditions?: [{ property: "...", operator: "...", value: "..." }] }, ' +
+        'additionalDetails: { note?: "..." } }. Always include additionalDetails. If there is only one free-text detail, put it in "description" or wrap it as additionalDetails.note. If there are no extra structured details, send additionalDetails: {}.'
+    );
+}
+
 // ============================================================================
 // Tool Implementations
 // ============================================================================
+
+const FLOWCHART_MERMAID_TYPES = ['flowchart', 'flowchart-v2'];
 
 /**
  * migration_listArtifacts — List all discovered artifacts.
@@ -1323,14 +1535,39 @@ class DiscoveryStoreArchitectureTool implements vscode.LanguageModelTool<Discove
             ]);
         }
 
+        const validation = await MermaidValidationService.getInstance().validate(mermaid, {
+            expectedDiagramTypes: FLOWCHART_MERMAID_TYPES,
+        });
+        if (!validation.valid) {
+            logger.warn(
+                `[LMTool] migration_discovery_storeArchitecture: Mermaid validation failed for "${flowId}" — ${validation.error}`
+            );
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(
+                    JSON.stringify({
+                        error: 'Invalid Mermaid diagram. Fix the parser error below and call this tool again.',
+                        parserError: validation.error,
+                        diagramType: validation.diagramType,
+                        hint: 'Use a flowchart TB/TD/LR/RL diagram. Keep labels inside node brackets or quoted edge labels, and avoid raw unescaped double quotes in label text.',
+                    })
+                ),
+            ]);
+        }
+
         try {
             const { DiscoveryCacheService } =
                 await import('../stages/discovery/DiscoveryCacheService');
-            DiscoveryCacheService.getInstance().storeArchitecture(flowId, mermaid);
+            DiscoveryCacheService.getInstance().storeArchitecture(flowId, validation.normalized);
 
             logger.info(`[LMTool] migration_discovery_storeArchitecture: stored for "${flowId}"`);
             return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(JSON.stringify({ success: true, flowId })),
+                new vscode.LanguageModelTextPart(
+                    JSON.stringify({
+                        success: true,
+                        flowId,
+                        diagramType: validation.diagramType,
+                    })
+                ),
             ]);
         } catch (err) {
             return new vscode.LanguageModelToolResult([
@@ -1367,15 +1604,16 @@ class DiscoveryStoreMessageFlowTool implements vscode.LanguageModelTool<Discover
             ]);
         }
 
-        // Validate each step has required fields
-        const invalidSteps = messageFlow.filter(
-            (m) => m.step === undefined || !m.component || !m.componentType || !m.action
+        const shapeErrors = messageFlow.flatMap((step, index) =>
+            validateMessageFlowStepShape(step, index)
         );
-        if (invalidSteps.length > 0) {
+        if (shapeErrors.length > 0) {
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
-                        error: `${invalidSteps.length} message flow steps are missing required fields. Each step must have: step (number), component, componentType, action, messageType, description.`,
+                        error: `Invalid messageFlow step shape detected (${shapeErrors.length} issue${shapeErrors.length === 1 ? '' : 's'}).`,
+                        details: shapeErrors.slice(0, 10),
+                        suggestion: getMessageFlowCorrectionGuidance(),
                     })
                 ),
             ]);
@@ -2390,143 +2628,6 @@ class PlanningStoreMetaTool implements vscode.LanguageModelTool<PlanningStoreMet
     }
 }
 
-/**
- * Stores the Mermaid architecture diagram for a flow.
- */
-// ── Mermaid normalization helper ──
-
-/** Normalize mermaid markup: fix literal \n, strip JSON escape artifacts, collapse blank lines, trim. */
-function normalizeMermaid(raw: string): string {
-    let code = raw.replace(/\\n/g, '\n');
-
-    // Strip JSON-escaped quotes that LLMs often leak into mermaid output.
-    // [\"text\"] → ["text"],  -->|\"label\"| → -->|"label"|
-    code = code.replace(/\\"/g, '"');
-
-    // Replace <br/> / <br> with real newlines inside node labels.
-    // With htmlLabels:true these *can* work, but LLMs place them
-    // inconsistently causing parse failures — newlines are safer.
-    code = code.replace(/<br\s*\/?>/gi, '\n');
-
-    code = code.replace(/\n{3,}/g, '\n\n');
-    code = code
-        .split('\n')
-        .map((l) => l.trimEnd())
-        .join('\n');
-    return code.trim();
-}
-
-/**
- * Validate Mermaid flowchart syntax structurally.
- * Returns an array of error strings (empty = valid).
- */
-function validateMermaidSyntax(code: string): string[] {
-    const errors: string[] = [];
-    const lines = code
-        .split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0 && !l.startsWith('%%'));
-
-    if (lines.length === 0) {
-        errors.push('Diagram is empty');
-        return errors;
-    }
-
-    // Must start with diagram type
-    const firstLine = lines[0];
-    if (
-        !/^(graph|flowchart)\s+(TB|TD|BT|LR|RL)/i.test(firstLine) &&
-        !/^(sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|gitGraph)/i.test(
-            firstLine
-        )
-    ) {
-        errors.push(
-            `First line must be a diagram type (e.g. "flowchart TB"). Got: "${firstLine.substring(0, 50)}"`
-        );
-    }
-
-    // Check balanced subgraph / end
-    let subgraphCount = 0;
-    const subgraphStack: string[] = [];
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const subgraphMatch = line.match(/^subgraph\s+(.*)/i);
-        if (subgraphMatch) {
-            subgraphCount++;
-            subgraphStack.push(subgraphMatch[1].trim());
-        }
-        if (/^end$/i.test(line)) {
-            subgraphCount--;
-            subgraphStack.pop();
-            if (subgraphCount < 0) {
-                errors.push(`Line ${i + 1}: unexpected "end" without matching "subgraph"`);
-                subgraphCount = 0;
-            }
-        }
-    }
-    if (subgraphCount > 0) {
-        errors.push(
-            `${subgraphCount} unclosed subgraph(s). Missing "end" for: ${subgraphStack.join(', ')}`
-        );
-    }
-
-    // Check for problematic node IDs (emojis, special chars)
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        // Skip subgraph/end/style/classDef/click/linkStyle lines
-        if (/^(subgraph|end|style|classDef|click|linkStyle|class\s)/i.test(line)) {
-            continue;
-        }
-        // Check for non-ASCII in node IDs (before any bracket/paren/quote)
-        const nodeIdMatch = line.match(/^([A-Za-z0-9_]+)/);
-        if (nodeIdMatch) {
-            const nodeId = nodeIdMatch[1];
-            if (/[^\x20-\x7E]/.test(nodeId)) {
-                errors.push(
-                    `Line ${i + 1}: node ID "${nodeId.substring(0, 30)}" contains non-ASCII characters (emojis/special chars). Use plain alphanumeric IDs.`
-                );
-            }
-        }
-    }
-
-    // Check for unclosed brackets/quotes in node labels
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (/^(subgraph|end|style|classDef|click|linkStyle|class\s)/i.test(line)) {
-            continue;
-        }
-        const openBrackets = (line.match(/\["/g) || []).length;
-        const closeBrackets = (line.match(/"\]/g) || []).length;
-        if (openBrackets > 0 && openBrackets !== closeBrackets) {
-            errors.push(`Line ${i + 1}: unclosed bracket/quote in label. Check ["..."] pairs.`);
-        }
-        const openParens = (line.match(/\("/g) || []).length;
-        const closeParens = (line.match(/"\)/g) || []).length;
-        if (openParens > 0 && openParens !== closeParens) {
-            errors.push(`Line ${i + 1}: unclosed paren/quote in label. Check ("...") pairs.`);
-        }
-    }
-
-    // Check for literal \n still present (not real newlines)
-    if (code.includes('\\n')) {
-        errors.push(
-            'Diagram contains literal "\\n" strings instead of real newlines. Use actual line breaks.'
-        );
-    }
-
-    // Check for JSON-escaped quotes (\" ) — these are NOT valid mermaid
-    if (code.includes('\\"')) {
-        errors.push(
-            'Diagram contains backslash-escaped quotes (\\"). Use plain quotes (") inside ["..."] labels.'
-        );
-    }
-
-    // Note: <br/> is valid Mermaid syntax for line breaks inside node labels.
-    // Do NOT reject it — Mermaid supports <br/> natively in ["..."] labels.
-
-    return errors;
-}
-
 class PlanningStoreArchitectureTool implements vscode.LanguageModelTool<PlanningStoreArchitectureInput> {
     async invoke(
         options: vscode.LanguageModelToolInvocationOptions<PlanningStoreArchitectureInput>,
@@ -2543,34 +2644,20 @@ class PlanningStoreArchitectureTool implements vscode.LanguageModelTool<Planning
             ]);
         }
 
-        // Validate mermaid starts with a valid diagram keyword
-        const normalized = normalizeMermaid(mermaid);
-        if (
-            !/^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|gitGraph)/i.test(
-                normalized
-            )
-        ) {
-            return new vscode.LanguageModelToolResult([
-                new vscode.LanguageModelTextPart(
-                    JSON.stringify({
-                        error: 'Invalid Mermaid diagram: must start with a diagram type keyword (e.g. "flowchart TB", "graph TD")',
-                    })
-                ),
-            ]);
-        }
-
-        // Structural syntax validation — return errors so agent can fix and retry
-        const syntaxErrors = validateMermaidSyntax(normalized);
-        if (syntaxErrors.length > 0) {
+        const validation = await MermaidValidationService.getInstance().validate(mermaid, {
+            expectedDiagramTypes: FLOWCHART_MERMAID_TYPES,
+        });
+        if (!validation.valid) {
             logger.warn(
-                `[LMTool] migration_planning_storeArchitecture: syntax validation found ${syntaxErrors.length} error(s) for "${flowId}"`
+                `[LMTool] migration_planning_storeArchitecture: Mermaid validation failed for "${flowId}" — ${validation.error}`
             );
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
-                        error: 'Mermaid diagram has syntax errors. Fix the issues below and call this tool again.',
-                        syntaxErrors,
-                        hint: 'Common fixes: (1) close every "subgraph" with "end", (2) use plain alphanumeric node IDs (no emojis), (3) balance ["..."] and ("...") pairs, (4) use real line breaks not literal \\n.',
+                        error: 'Invalid Mermaid diagram. Fix the parser error below and call this tool again.',
+                        parserError: validation.error,
+                        diagramType: validation.diagramType,
+                        hint: 'Use a flowchart TB/TD/LR/RL diagram. Keep labels inside node brackets or quoted edge labels, and avoid raw unescaped double quotes in label text.',
                     })
                 ),
             ]);
@@ -2578,7 +2665,7 @@ class PlanningStoreArchitectureTool implements vscode.LanguageModelTool<Planning
 
         try {
             const fileService = PlanningFileService.getInstance();
-            const filePath = fileService.storeArchitecture(flowId, normalized);
+            const filePath = fileService.storeArchitecture(flowId, validation.normalized);
 
             logger.info(`[LMTool] migration_planning_storeArchitecture: stored for "${flowId}"`);
             return new vscode.LanguageModelToolResult([
@@ -2586,6 +2673,7 @@ class PlanningStoreArchitectureTool implements vscode.LanguageModelTool<Planning
                     JSON.stringify({
                         success: true,
                         flowId,
+                        diagramType: validation.diagramType,
                         file: PLANNING_FILES.ARCHITECTURE,
                         path: filePath,
                         message: `Architecture diagram (Mermaid) stored for flow "${flowId}".`,
@@ -2675,11 +2763,38 @@ class PlanningStoreWorkflowDefinitionTool implements vscode.LanguageModelTool<Pl
 
         try {
             const fileService = PlanningFileService.getInstance();
-            const mermaid = options.input.mermaid;
+            const rawMermaid = options.input.mermaid;
+            let normalizedWorkflowMermaid: string | undefined;
+            let workflowMermaidDiagramType: string | undefined;
+
+            if (rawMermaid) {
+                const mermaidValidation = await MermaidValidationService.getInstance().validate(
+                    rawMermaid,
+                    { expectedDiagramTypes: FLOWCHART_MERMAID_TYPES }
+                );
+                if (!mermaidValidation.valid) {
+                    logger.warn(
+                        `[LMTool] migration_planning_storeWorkflowDefinition: Mermaid validation failed for "${flowId}" workflow "${name}" — ${mermaidValidation.error}`
+                    );
+                    return new vscode.LanguageModelToolResult([
+                        new vscode.LanguageModelTextPart(
+                            JSON.stringify({
+                                error: 'Invalid workflow Mermaid diagram. Fix the parser error below and call this tool again.',
+                                parserError: mermaidValidation.error,
+                                diagramType: mermaidValidation.diagramType,
+                                hint: 'Use a flowchart TB/TD/LR/RL diagram for per-workflow Mermaid and keep all free text inside node labels.',
+                            })
+                        ),
+                    ]);
+                }
+
+                normalizedWorkflowMermaid = mermaidValidation.normalized;
+                workflowMermaidDiagramType = mermaidValidation.diagramType;
+            }
 
             // Enforce per-workflow mermaid when multiple workflows exist
             const existingWorkflows = fileService.readAllWorkflowDefinitions(flowId);
-            if (!mermaid && existingWorkflows.length > 0) {
+            if (!normalizedWorkflowMermaid && existingWorkflows.length > 0) {
                 // Another workflow already stored → multi-workflow scenario → mermaid is REQUIRED
                 logger.warn(
                     `[LMTool] migration_planning_storeWorkflowDefinition: rejecting "${name}" — mermaid is required in multi-workflow scenarios (${existingWorkflows.length} workflow(s) already stored)`
@@ -2703,7 +2818,7 @@ class PlanningStoreWorkflowDefinitionTool implements vscode.LanguageModelTool<Pl
                 sourceArtifactIds: sourceArtifactIds || [],
                 definition:
                     workflowDefinition as unknown as import('../workflowSchema/types').LogicAppsWorkflowDefinition,
-                ...(mermaid ? { mermaid: normalizeMermaid(mermaid) } : {}),
+                ...(normalizedWorkflowMermaid ? { mermaid: normalizedWorkflowMermaid } : {}),
             });
 
             const actionCount = def.actions ? Object.keys(def.actions).length : 0;
@@ -2721,9 +2836,10 @@ class PlanningStoreWorkflowDefinitionTool implements vscode.LanguageModelTool<Pl
                         path: filePath,
                         actionCount,
                         triggerCount,
-                        hasMermaid: !!mermaid,
+                        hasMermaid: !!normalizedWorkflowMermaid,
+                        mermaidDiagramType: workflowMermaidDiagramType,
                         message: `Workflow definition "${name}" stored for flow "${flowId}" with ${actionCount} actions and ${triggerCount} triggers. You can call this tool again for additional workflows.`,
-                        ...(!mermaid
+                        ...(!normalizedWorkflowMermaid
                             ? {
                                   mermaidWarning:
                                       'No per-workflow mermaid diagram provided. If this flow has multiple workflows, each workflow MUST include a mermaid field with a flowchart TB diagram showing its triggers, actions, and data flow. Call this tool again with the mermaid field to add it.',

@@ -102,7 +102,7 @@ Store discovery results in THIS order:
 1. `migration_discovery_storeMeta` — explanation, summary (with receiveLocations, receivePipelines, receivePorts, orchestrations, maps, schemas, sendPorts, sendPipelines arrays), title.
 2. `migration_discovery_storeArchitecture` — complete Mermaid diagram string.
 3. `migration_discovery_storeComponents` — componentDetails array (id, name, type, description, purpose, connectedTo, properties, azureEquivalent, isLogicAppsNative).
-4. `migration_discovery_storeMessageFlow` — messageFlow array (step, component, componentType, action, messageType, description, pipelineComponents, properties, subscriptionFilter, additionalDetails).
+4. `migration_discovery_storeMessageFlow` — messageFlow array (step, component, componentType, action, messageType, description, pipelineComponents, properties, subscriptionFilter, additionalDetails). `additionalDetails` is MANDATORY and MUST be an object of named fields, never a raw string. If there is only one free-text note, put it in `description` or use `additionalDetails: { note: "..." }`. If there are no extra structured details, send `additionalDetails: {}`.
 5. `migration_discovery_storeGaps` — gapAnalysis array (component, componentType, gap, severity, options, recommendation).
 6. `migration_discovery_storePatterns` — migrationPatterns array (pattern, description, complexity, biztalkApproach, logicAppsApproach, components).
 7. `migration_discovery_storeDependencies` — missingDependencies array + summary + allCriticalResolved + counts.

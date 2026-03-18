@@ -351,7 +351,7 @@
                 "displayName": "Store Discovery Message Flow",
                 "toolReferenceName": "migration_discovery_storeMessageFlow",
                 "canBeReferencedInPrompt": true,
-                "modelDescription": "Stores the message flow steps for a specific flow group. Each step should have: step (number), component (name), componentType, action, messageType, description. Optionally include pipelineComponents (name, stage, description), properties (name, type like promoted/written, value), subscriptionFilter (expression, conditions), and additionalDetails (shapeType, mapName, etc).",
+                "modelDescription": "Stores the message flow steps for a specific flow group. Each step must be an object with: step (number), component (name), componentType, action, description, mandatory additionalDetails object, and optional messageType. Optionally include pipelineComponents (array of objects with name, stage, description), properties (array of objects with name, type like promoted/written/demoted, value), and subscriptionFilter (object with expression or readableExpression and optional conditions). Always send additionalDetails as an OBJECT of named fields such as shapeType, mapName, note. Never send additionalDetails as a raw string; use additionalDetails.note or move the text into description. If no extra structured details exist, send additionalDetails: {}.",
                 "userDescription": "Store message flow steps for a flow",
                 "inputSchema": {
                     "type": "object",
@@ -364,7 +364,121 @@
                             "type": "array",
                             "description": "Array of message flow steps",
                             "items": {
-                                "type": "object"
+                                "type": "object",
+                                "properties": {
+                                    "step": {
+                                        "type": "number"
+                                    },
+                                    "component": {
+                                        "type": "string"
+                                    },
+                                    "componentType": {
+                                        "type": "string"
+                                    },
+                                    "action": {
+                                        "type": "string"
+                                    },
+                                    "messageType": {
+                                        "type": "string"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "pipelineComponents": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "stage": {
+                                                    "type": "string"
+                                                },
+                                                "description": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "name",
+                                                "stage",
+                                                "description"
+                                            ]
+                                        }
+                                    },
+                                    "properties": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "namespace": {
+                                                    "type": "string"
+                                                },
+                                                "type": {
+                                                    "type": "string"
+                                                },
+                                                "source": {
+                                                    "type": "string"
+                                                },
+                                                "value": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "name",
+                                                "type"
+                                            ]
+                                        }
+                                    },
+                                    "subscriptionFilter": {
+                                        "type": "object",
+                                        "properties": {
+                                            "expression": {
+                                                "type": "string"
+                                            },
+                                            "readableExpression": {
+                                                "type": "string"
+                                            },
+                                            "conditions": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "property": {
+                                                            "type": "string"
+                                                        },
+                                                        "operator": {
+                                                            "type": "string"
+                                                        },
+                                                        "value": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "property",
+                                                        "operator",
+                                                        "value"
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "additionalDetails": {
+                                        "type": "object",
+                                        "description": "Required named detail fields object. For a single note use { note: \"...\" }, not a raw string. Use {} when there are no extra structured details."
+                                    }
+                                },
+                                "required": [
+                                    "step",
+                                    "component",
+                                    "componentType",
+                                    "action",
+                                    "description",
+                                    "additionalDetails"
+                                ]
                             }
                         }
                     },
@@ -1556,7 +1670,13 @@
         "@xmldom/xmldom": "^0.8.11",
         "fast-xml-parser": "^5.3.4",
         "immer": "^11.0.0",
+        "jsdom": "^29.0.0",
+        "mermaid": "^11.13.0",
         "xstate": "^5.5.0"
+    },
+    "overrides": {
+        "diff": "8.0.3",
+        "serialize-javascript": "7.0.4"
     },
     "lint-staged": {
         "*.ts": [
