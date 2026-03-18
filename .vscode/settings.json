@@ -20,6 +20,10 @@
         "dist": true,
         "node_modules": true
     },
+    "problems.exclude": {
+        "resources/skills/**": true,
+        ".github/skills/**": true
+    },
     "markdown.validate.enabled": false,
     "markdown.validate.fragmentLinks.enabled": "ignore"
 }
