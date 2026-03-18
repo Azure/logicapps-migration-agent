@@ -1,28 +1,29 @@
 ---
 name: logic-apps-planning-rules
-description: Rules for planning the migration of a flow to Azure Logic Apps Standard. Covers workflow split policy, 1-orchestration-to-1-workflow rule, source coverage requirements, planning artifact store sequence, and design constraints.
+description: Rules for planning the migration of a MuleSoft flow to Azure Logic Apps Standard. Covers workflow split policy, 1-flow-to-1-workflow rule, source coverage requirements, planning artifact store sequence, and design constraints.
 ---
 
 # Skill: Logic Apps Planning Rules
 
-> **Purpose**: Authoritative rules for how an AI agent should plan the target Logic Apps Standard architecture. Follow exactly.
+> **Purpose**: Authoritative rules for how an AI agent should plan the target Logic Apps Standard architecture for a MuleSoft migration. Follow exactly.
 
-> **⚠️ DECOMPILATION PREREQUISITE**: Whenever source behavior required to fully implement the workflows exists only in compiled assemblies (.dll/.exe), you MUST follow skill `dependency-and-decompilation-analysis` to decompile BEFORE designing the target architecture. This applies to orchestrations and any workflow-critical logic — custom pipeline components, helper libraries, functoids, map extension code, and shared business rules. Do NOT proceed with planning until all relevant assemblies are decompiled and their logic is understood.
+> **⚠️ DEPENDENCY PREREQUISITE**: Whenever source behavior required to fully implement the workflows exists only in custom Java classes, custom Mule modules, or compiled JARs, you MUST follow skill `dependency-and-decompilation-analysis` to analyse dependencies BEFORE designing the target architecture. This applies to flows and any workflow-critical logic — custom Java components, custom transformers, DataWeave modules with complex logic, and shared utility libraries. Do NOT proceed with planning until all relevant dependencies are analysed and their logic is understood.
 
 ---
 
 ## 1. Workflow Split Policy
 
-- **Every discovered orchestration** (including sub-orchestrations called via Call Orchestration or Start Orchestration) MUST map to its own separate Logic Apps workflow.
-- Do NOT collapse sub-orchestrations into local functions or merge them into a parent workflow.
-- Use the Workflow action type (`InvokeWorkflow`) to call child workflows from parent workflows.
-- You MUST enumerate ALL discovered orchestrations and scenarios (happy path + branch/error/contingency paths) before deciding the workflow split.
+- **Every discovered flow** (including sub-flows invoked via `flow-ref`) MUST map to its own separate Logic Apps workflow.
+- Do NOT collapse sub-flows into local functions or merge them into a parent workflow.
+- Use the Workflow action type (`InvokeWorkflow`) to call child workflows from parent workflows, mirroring the `flow-ref` pattern.
+- Small, simple sub-flows (2–3 processors, no branching) MAY be inlined into the parent workflow if it simplifies the design — document this explicitly.
+- You MUST enumerate ALL discovered flows and scenarios (happy path + branch/error/contingency paths) before deciding the workflow split.
 
 ---
 
 ## 2. Source Coverage Requirement
 
-Build a one-to-one source coverage map: every discovered orchestration/scenario MUST appear in:
+Build a one-to-one source coverage map: every discovered flow/sub-flow/processor MUST appear in:
 
 - workflow definitions, OR
 - action mappings, OR
@@ -38,9 +39,9 @@ Nothing from the source may be silently dropped.
 
 > **⚠️ MANDATORY DESIGN PRESERVATION RULE:** Do NOT independently simplify, optimize, refactor, merge, reorder, or redesign the source flow. The target plan MUST preserve the **same source design and execution intent** unless there is a documented platform gap or the user explicitly asks for a redesign.
 
-- Preserve the original flow boundaries, subflow call structure, branching shape, sequencing, message construction pattern, and helper/local processing decomposition as closely as Logic Apps permits.
-- Do NOT combine separate source steps into one target step merely because it looks simpler, unless the source already treated them as one logical unit or an unavoidable platform limitation requires it.
-- Do NOT remove intermediate steps, wrapper/message-construction steps, helper calls, or transformation stages unless they are explicitly proven redundant from the source behavior.
+- Preserve the original flow boundaries, sub-flow call structure, choice branching, scatter-gather parallelism, foreach iteration, sequencing, and error-handler decomposition as closely as Logic Apps permits.
+- Do NOT combine separate source processors into one target step merely because it looks simpler, unless the source already treated them as one logical unit or an unavoidable platform limitation requires it.
+- Do NOT remove intermediate steps, set-variable operations, logger steps, or transformation stages unless they are explicitly proven redundant from the source behavior.
 - If any deviation from source design is unavoidable, document it explicitly in action mappings and gaps with the exact reason.
 
 ### 3.1 SplitOn over ForEach
@@ -54,15 +55,15 @@ Do NOT add delete/remove/cleanup actions that remove the trigger input file by d
 ### 3.3 Component Priority Ladder
 
 > **⚠️ MANDATORY OVERRIDE — READ THIS FIRST:**
-> Source custom code — scripting functoids, external assemblies (.dll), custom pipeline components, helper libraries, map extension objects — MUST **ALWAYS** map to **.NET local functions**. Do NOT simplify custom code to expressions, inline code, or any other level. This overrides the ladder below. Translate the real business logic from source or decompiled code — never approximate with expressions.
+> Source custom code — custom Java classes, custom Mule modules/connectors, Java-interop MEL expressions, custom message processors — MUST **ALWAYS** map to **.NET local functions**. Do NOT simplify custom code to expressions, inline code, or any other level. This overrides the ladder below. Translate the real business logic from source code — never approximate with expressions.
 
 For all **other** (non-custom-code) components:
 
-1. Built-in actions (XmlParse, XmlValidation, Xslt, Compose, Parse JSON, Select, Flat File Decode/Encode) → 2. Expressions → 3. Data Mapper/Liquid → 4. Inline Code → 5. .NET local functions → 6. Azure Functions (last resort).
+1. Built-in actions (HTTP, Compose, Parse JSON, Select, SQL Connector, Service Bus, Transform XML/Xslt, XmlParse, XmlValidation, Flat File Decode/Encode) → 2. Expressions → 3. Data Mapper/Liquid (for DataWeave conversions) → 4. Inline Code → 5. .NET local functions → 6. Azure Functions (last resort).
 
-> **AUTO-APPLY RULE**: Always choose the HIGHEST applicable level without asking the user. If a built-in action exists (e.g. XmlParse for XML processing), use it — do NOT fall back to expressions or ask.
+> **AUTO-APPLY RULE**: Always choose the HIGHEST applicable level without asking the user. If a built-in action exists (e.g. SQL Connector for db:select, HTTP for http:request), use it — do NOT fall back to expressions or ask.
 
-> **XML PROCESSING RULE**: For XML parsing, validation, or structured access, ALWAYS use XmlParse / XmlValidation (built-in XML Operations) instead of `xpath()` expressions. XmlParse validates against schemas and returns structured JSON. xpath() skips validation and is verbose. This applies to all BizTalk XMLReceive pipeline replacements.
+> **DATAWEAVE PROCESSING RULE**: For DataWeave transformations (`ee:transform`), assess complexity. Simple field mappings (payload.field, basic map/filter) → Liquid templates or Compose actions. Complex scripts with reduce, groupBy, match, custom functions → .NET local functions. Always flag DataWeave conversions as gaps requiring review.
 
 ---
 
@@ -70,7 +71,7 @@ For all **other** (non-custom-code) components:
 
 Before generating any workflow definition:
 
-1. Read the skill `source-to-logic-apps-mapping` to look up the exact Logic Apps Standard equivalent for every component.
+1. Read the skill `source-to-logic-apps-mapping` to look up the exact Logic Apps Standard equivalent for every MuleSoft processor.
 2. Call `migration_searchReferenceWorkflows` and `migration_readReferenceWorkflow` to find real reference examples.
 3. Use the operation names from the mapping skill as search terms.
 4. Copy exact `serviceProviderConfiguration` and `operationId` values from references — do NOT invent these.
@@ -90,5 +91,5 @@ Store planning results in THIS order:
 5. `migration_planning_storeActionMappings` — flowId and mappings array (source → target for each component; include `workflowName` when multiple workflows exist).
 6. `migration_planning_storeGaps` — flowId and gaps array (empty if none).
 7. `migration_planning_storePatterns` — flowId and patterns array (empty if none).
-8. `migration_planning_storeArtifactDispositions` — flowId and dispositions array. ONLY include artifacts that need conversion or upload: schemas (.xsd), maps (.btm → XSLT), custom code (.cs/.dll → local function), certificates. Do NOT include orchestrations, pipelines, or bindings. Each entry needs: artifactName, artifactType, conversionRequired, uploadDestination (integration-account / logic-app-artifact-folder / azure-function / not-applicable), uploadNotes (REQUIRED). When conversionRequired=true, also include conversionFrom, conversionTo, conversionNotes.
+8. `migration_planning_storeArtifactDispositions` — flowId and dispositions array. ONLY include artifacts that need conversion or upload: DataWeave scripts (.dwl → Liquid/XSLT), RAML/OAS specs, JSON/XML schemas, custom Java code (.java → local function), certificates. Do NOT include flow XMLs or property files. Each entry needs: artifactName, artifactType, conversionRequired, uploadDestination (integration-account / logic-app-artifact-folder / azure-function / not-applicable), uploadNotes (REQUIRED). When conversionRequired=true, also include conversionFrom, conversionTo, conversionNotes.
 9. `migration_planning_finalize` — flowId to validate and display the plan.

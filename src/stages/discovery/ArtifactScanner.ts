@@ -77,6 +77,7 @@ const DEFAULT_EXCLUDE_PATTERNS = [
     '**/.vs/**',
     '**/packages/**',
     '**/out/**',
+    '**/target/**',
 ];
 
 /**
@@ -103,6 +104,9 @@ const EXTENSION_TO_CATEGORY: Record<string, ArtifactCategory> = {
     '.yaml': 'config',
     '.json': 'config',
     '.xml': 'config',
+    '.properties': 'config',
+    '.wsdl': 'schema',
+    '.sql': 'config',
     // Dependency files — source code, project files, and binaries
     '.cs': 'dependency',
     '.vb': 'dependency',
@@ -450,6 +454,9 @@ export class ArtifactScanner implements vscode.Disposable {
         supportedExtensions.add('.xml');
         supportedExtensions.add('.xsd');
         supportedExtensions.add('.json');
+        supportedExtensions.add('.properties');
+        supportedExtensions.add('.wsdl');
+        supportedExtensions.add('.sql');
 
         // Add dependency file extensions so they are discovered
         for (const ext of DEPENDENCY_EXTENSIONS) {
@@ -533,11 +540,20 @@ export class ArtifactScanner implements vscode.Disposable {
         const normalizedPath = relativePath.replace(/\\/g, '/');
 
         for (const pattern of patterns) {
-            // Convert glob to simple regex
-            const regexPattern = pattern
-                .replace(/\*\*/g, '.*')
+            // Convert glob to regex
+            // Use a placeholder for ** to avoid the subsequent * replacement corrupting .*
+            let regexPattern = pattern
+                .replace(/\*\*/g, '\0GLOBSTAR\0')
                 .replace(/\*/g, '[^/]*')
+                .replace(/\0GLOBSTAR\0/g, '.*')
                 .replace(/\//g, '[\\\\/]');
+
+            // Anchor: if pattern starts with .*[\\/] (from **/) make the leading
+            // part optional so it also matches paths that begin with the directory
+            // name (e.g. "target/..." matches both **/target/** and target/**)
+            if (regexPattern.startsWith('.*[\\\\/]')) {
+                regexPattern = '(.*[\\\\/])?' + regexPattern.slice('.*[\\\\/]'.length);
+            }
 
             if (new RegExp(regexPattern).test(normalizedPath)) {
                 return true;

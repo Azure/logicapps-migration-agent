@@ -1,35 +1,36 @@
 ---
 name: detect-logical-groups
-description: Rules for detecting and grouping integration artifacts into logical flow groups using shared-orchestration strategy. Covers orchestration call-chain rules, fallback grouping when no receive locations exist, and required output fields.
+description: Rules for detecting and grouping MuleSoft integration artifacts into logical flow groups using flow-reference strategy. Covers flow-ref call-chain rules, fallback grouping when no sources exist, and required output fields.
 ---
 
 # Skill: Detecting Flow Groups
 
-> **Purpose**: Authoritative rules for how an AI agent should group discovered integration artifacts into logical flow groups. The agent MUST follow these rules exactly.
+> **Purpose**: Authoritative rules for how an AI agent should group discovered MuleSoft integration artifacts into logical flow groups. The agent MUST follow these rules exactly.
 
 ---
 
-## 1. Grouping Strategy (Shared Orchestration)
+## 1. Grouping Strategy (Flow Reference Chains)
 
-- **HIGHEST PRIORITY**: If multiple Receive Locations feed into the SAME Orchestration (directly or transitively), they MUST be in the SAME group — the orchestration is the unifying element.
-- **Orchestration Call Chains**: The `connectionGraph` includes `orchestration-calls` edges when one orchestration calls/starts another. Orchestrations linked by these edges (directly or transitively) MUST be in the SAME group. Example: If Orch-A calls Orch-B and Orch-B calls Orch-C, all three belong in ONE group.
-- Only create separate groups for Receive Locations that feed into DIFFERENT orchestrations with no transitive connection.
+- **HIGHEST PRIORITY**: If multiple flows reference the SAME sub-flow via `flow-ref` (directly or transitively), they MUST be in the SAME group — the shared sub-flow is the unifying element.
+- **Flow-ref Call Chains**: The `connectionGraph` includes `flow-ref` edges when one flow calls another flow or sub-flow. Flows linked by these edges (directly or transitively) MUST be in the SAME group. Example: If Flow-A calls Sub-Flow-B and Sub-Flow-B calls Sub-Flow-C, all three belong in ONE group.
+- Only create separate groups for flows that use DIFFERENT sub-flows with no transitive connection.
 - Transitively connected artifacts belong in the SAME group.
-- Name each group by business purpose.
+- Name each group by business purpose (derived from flow names and HTTP listener paths).
+- Flows within the same Mule XML configuration file that share global configs SHOULD be in the same group unless they are clearly independent.
 
 ---
 
-## 2. Fallback Rules (When receiveLocationCount = 0)
+## 2. Fallback Rules (When no HTTP listeners or schedulers exist)
 
 Do NOT return empty groups. Use this fallback order:
 
-1. **Orchestration-root grouping** — one group per CONNECTED orchestration cluster. Follow `orchestration-calls` edges to find clusters. Do NOT create one group per individual orchestration when they call each other.
-2. **Trigger-capability grouping** — file/queue/http/timer/db-poller entry-capable artifacts.
-3. **Connected-component grouping** — from the graph edges.
+1. **Flow-root grouping** — one group per CONNECTED flow cluster. Follow `flow-ref` edges to find clusters. Do NOT create one group per individual flow when they reference each other.
+2. **Trigger-capability grouping** — flows with sources (http:listener, scheduler, jms:listener, file:listener, vm:listener) as entry points.
+3. **Connected-component grouping** — from the graph edges and shared global config references.
 
 Only leave artifacts in `ungroupedArtifactIds` if they are truly isolated with no meaningful edges or entry semantics.
 
-For fallback groups, set `entryPoint` to orchestration/trigger/internal-entry (not receive-location).
+For fallback groups, set `entryPoint` to flow/trigger/internal-entry (not receive-location).
 
 ---
 
@@ -52,7 +53,7 @@ Each group MUST have:
 ## 4. Procedure
 
 1. Call `migration_detectFlowGroups` to get the artifact connection graph and summaries.
-2. Determine logical flow groups using the shared-orchestration strategy above.
+2. Determine logical flow groups using the flow-reference chain strategy above.
 3. Call `migration_discovery_storeFlowGroups` with the groups array, `ungroupedArtifactIds`, and explanation.
 4. Do NOT read source files or generate architecture diagrams — only detect and store groups.
 
@@ -63,4 +64,4 @@ Each group MUST have:
 - Do NOT read source files during flow group detection.
 - Do NOT generate architecture diagrams.
 - Do NOT create empty `artifactIds` arrays.
-- Do NOT split orchestrations linked by call chains into separate groups.
+- Do NOT split flows linked by flow-ref chains into separate groups.

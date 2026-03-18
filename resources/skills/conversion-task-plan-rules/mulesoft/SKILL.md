@@ -7,7 +7,7 @@ description: Rules for generating ordered conversion task plans. Covers mandator
 
 > **Purpose**: Authoritative rules for how an AI agent should generate the ordered task plan for converting a flow. Follow exactly.
 
-> **⚠️ DECOMPILATION PREREQUISITE**: Whenever source behavior required to fully implement the workflows exists only in compiled assemblies (.dll/.exe), you MUST follow skill `dependency-and-decompilation-analysis` to decompile BEFORE generating conversion tasks. This applies to orchestrations and any workflow-critical logic — custom pipeline components, helper libraries, functoids, map extension code, and shared business rules. Do NOT generate tasks until all relevant assemblies are decompiled and their logic is understood.
+> **⚠️ DEPENDENCY PREREQUISITE**: Whenever source behavior required to fully implement the workflows exists only in custom Java classes, custom Mule modules, or compiled JAR files, you MUST follow skill `dependency-and-decompilation-analysis` to analyse dependencies BEFORE generating conversion tasks. This applies to flows and any workflow-critical logic — custom Java components, custom transformers, DataWeave modules with complex logic, and shared utility libraries. Do NOT generate tasks until all relevant dependencies are analysed and their logic is understood.
 
 ---
 

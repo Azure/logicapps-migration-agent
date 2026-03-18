@@ -3,7 +3,7 @@
  *
  * Provides parsing capabilities for various integration platforms:
  * - BizTalk Server (fully implemented)
- * - MuleSoft (stub)
+ * - MuleSoft (fully implemented)
  *
  * @module parsers
  */
@@ -44,10 +44,15 @@ export {
     BizTalkBindingsParser,
 } from './biztalk';
 
-// Stub Parsers (work in progress)
+// MuleSoft Parsers (fully implemented)
 export {
     MuleSoftFlowParser,
     MuleSoftDataWeaveParser,
+    MuleSoftProjectParser,
+} from './mulesoft';
+
+// Stub Parsers (work in progress)
+export {
     MuleSoftAPISpecParser,
     GenericXMLParser,
 } from './stubs';
@@ -65,6 +70,9 @@ import {
 import {
     MuleSoftFlowParser,
     MuleSoftDataWeaveParser,
+    MuleSoftProjectParser,
+} from './mulesoft';
+import {
     MuleSoftAPISpecParser,
     GenericXMLParser,
 } from './stubs';
@@ -82,9 +90,12 @@ export function initializeParsers(): void {
     defaultParserRegistry.register(new BizTalkPipelineParser());
     defaultParserRegistry.register(new BizTalkBindingsParser());
 
-    // MuleSoft parsers (stubs)
+    // MuleSoft parsers (fully implemented)
+    defaultParserRegistry.register(new MuleSoftProjectParser());
     defaultParserRegistry.register(new MuleSoftFlowParser());
     defaultParserRegistry.register(new MuleSoftDataWeaveParser());
+
+    // MuleSoft API spec parser (stub — RAML/OAS parsing planned)
     defaultParserRegistry.register(new MuleSoftAPISpecParser());
 
     // Generic XML parser (stub)

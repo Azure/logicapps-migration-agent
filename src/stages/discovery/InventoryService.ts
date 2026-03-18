@@ -238,6 +238,10 @@ export class InventoryBuilder {
             '.dll': 'dependency',
             '.jar': 'dependency',
             '.btproj': 'dependency',
+            '.properties': 'config',
+            '.wsdl': 'schema',
+            '.sql': 'config',
+            '.raml': 'api',
         };
         return mapping[ext] || 'other';
     }
