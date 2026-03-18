@@ -39,7 +39,7 @@ Logic Apps Standard supports calling custom .NET code directly from workflows us
 
 ### When to Use
 
-- Porting BizTalk orchestration expression shapes that call .NET assemblies
+- Porting MuleSoft custom Java components, complex DataWeave logic, or MEL expressions to .NET
 - Custom business logic (calculations, transformations, validations)
 - XML/JSON document construction using System.Xml or System.Text.Json
 - Any scenario where built-in Logic Apps actions/expressions are insufficient
@@ -49,7 +49,7 @@ Logic Apps Standard supports calling custom .NET code directly from workflows us
 - Processes that take more than 10 minutes
 - Large message/data transformations (use Data Mapper instead)
 - Complex batching/debatching
-- BizTalk pipeline components that use streaming
+- MuleSoft streaming transformations or large payload processing
 
 ### Which Approach to Choose
 

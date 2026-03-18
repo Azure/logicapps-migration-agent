@@ -34,6 +34,15 @@ Nothing from the source may be silently dropped.
 
 ## 3. Design Constraints
 
+### 3.0 Preserve Source Design
+
+> **⚠️ MANDATORY DESIGN PRESERVATION RULE:** Do NOT independently simplify, optimize, refactor, merge, reorder, or redesign the BizTalk flow. The target plan MUST preserve the **same source design and execution intent** unless there is a documented platform gap or the user explicitly asks for a redesign.
+
+- Preserve the original orchestration boundaries, call structure, branching shape, sequencing, message construction pattern, and helper/local processing decomposition as closely as Logic Apps permits.
+- Do NOT combine separate source steps into one target step merely because it looks simpler, unless the source already treated them as one logical unit or an unavoidable platform limitation requires it.
+- Do NOT remove intermediate steps, wrapper/message-construction steps, helper calls, or transformation stages unless they are explicitly proven redundant from the source behavior.
+- If any deviation from source design is unavoidable, document it explicitly in action mappings and gaps with the exact reason.
+
 ### 3.1 SplitOn over ForEach
 
 When a trigger returns an array (batch of messages), ALWAYS use `splitOn` on the trigger instead of wrapping actions in a `For_each` loop. SplitOn debatches the array so each item fires a separate workflow run. Only use `For_each` if splitOn is not supported by that trigger type.

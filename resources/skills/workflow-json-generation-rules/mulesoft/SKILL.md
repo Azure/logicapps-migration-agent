@@ -105,11 +105,11 @@ Many triggers return **metadata** (file path, message ID, blob URI) rather than 
 
 ---
 
-## 6. 1:1 Orchestration to Workflow Rule
+## 6. 1:1 Flow to Workflow Rule
 
-- Every orchestration (including sub-orchestrations) MUST be a separate workflow.
+- Every flow (including sub-flows with significant logic) MUST be a separate workflow.
 - Use the `Workflow` action type to invoke child workflows from parent workflows.
-- Do NOT convert orchestrations to local functions.
+- Do NOT convert flows to local functions.
 
 ---
 
@@ -132,7 +132,7 @@ These overrides are deterministic — apply them directly without asking the use
 
 When extracting fields from an XML message body:
 
-1. **FIRST**: Use `XmlParse` built-in action with the schema from `Artifacts/Schemas/`. This replaces the BizTalk XMLReceive pipeline's validation + extraction in one step. Access fields via: `body('Parse_XML')?['Root']?['fieldName']`
+1. **FIRST**: Use `XmlParse` built-in action with the schema from `Artifacts/Schemas/`. This validates and extracts XML fields in one step. Access fields via: `body('Parse_XML')?['Root']?['fieldName']`
 2. **ONLY IF** no schema exists and cannot be generated: fall back to `xpath()` expressions.
 
 Do NOT use `xpath()` when an XSD schema is available — XmlParse is a level-1 built-in action and MUST be preferred over level-2 expressions per the Component Priority Ladder.
@@ -153,7 +153,7 @@ When transforming XML documents:
 
 When constructing XML output documents:
 
-- **FIRST**: Use `XmlCompose` built-in action (XML Operations) to compose XML from structured data. This replaces the BizTalk XML Assembler pipeline.
+- **FIRST**: Use `XmlCompose` built-in action (XML Operations) to compose XML from structured data. This assembles XML output from structured fields.
 - If the source uses .NET code to build XML (e.g. `XmlDocument`, `XElement`) with complex business logic, use a **.NET local function**.
 - If the output is a simple static template with field substitution, `Compose` is acceptable.
 - Do NOT approximate XML construction with `Compose` + `concat()` when `XmlCompose` or a local function is more appropriate.
@@ -182,5 +182,5 @@ Before storing workflow definitions, cross-check EVERY action against this table
 | JSON parsing                | `Parse JSON` action                                  | `json()` expression for structured access              |
 | Array trigger debatching    | `splitOn` on trigger                                 | `For_each` loop wrapping all actions                   |
 | File trigger cleanup        | Do nothing (no delete)                               | Delete/archive trigger input file                      |
-| Sub-orchestration           | Separate workflow + `Workflow` action                | Merge into parent or local function                    |
+| Sub-flow (via flow-ref)     | Separate workflow + `Workflow` action                | Merge into parent or local function                    |
 | Custom source code          | .NET local function                                  | Expressions or inline approximation                    |

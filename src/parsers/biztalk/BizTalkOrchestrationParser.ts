@@ -206,13 +206,52 @@ export class BizTalkOrchestrationParser extends AbstractParser implements IArtif
 
         // Find the ServiceDeclaration (orchestration)
         const serviceElement = this.findChildByType(moduleElement, 'ServiceDeclaration');
+        const methodMessageTypeElement = this.findChildByType(moduleElement, 'MethodMessageType');
         if (!serviceElement) {
-            errors.addError(
+            if (methodMessageTypeElement) {
+                errors.addInfo(
+                    ParseErrorCodes.INVALID_ORCHESTRATION,
+                    'Module does not contain ServiceDeclaration but includes MethodMessageType; treating as service-contract ODX and returning partial orchestration metadata',
+                    { filePath }
+                );
+
+                return {
+                    name: this.getElementName(
+                        methodMessageTypeElement,
+                        path.basename(filePath, '.odx')
+                    ),
+                    namespace,
+                    filePath,
+                    shapes: [],
+                    ports: [],
+                    messages: [],
+                    variables: [],
+                    correlationTypes: this.parseCorrelationTypes(moduleElement, errors),
+                    correlationSets: [],
+                    isServiceLink: true,
+                    description: this.getPropertyValue(methodMessageTypeElement, 'Description'),
+                };
+            }
+
+            errors.addWarning(
                 ParseErrorCodes.INVALID_ORCHESTRATION,
-                'Could not find ServiceDeclaration (orchestration) in module',
+                'Module does not contain ServiceDeclaration; treating as module-only ODX and returning partial orchestration metadata',
                 { filePath }
             );
-            return null;
+
+            return {
+                name: path.basename(filePath, '.odx'),
+                namespace,
+                filePath,
+                shapes: [],
+                ports: [],
+                messages: [],
+                variables: [],
+                correlationTypes: this.parseCorrelationTypes(moduleElement, errors),
+                correlationSets: [],
+                isServiceLink: true,
+                description: this.getPropertyValue(moduleElement, 'Description'),
+            };
         }
 
         const name = this.getElementName(serviceElement, path.basename(filePath, '.odx'));

@@ -27,6 +27,7 @@ import {
 } from './types';
 import { IRDocument, createEmptyIRDocument } from '../ir/types';
 import { SourceFileType } from '../ir/types/common';
+import { LoggingService } from '../services/LoggingService';
 
 // =============================================================================
 // Error Accumulator
@@ -163,6 +164,8 @@ export class ParseErrorAccumulator {
  * - Common parsing infrastructure
  */
 export abstract class AbstractParser implements IParser, IArtifactParser {
+    protected readonly logger = LoggingService.getInstance();
+
     // =========================================================================
     // Abstract Members
     // =========================================================================
@@ -453,6 +456,8 @@ export abstract class AbstractParser implements IParser, IArtifactParser {
         stats: ParseStats,
         startTime: number
     ): ParseResult {
+        this.logParseDiagnostics(errors.errors);
+
         const updatedStats: ParseStats = {
             ...stats,
             durationMs: Date.now() - startTime,
@@ -464,6 +469,31 @@ export abstract class AbstractParser implements IParser, IArtifactParser {
             errors: errors.errors,
             stats: updatedStats,
         };
+    }
+
+    protected logParseDiagnostics(parseErrors: readonly ParseError[]): void {
+        for (const parseError of parseErrors) {
+            const metadata = {
+                parser: this.constructor.name,
+                platform: this.capabilities.platform,
+                code: parseError.code,
+                filePath: parseError.filePath,
+                line: parseError.line,
+                column: parseError.column,
+            };
+
+            if (parseError.severity === 'error') {
+                this.logger.error(`[Parser] ${parseError.message}`, parseError.cause, metadata);
+                continue;
+            }
+
+            if (parseError.severity === 'warning') {
+                this.logger.warn(`[Parser] ${parseError.message}`, metadata);
+                continue;
+            }
+
+            this.logger.info(`[Parser] ${parseError.message}`, metadata);
+        }
     }
 
     /**

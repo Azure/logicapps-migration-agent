@@ -2,7 +2,7 @@
     "name": "logicapps-migration-assistant",
     "displayName": "Logic Apps Migration Assistant",
     "description": "Migrate BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard with AI-powered assistance",
-    "version": "1.5.0",
+    "version": "1.5.5",
     "publisher": "microsoft",
     "license": "MIT",
     "engines": {
@@ -1670,7 +1670,6 @@
         "@xmldom/xmldom": "^0.8.11",
         "fast-xml-parser": "^5.3.4",
         "immer": "^11.0.0",
-        "jsdom": "^29.0.0",
         "mermaid": "^11.13.0",
         "xstate": "^5.5.0"
     },

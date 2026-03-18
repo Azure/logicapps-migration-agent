@@ -90,45 +90,12 @@ abstract class StubParser extends AbstractParser implements IArtifactParser {
 }
 
 // =============================================================================
-// MuleSoft Parsers (Stubs)
+// MuleSoft API Spec Parser (Stub - RAML/OAS parsing planned)
 // =============================================================================
 
 /**
- * Stub parser for MuleSoft flows.
- */
-export class MuleSoftFlowParser extends StubParser {
-    readonly capabilities: ParserCapabilities = {
-        platform: 'mulesoft',
-        fileExtensions: ['.xml'],
-        fileTypes: ['flow'],
-        supportsFolder: false,
-        description: 'Parses MuleSoft Mule flow files (Work in Progress)',
-    };
-
-    override canParse(filePath: string): boolean {
-        const fileName = path.basename(filePath).toLowerCase();
-        return (
-            (fileName.includes('mule') || fileName.includes('flow')) &&
-            filePath.toLowerCase().endsWith('.xml')
-        );
-    }
-}
-
-/**
- * Stub parser for MuleSoft DataWeave.
- */
-export class MuleSoftDataWeaveParser extends StubParser {
-    readonly capabilities: ParserCapabilities = {
-        platform: 'mulesoft',
-        fileExtensions: ['.dwl'],
-        fileTypes: ['transform'],
-        supportsFolder: false,
-        description: 'Parses MuleSoft DataWeave files (Work in Progress)',
-    };
-}
-
-/**
  * Stub parser for MuleSoft API specs.
+ * RAML and OAS specification parsing is planned for a future release.
  */
 export class MuleSoftAPISpecParser extends StubParser {
     readonly capabilities: ParserCapabilities = {
