@@ -255,10 +255,16 @@ export class MigrationTreeProvider
             schema: 'Schemas',
             pipeline: 'Pipelines',
             binding: 'Bindings',
+            ruleset: 'Rulesets & Vocabularies',
+            'custom-code': 'Custom Code & Assemblies',
+            'legacy-webservice': 'Legacy Web Services',
+            hidx: 'HIDX Metadata',
+            b2b: 'B2B / TPM',
             flow: 'Flows',
             dataweave: 'DataWeave',
             process: 'Processes',
             recipe: 'Recipes',
+            config: 'Configuration',
             unknown: 'Other',
         };
 
@@ -467,13 +473,23 @@ export function registerTreeViewProviders(context: vscode.ExtensionContext): voi
     });
     context.subscriptions.push(homeTreeView);
 
-    // Register inventory tree view
-    const inventoryProvider = MigrationTreeProvider.getInstance('inventory');
-    const inventoryTreeView = vscode.window.createTreeView('logicAppsMigrationAssistant.inventory', {
-        treeDataProvider: inventoryProvider,
-        showCollapseAll: true,
-    });
-    context.subscriptions.push(inventoryTreeView);
+    const showArtifactInventory = vscode.workspace
+        .getConfiguration('logicAppsMigrationAssistant')
+        .get<boolean>('showArtifactInventory', false);
+
+    // Register inventory tree view (optional)
+    let inventoryProvider: MigrationTreeProvider | undefined;
+    if (showArtifactInventory) {
+        inventoryProvider = MigrationTreeProvider.getInstance('inventory');
+        const inventoryTreeView = vscode.window.createTreeView(
+            'logicAppsMigrationAssistant.inventory',
+            {
+                treeDataProvider: inventoryProvider,
+                showCollapseAll: true,
+            }
+        );
+        context.subscriptions.push(inventoryTreeView);
+    }
 
     // Register actions tree view
     const actionsProvider = MigrationTreeProvider.getInstance('actions');
@@ -486,7 +502,7 @@ export function registerTreeViewProviders(context: vscode.ExtensionContext): voi
     const refreshCommand = vscode.commands.registerCommand(
         'logicAppsMigrationAssistant.refreshViews',
         () => {
-            inventoryProvider.refresh();
+            inventoryProvider?.refresh();
             actionsProvider.refresh();
         }
     );

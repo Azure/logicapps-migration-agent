@@ -2000,7 +2000,7 @@ class DiscoveryFinalizeTool implements vscode.LanguageModelTool<DiscoveryFinaliz
                 const { InventoryService: InvSvc } =
                     await import('../stages/discovery/InventoryService');
                 const parsedArtifacts = await InvSvc.getInstance().getAllParsedArtifacts();
-                const EXCLUDED_CATEGORIES = new Set(['dependency', 'other']);
+                const EXCLUDED_CATEGORIES = new Set(['custom-code', 'other']);
                 const integrationArtifacts = parsedArtifacts.filter(
                     (a) => !EXCLUDED_CATEGORIES.has(a.type)
                 );

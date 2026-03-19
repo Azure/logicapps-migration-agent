@@ -84,21 +84,24 @@ const CATEGORY_INFO: Record<string, { label: string; icon: string; priority: num
     'send-port': { label: 'Send Ports', icon: 'call-outgoing', priority: 4 },
     'receive-port': { label: 'Receive Ports', icon: 'call-incoming', priority: 5 },
     'receive-location': { label: 'Receive Locations', icon: 'location', priority: 6 },
-    policy: { label: 'Policies', icon: 'law', priority: 7 },
-    schema: { label: 'Schemas', icon: 'file-code', priority: 8 },
-    map: { label: 'Maps', icon: 'symbol-array', priority: 9 },
-    pipeline: { label: 'Pipelines', icon: 'layers', priority: 10 },
-    flow: { label: 'Flows', icon: 'git-branch', priority: 11 },
-    process: { label: 'Processes', icon: 'workflow', priority: 12 },
-    workflow: { label: 'Workflows', icon: 'list-tree', priority: 13 },
-    binding: { label: 'Bindings', icon: 'plug', priority: 14 },
-    dataweave: { label: 'DataWeave', icon: 'symbol-function', priority: 15 },
-    esql: { label: 'ESQL', icon: 'database', priority: 16 },
-    api: { label: 'APIs', icon: 'globe', priority: 17 },
-    connector: { label: 'Connectors', icon: 'extensions', priority: 18 },
-    config: { label: 'Configuration', icon: 'gear', priority: 19 },
-    project: { label: 'Projects', icon: 'project', priority: 20 },
-    dependency: { label: 'Resources', icon: 'package', priority: 21 },
+    schema: { label: 'Schemas', icon: 'file-code', priority: 7 },
+    map: { label: 'Maps', icon: 'symbol-array', priority: 8 },
+    pipeline: { label: 'Pipelines', icon: 'layers', priority: 9 },
+    binding: { label: 'Bindings', icon: 'plug', priority: 10 },
+    ruleset: { label: 'Rulesets & Vocabularies', icon: 'law', priority: 11 },
+    'custom-code': { label: 'Custom Code & Assemblies', icon: 'symbol-class', priority: 12 },
+    'legacy-webservice': { label: 'Legacy Web Services', icon: 'globe', priority: 13 },
+    hidx: { label: 'HIDX Metadata', icon: 'server', priority: 14 },
+    b2b: { label: 'B2B / TPM', icon: 'organization', priority: 15 },
+    policy: { label: 'Policies', icon: 'law', priority: 16 },
+    flow: { label: 'Flows', icon: 'git-branch', priority: 17 },
+    process: { label: 'Processes', icon: 'workflow', priority: 18 },
+    workflow: { label: 'Workflows', icon: 'list-tree', priority: 19 },
+    dataweave: { label: 'DataWeave', icon: 'symbol-function', priority: 20 },
+    esql: { label: 'ESQL', icon: 'database', priority: 21 },
+    api: { label: 'APIs', icon: 'globe', priority: 22 },
+    connector: { label: 'Connectors', icon: 'extensions', priority: 23 },
+    config: { label: 'Configuration', icon: 'gear', priority: 24 },
     other: { label: 'Other', icon: 'file', priority: 99 },
 };
 
@@ -186,7 +189,7 @@ export class DiscoveryTreeProvider
      */
     private getRootItems(inventory: ArtifactInventory | undefined): DiscoveryTreeItem[] {
         if (!inventory) {
-            return [this.createNoInventoryItem()];
+            return [];
         }
 
         const items: DiscoveryTreeItem[] = [];
@@ -524,17 +527,6 @@ export class DiscoveryTreeProvider
     // =========================================================================
     // Item Creators
     // =========================================================================
-
-    private createNoInventoryItem(): DiscoveryTreeItem {
-        const item = new DiscoveryTreeItem(
-            'root',
-            'No artifacts discovered',
-            vscode.TreeItemCollapsibleState.None
-        );
-        item.description = 'Run discovery to scan for artifacts';
-        item.iconPath = new vscode.ThemeIcon('info');
-        return item;
-    }
 
     private createProjectInfoItem(inventory: ArtifactInventory): DiscoveryTreeItem {
         const item = new DiscoveryTreeItem(

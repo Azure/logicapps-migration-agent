@@ -18,6 +18,11 @@ export type ArtifactType =
     | 'schema'
     | 'pipeline'
     | 'binding'
+    | 'ruleset'
+    | 'custom-code'
+    | 'legacy-webservice'
+    | 'hidx'
+    | 'b2b'
     | 'flow'
     | 'dataweave'
     | 'subflow'
@@ -73,6 +78,41 @@ export const ARTIFACT_TYPE_INFO: Record<ArtifactType, ArtifactTypeInfo> = {
         pluralLabel: 'Bindings',
         icon: 'plug',
         description: 'Port and connection bindings',
+        platforms: ['biztalk'],
+    },
+    ruleset: {
+        label: 'Ruleset',
+        pluralLabel: 'Rulesets & Vocabularies',
+        icon: 'law',
+        description: 'BizTalk Business Rules Engine policies and vocabularies',
+        platforms: ['biztalk'],
+    },
+    'custom-code': {
+        label: 'Custom Code',
+        pluralLabel: 'Custom Code & Assemblies',
+        icon: 'symbol-class',
+        description: 'Custom .NET code, helper assemblies, and pipeline components',
+        platforms: ['biztalk'],
+    },
+    'legacy-webservice': {
+        label: 'Legacy Web Service',
+        pluralLabel: 'Legacy Web Services',
+        icon: 'globe',
+        description: 'Legacy ASMX web service endpoints',
+        platforms: ['biztalk'],
+    },
+    hidx: {
+        label: 'HIDX',
+        pluralLabel: 'HIDX Metadata',
+        icon: 'server',
+        description: 'BizTalk Adapter for Host Systems metadata',
+        platforms: ['biztalk'],
+    },
+    b2b: {
+        label: 'B2B',
+        pluralLabel: 'B2B / TPM',
+        icon: 'organization',
+        description: 'Trading Partner Management, EDI, AS2, and partner configuration',
         platforms: ['biztalk'],
     },
     flow: {
