@@ -285,37 +285,10 @@ export class MuleSoftProjectParser extends AbstractParser implements IProjectPar
 
         this.reportProgress(options.onProgress, 4, 4, 'Converting to IR');
 
-        // Convert to IR — use the file-specific name when parsing an individual file
-        // so that pom.xml shows its Maven name and mule-project.xml shows its own name
-        const inputFileName = path.basename(inputPath).toLowerCase();
-        let displayName = projectInfo.name;
-        if (inputFileName === 'pom.xml' && pomContent) {
-            // Use Maven artifactId/name from pom.xml
-            const pomDoc = parseXml(pomContent);
-            if (pomDoc) {
-                const pomName =
-                    getElementText(pomDoc.documentElement, 'name') ||
-                    getElementText(pomDoc.documentElement, 'artifactId');
-                if (pomName) {
-                    displayName = pomName;
-                }
-            }
-        } else if (inputFileName === 'mule-project.xml') {
-            // Use name from mule-project.xml
-            const muleProjectPath = path.join(projectDir, 'mule-project.xml');
-            const muleProjectContent = await fs.promises
-                .readFile(muleProjectPath, 'utf-8')
-                .catch(() => null);
-            if (muleProjectContent) {
-                const muleProjectDoc = parseXml(muleProjectContent);
-                if (muleProjectDoc?.documentElement) {
-                    const mpName = getElementText(muleProjectDoc.documentElement, 'name');
-                    if (mpName) {
-                        displayName = mpName;
-                    }
-                }
-            }
-        }
+        // Convert to IR — use the actual filename (without extension) so the tree
+        // shows the real file (e.g. "pom.xml") after the extension is re-appended.
+        const ext = path.extname(inputPath);
+        const displayName = path.basename(inputPath, ext);
 
         return this.convertToIR({ ...projectInfo, name: displayName }, artifacts, errors);
     }

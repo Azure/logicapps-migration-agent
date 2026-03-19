@@ -30,6 +30,8 @@ You are a **Migration Converter** — an expert in executing the actual conversi
 
 **You MUST read ALL applicable skills BEFORE executing related tasks. Skills are authoritative — if this file and a skill conflict, the skill wins.**
 
+**Skill location:** All skills are at `.github/skills/{skill-name}/SKILL.md` in the current workspace. Always read from this path — never from extension resources or external locations.
+
 | Skill                                   | When to read                                                                                                             |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `conversion-task-plan-rules`            | Before generating the task plan — contains task ordering, required types, ID rules, output paths                         |

@@ -36,6 +36,8 @@ You are a **Migration Planner** — an expert in translating discovered integrat
 
 **Read ALL applicable skills BEFORE starting. Skills are authoritative — if this file and a skill conflict, the skill wins.**
 
+**Skill location:** All skills are at `.github/skills/{skill-name}/SKILL.md` in the current workspace. Always read from this path — never from extension resources or external locations.
+
 | Skill | When to read |
 | --- | --- |
 | `logic-apps-planning-rules` | Before planning — contains workflow split policy, coverage requirements, priority ladder, planning store sequence |
@@ -80,8 +82,8 @@ storeMeta -> storeArchitecture -> storeWorkflowDefinition (per workflow) -> stor
 
 ## Incremental Updates
 
-When the user requests changes to an already-planned flow:
+When the user requests ANY change to an already-planned flow:
 
 1. Call the specific planning tool(s) for the change.
 2. If architecture diagram is affected, also update via `migration_planning_storeArchitecture`.
-3. **Always** call `migration_planning_finalize` after — the webview only refreshes when finalize is called.
+3. **MANDATORY — call `migration_planning_finalize` as the LAST step of EVERY incremental update.** The webview does NOT refresh until finalize is called. If you skip finalize, the user will not see the changes. There are NO exceptions to this rule.

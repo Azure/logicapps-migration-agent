@@ -595,6 +595,167 @@ function getMessageFlowCorrectionGuidance(): string {
 }
 
 // ============================================================================
+// Component / Gap / Pattern / Dependency Validators
+// ============================================================================
+
+function validateComponentShape(comp: unknown, index: number): string[] {
+    if (!isPlainObject(comp)) {
+        return [`componentDetails[${index}] must be an object, not ${describeValueShape(comp)}.`];
+    }
+    const label = `componentDetails[${index}]${typeof comp.name === 'string' ? ` (${comp.name})` : ''}`;
+    const issues: string[] = [];
+
+    if (typeof comp.id !== 'string' || comp.id.trim().length === 0) {
+        issues.push(`${label}: "id" must be a non-empty string.`);
+    }
+    if (typeof comp.name !== 'string' || comp.name.trim().length === 0) {
+        issues.push(`${label}: "name" must be a non-empty string.`);
+    }
+    if (typeof comp.type !== 'string' || comp.type.trim().length === 0) {
+        issues.push(`${label}: "type" must be a non-empty string.`);
+    }
+    if (typeof comp.description !== 'string' || comp.description.trim().length === 0) {
+        issues.push(`${label}: "description" must be a non-empty string.`);
+    }
+    if (typeof comp.isLogicAppsNative !== 'boolean') {
+        issues.push(`${label}: "isLogicAppsNative" must be a boolean (true/false).`);
+    }
+    if (typeof comp.azureEquivalent !== 'string') {
+        issues.push(
+            `${label}: "azureEquivalent" must be a plain string describing the Azure equivalent, not ${describeValueShape(comp.azureEquivalent)}. Example: "Stateful Workflow with HTTP Request trigger and built-in HTTP actions".`
+        );
+    }
+    if (comp.connectedTo !== undefined && !Array.isArray(comp.connectedTo)) {
+        issues.push(`${label}: "connectedTo" must be an array of component ID strings.`);
+    }
+    return issues;
+}
+
+function validateGapShape(gap: unknown, index: number): string[] {
+    if (!isPlainObject(gap)) {
+        return [`gapAnalysis[${index}] must be an object, not ${describeValueShape(gap)}.`];
+    }
+    const label = `gapAnalysis[${index}]${typeof gap.component === 'string' ? ` (${gap.component})` : ''}`;
+    const issues: string[] = [];
+
+    if (typeof gap.component !== 'string' || gap.component.trim().length === 0) {
+        issues.push(`${label}: "component" must be a non-empty string.`);
+    }
+    if (typeof gap.componentType !== 'string' || gap.componentType.trim().length === 0) {
+        issues.push(`${label}: "componentType" must be a non-empty string.`);
+    }
+    if (typeof gap.gap !== 'string' || gap.gap.trim().length === 0) {
+        issues.push(`${label}: "gap" must be a non-empty string describing the gap.`);
+    }
+    const validSeverities = ['high', 'medium', 'low'];
+    if (typeof gap.severity !== 'string' || !validSeverities.includes(gap.severity)) {
+        issues.push(`${label}: "severity" must be one of: ${validSeverities.join(', ')}.`);
+    }
+    if (!Array.isArray(gap.options)) {
+        issues.push(`${label}: "options" must be an array of resolution option strings.`);
+    } else {
+        gap.options.forEach((o, i) => {
+            if (typeof o !== 'string') {
+                issues.push(
+                    `${label}: options[${i}] must be a string, not ${describeValueShape(o)}.`
+                );
+            }
+        });
+    }
+    if (typeof gap.recommendation !== 'string' || gap.recommendation.trim().length === 0) {
+        issues.push(
+            `${label}: "recommendation" must be a plain string, not ${describeValueShape(gap.recommendation)}.`
+        );
+    }
+    return issues;
+}
+
+function validatePatternShape(pattern: unknown, index: number): string[] {
+    if (!isPlainObject(pattern)) {
+        return [
+            `migrationPatterns[${index}] must be an object, not ${describeValueShape(pattern)}.`,
+        ];
+    }
+    const label = `migrationPatterns[${index}]${typeof pattern.pattern === 'string' ? ` (${pattern.pattern})` : ''}`;
+    const issues: string[] = [];
+
+    if (typeof pattern.pattern !== 'string' || pattern.pattern.trim().length === 0) {
+        issues.push(`${label}: "pattern" must be a non-empty string.`);
+    }
+    if (typeof pattern.description !== 'string' || pattern.description.trim().length === 0) {
+        issues.push(`${label}: "description" must be a non-empty string.`);
+    }
+    const validComplexities = ['high', 'medium', 'low'];
+    if (typeof pattern.complexity !== 'string' || !validComplexities.includes(pattern.complexity)) {
+        issues.push(`${label}: "complexity" must be one of: ${validComplexities.join(', ')}.`);
+    }
+    if (
+        typeof pattern.biztalkApproach !== 'string' ||
+        pattern.biztalkApproach.trim().length === 0
+    ) {
+        issues.push(`${label}: "biztalkApproach" must be a non-empty string.`);
+    }
+    if (
+        typeof pattern.logicAppsApproach !== 'string' ||
+        pattern.logicAppsApproach.trim().length === 0
+    ) {
+        issues.push(`${label}: "logicAppsApproach" must be a non-empty string.`);
+    }
+    if (!Array.isArray(pattern.components)) {
+        issues.push(`${label}: "components" must be an array of component name strings.`);
+    }
+    return issues;
+}
+
+function validateDependencyShape(dep: unknown, index: number): string[] {
+    if (!isPlainObject(dep)) {
+        return [`missingDependencies[${index}] must be an object, not ${describeValueShape(dep)}.`];
+    }
+    const label = `missingDependencies[${index}]${typeof dep.name === 'string' ? ` (${dep.name})` : ''}`;
+    const issues: string[] = [];
+
+    if (typeof dep.name !== 'string' || dep.name.trim().length === 0) {
+        issues.push(`${label}: "name" must be a non-empty string.`);
+    }
+    if (typeof dep.type !== 'string' || dep.type.trim().length === 0) {
+        issues.push(`${label}: "type" must be a non-empty string.`);
+    }
+    const validOrigins = [
+        'standard-framework',
+        'standard-biztalk',
+        'standard-platform',
+        'third-party',
+        'custom',
+        'unknown',
+    ];
+    if (typeof dep.origin !== 'string' || !validOrigins.includes(dep.origin)) {
+        issues.push(`${label}: "origin" must be one of: ${validOrigins.join(', ')}.`);
+    }
+    const validSeverities = ['critical', 'warning', 'info'];
+    if (typeof dep.severity !== 'string' || !validSeverities.includes(dep.severity)) {
+        issues.push(`${label}: "severity" must be one of: ${validSeverities.join(', ')}.`);
+    }
+    if (!Array.isArray(dep.referencedBy)) {
+        issues.push(`${label}: "referencedBy" must be an array of artifact name strings.`);
+    }
+    if (typeof dep.reason !== 'string' || dep.reason.trim().length === 0) {
+        issues.push(`${label}: "reason" must be a non-empty string.`);
+    }
+    if (typeof dep.blocksMigration !== 'boolean') {
+        issues.push(`${label}: "blocksMigration" must be a boolean.`);
+    }
+    if (typeof dep.migrationRelevant !== 'boolean') {
+        issues.push(`${label}: "migrationRelevant" must be a boolean.`);
+    }
+    if (typeof dep.resolution !== 'string' || dep.resolution.trim().length === 0) {
+        issues.push(
+            `${label}: "resolution" must be a non-empty string describing the suggested fix.`
+        );
+    }
+    return issues;
+}
+
+// ============================================================================
 // Tool Implementations
 // ============================================================================
 
@@ -1669,26 +1830,22 @@ class DiscoveryStoreComponentsTool implements vscode.LanguageModelTool<Discovery
             ]);
         }
 
-        // Validate each component has required fields
-        const invalidComponents = componentDetails.filter((c) => !c.id || !c.name || !c.type);
-        if (invalidComponents.length > 0) {
+        // Validate each component against the strict schema
+        const allIssues: string[] = [];
+        componentDetails.forEach((comp, i) => {
+            allIssues.push(...validateComponentShape(comp, i));
+        });
+        if (allIssues.length > 0) {
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
-                        error: `${invalidComponents.length} components are missing required fields (id, name, type). Each component must have: id, name, type, description, purpose, connectedTo, azureEquivalent, isLogicAppsNative.`,
+                        error: `${allIssues.length} validation issue(s) in componentDetails. Fix and retry.`,
+                        issues: allIssues.slice(0, 20),
+                        guidance:
+                            'Each component must have: id (string), name (string), type (string), description (string), isLogicAppsNative (boolean), azureEquivalent (string — plain text, NOT an object). Optional: purpose, connectedTo (string[]), sourcePath.',
                     })
                 ),
             ]);
-        }
-
-        // Validate azureEquivalent and isLogicAppsNative are present
-        const missingAzure = componentDetails.filter(
-            (c) => c.azureEquivalent === undefined || c.isLogicAppsNative === undefined
-        );
-        if (missingAzure.length > 0) {
-            logger.warn(
-                `[LMTool] migration_discovery_storeComponents: ${missingAzure.length} components missing azureEquivalent or isLogicAppsNative — will default`
-            );
         }
 
         try {
@@ -1741,10 +1898,31 @@ class DiscoveryStoreGapsTool implements vscode.LanguageModelTool<DiscoveryStoreG
             ]);
         }
 
+        // Validate each gap against the strict schema
+        const gaps = gapAnalysis || [];
+        if (gaps.length > 0) {
+            const allIssues: string[] = [];
+            gaps.forEach((gap, i) => {
+                allIssues.push(...validateGapShape(gap, i));
+            });
+            if (allIssues.length > 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({
+                            error: `${allIssues.length} validation issue(s) in gapAnalysis. Fix and retry.`,
+                            issues: allIssues.slice(0, 20),
+                            guidance:
+                                'Each gap must have: component (string), componentType (string), gap (string), severity ("high"|"medium"|"low"), options (string[]), recommendation (string — plain text, NOT an object).',
+                        })
+                    ),
+                ]);
+            }
+        }
+
         try {
             const { DiscoveryCacheService } =
                 await import('../stages/discovery/DiscoveryCacheService');
-            DiscoveryCacheService.getInstance().storeGaps(flowId, gapAnalysis || []);
+            DiscoveryCacheService.getInstance().storeGaps(flowId, gaps);
 
             logger.info(
                 `[LMTool] migration_discovery_storeGaps: stored ${(gapAnalysis || []).length} gaps for "${flowId}"`
@@ -1787,10 +1965,31 @@ class DiscoveryStorePatternsTool implements vscode.LanguageModelTool<DiscoverySt
             ]);
         }
 
+        // Validate each pattern against the strict schema
+        const patterns = migrationPatterns || [];
+        if (patterns.length > 0) {
+            const allIssues: string[] = [];
+            patterns.forEach((pattern, i) => {
+                allIssues.push(...validatePatternShape(pattern, i));
+            });
+            if (allIssues.length > 0) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({
+                            error: `${allIssues.length} validation issue(s) in migrationPatterns. Fix and retry.`,
+                            issues: allIssues.slice(0, 20),
+                            guidance:
+                                'Each pattern must have: pattern (string), description (string), complexity ("high"|"medium"|"low"), biztalkApproach (string), logicAppsApproach (string), components (string[]).',
+                        })
+                    ),
+                ]);
+            }
+        }
+
         try {
             const { DiscoveryCacheService } =
                 await import('../stages/discovery/DiscoveryCacheService');
-            DiscoveryCacheService.getInstance().storePatterns(flowId, migrationPatterns || []);
+            DiscoveryCacheService.getInstance().storePatterns(flowId, patterns);
 
             logger.info(
                 `[LMTool] migration_discovery_storePatterns: stored ${(migrationPatterns || []).length} patterns for "${flowId}"`
@@ -1839,16 +2038,20 @@ class DiscoveryStoreDependenciesTool implements vscode.LanguageModelTool<Discove
             ]);
         }
 
-        // Validate each dependency has required fields
+        // Validate each dependency against the strict schema
         if (missingDependencies && missingDependencies.length > 0) {
-            const invalidDeps = missingDependencies.filter(
-                (d) => !d.name || !d.type || !d.severity
-            );
-            if (invalidDeps.length > 0) {
+            const allIssues: string[] = [];
+            missingDependencies.forEach((dep, i) => {
+                allIssues.push(...validateDependencyShape(dep, i));
+            });
+            if (allIssues.length > 0) {
                 return new vscode.LanguageModelToolResult([
                     new vscode.LanguageModelTextPart(
                         JSON.stringify({
-                            error: `${invalidDeps.length} dependencies are missing required fields (name, type, severity). Each dependency must have: id, name, type (dll/assembly/jar/schema/map/pipeline/orchestration/binding/connector/library/module/subflow/custom-code/other), origin (standard-framework/standard-biztalk/standard-platform/third-party/custom/unknown), severity (critical/warning/info), referencedBy (array), reason, blocksMigration (boolean), migrationRelevant (boolean), and optionally: resolution, expectedLocation, version, platform.`,
+                            error: `${allIssues.length} validation issue(s) in missingDependencies. Fix and retry.`,
+                            issues: allIssues.slice(0, 20),
+                            guidance:
+                                'Each dependency must have: name (string), type (string), origin ("standard-framework"|"standard-biztalk"|"standard-platform"|"third-party"|"custom"|"unknown"), severity ("critical"|"warning"|"info"), referencedBy (string[]), reason (string), blocksMigration (boolean), migrationRelevant (boolean).',
                         })
                     ),
                 ]);
