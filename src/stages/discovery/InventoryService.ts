@@ -187,6 +187,9 @@ export class InventoryBuilder {
         artifact: ParsedArtifact,
         status: 'parsed' | 'error' | 'warning'
     ): InventoryItem {
+        const normalizedCategory: ArtifactCategory =
+            artifact.type === 'project' ? 'custom-code' : artifact.type;
+
         const metadata: InventoryItemMetadata = {
             fileSize: artifact.fileSize,
             lastModified: artifact.lastModified,
@@ -197,7 +200,7 @@ export class InventoryBuilder {
         };
 
         // Auto-generate tags based on artifact
-        const tags: string[] = [artifact.type];
+        const tags: string[] = [normalizedCategory];
         if (artifact.ir.triggers && artifact.ir.triggers.length > 0) {
             tags.push('has-triggers');
         }
@@ -208,7 +211,7 @@ export class InventoryBuilder {
         return {
             id: artifact.id,
             name: artifact.name,
-            category: artifact.type,
+            category: normalizedCategory,
             sourcePath: artifact.sourcePath,
             status,
             irId: artifact.id,
@@ -224,30 +227,32 @@ export class InventoryBuilder {
             '.btm': 'map',
             '.xsd': 'schema',
             '.btp': 'pipeline',
-            '.brl': 'policy',
-            '.bre': 'policy',
+            '.brl': 'ruleset',
+            '.bre': 'ruleset',
             '.dwl': 'dataweave',
             '.esql': 'esql',
             '.msgflow': 'flow',
             '.process': 'process',
-            '.cs': 'dependency',
-            '.vb': 'dependency',
-            '.java': 'dependency',
-            '.csproj': 'dependency',
-            '.vbproj': 'dependency',
-            '.dll': 'dependency',
-            '.jar': 'dependency',
-            '.btproj': 'dependency',
+            '.cs': 'custom-code',
+            '.vb': 'custom-code',
+            '.java': 'custom-code',
+            '.csproj': 'custom-code',
+            '.vbproj': 'custom-code',
+            '.dll': 'custom-code',
+            '.jar': 'custom-code',
+            '.btproj': 'custom-code',
             '.properties': 'config',
             '.wsdl': 'schema',
             '.sql': 'config',
             '.raml': 'api',
+            '.asmx': 'legacy-webservice',
+            '.hidx': 'hidx',
         };
         return mapping[ext] || 'other';
     }
 
     private calculateStatistics(items: InventoryItem[]): InventoryStatistics {
-        const byCategory: Record<ArtifactCategory, number> = {
+        const byCategory: Partial<Record<ArtifactCategory, number>> = {
             workflow: 0,
             orchestration: 0,
             flow: 0,
@@ -257,13 +262,16 @@ export class InventoryBuilder {
             pipeline: 0,
             binding: 0,
             policy: 0,
+            ruleset: 0,
+            'custom-code': 0,
+            'legacy-webservice': 0,
+            hidx: 0,
+            b2b: 0,
             dataweave: 0,
             esql: 0,
             api: 0,
             connector: 0,
             config: 0,
-            project: 0,
-            dependency: 0,
             other: 0,
         };
 
@@ -276,7 +284,8 @@ export class InventoryBuilder {
         let totalFileSize = 0;
 
         for (const item of items) {
-            byCategory[item.category] = (byCategory[item.category] || 0) + 1;
+            const category = item.category === 'project' ? 'custom-code' : item.category;
+            byCategory[category] = (byCategory[category] || 0) + 1;
             byStatus[item.status]++;
             totalFileSize += item.metadata.fileSize;
         }
@@ -578,7 +587,22 @@ export class InventoryService implements vscode.Disposable {
         if (!this.inventory) {
             throw new Error('No inventory to export');
         }
-        return JSON.stringify(this.inventory, null, 2);
+
+        const filteredByCategory = Object.fromEntries(
+            Object.entries(this.inventory.statistics.byCategory).filter(
+                ([category]) => category !== 'project'
+            )
+        );
+
+        const exportableInventory = {
+            ...this.inventory,
+            statistics: {
+                ...this.inventory.statistics,
+                byCategory: filteredByCategory,
+            },
+        };
+
+        return JSON.stringify(exportableInventory, null, 2);
     }
 
     /**
@@ -628,7 +652,7 @@ export class InventoryService implements vscode.Disposable {
         lines.push('| Category | Count |');
         lines.push('|----------|-------|');
         for (const [category, count] of Object.entries(this.inventory.statistics.byCategory)) {
-            if (count > 0) {
+            if (category !== 'project' && count > 0) {
                 lines.push(`| ${category} | ${count} |`);
             }
         }

@@ -243,13 +243,17 @@ export type ArtifactCategory =
     | 'pipeline'
     | 'binding'
     | 'policy'
+    | 'ruleset'
+    | 'custom-code'
+    | 'legacy-webservice'
+    | 'hidx'
+    | 'b2b'
     | 'dataweave'
     | 'esql'
     | 'api'
     | 'connector'
     | 'config'
     | 'project'
-    | 'dependency'
     | 'other';
 
 /**
@@ -391,7 +395,7 @@ export interface InventoryStatistics {
     readonly totalCount: number;
 
     /** Count by category */
-    readonly byCategory: Record<ArtifactCategory, number>;
+    readonly byCategory: Partial<Record<ArtifactCategory, number>>;
 
     /** Count by status */
     readonly byStatus: Record<'parsed' | 'error' | 'warning', number>;

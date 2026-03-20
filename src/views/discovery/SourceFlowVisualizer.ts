@@ -674,7 +674,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         const displayTitle = title || 'Integration Flow';
 
         // Filter out non-integration artifacts
-        const EXCLUDED_CATEGORIES = new Set(['dependency', 'other']);
+        const EXCLUDED_CATEGORIES = new Set(['custom-code', 'other']);
         const integrationArtifacts = artifacts.filter((a) => !EXCLUDED_CATEGORIES.has(a.type));
 
         if (SourceFlowVisualizer.currentPanel) {
@@ -1133,7 +1133,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                                 await InventoryService.getInstance().getAllParsedArtifacts();
                             const group = discoveryCacheService.getFlowGroup(flowId);
                             const displayTitle = group?.name || flowId;
-                            const EXCLUDED_CATEGORIES = new Set(['dependency', 'other']);
+                            const EXCLUDED_CATEGORIES = new Set(['custom-code', 'other']);
                             const integrationArtifacts = parsedArtifacts.filter(
                                 (a) => !EXCLUDED_CATEGORIES.has(a.type)
                             );
@@ -3970,7 +3970,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 return undefined;
             }
 
-            const EXCLUDED_CATEGORIES = new Set(['dependency', 'other']);
+            const EXCLUDED_CATEGORIES = new Set(['custom-code', 'other']);
             const integrationArtifacts = parsedArtifacts.filter(
                 (a) => !EXCLUDED_CATEGORIES.has(a.type)
             );

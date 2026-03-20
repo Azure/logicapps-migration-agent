@@ -93,7 +93,7 @@ const EXTENSION_TO_CATEGORY: Record<string, ArtifactCategory> = {
     '.btm': 'map',
     '.xsd': 'schema',
     '.btp': 'pipeline',
-    '.btproj': 'project',
+    '.btproj': 'custom-code',
     '.dwl': 'dataweave',
     '.esql': 'esql',
     '.msgflow': 'flow',
@@ -107,21 +107,26 @@ const EXTENSION_TO_CATEGORY: Record<string, ArtifactCategory> = {
     '.properties': 'config',
     '.wsdl': 'schema',
     '.sql': 'config',
-    // Dependency files — source code, project files, and binaries
-    '.cs': 'dependency',
-    '.vb': 'dependency',
-    '.java': 'dependency',
-    '.csproj': 'dependency',
-    '.vbproj': 'dependency',
-    '.dll': 'dependency',
-    '.jar': 'dependency',
+    // BizTalk-specific extensions
+    '.asmx': 'legacy-webservice',
+    '.hidx': 'hidx',
+    '.brl': 'ruleset',
+    '.bre': 'ruleset',
+    // Custom code and assemblies
+    '.cs': 'custom-code',
+    '.vb': 'custom-code',
+    '.java': 'custom-code',
+    '.csproj': 'custom-code',
+    '.vbproj': 'custom-code',
+    '.dll': 'custom-code',
+    '.jar': 'custom-code',
 };
 
 /**
  * Extensions that are dependency files (no parser required).
  * These create lightweight inventory entries without full IR parsing.
  */
-const DEPENDENCY_EXTENSIONS = new Set([
+const CUSTOM_CODE_EXTENSIONS = new Set([
     '.cs',
     '.vb',
     '.java',
@@ -130,6 +135,57 @@ const DEPENDENCY_EXTENSIONS = new Set([
     '.dll',
     '.jar',
 ]);
+
+// =============================================================================
+// BizTalk XML Path Heuristics
+// =============================================================================
+
+/**
+ * Classify a generic .xml file into a more specific BizTalk category
+ * based on its relative path within the source project.
+ *
+ * Returns the refined ArtifactCategory, or 'config' if no heuristic matches.
+ */
+function classifyXmlByPath(relativePath: string): ArtifactCategory {
+    const normalized = relativePath.replace(/\\/g, '/').toLowerCase();
+
+    // B2B / TPM — Trading Partner Management, EDI, AS2, agreements, partner profiles
+    if (
+        /\btpm\b/.test(normalized) ||
+        /\bpartner\s?data\b/.test(normalized) ||
+        /\bagreement/.test(normalized) ||
+        /\bedi\b/.test(normalized) ||
+        /\bas2\b/.test(normalized) ||
+        /\bx12\b/.test(normalized) ||
+        /\bedifact\b/.test(normalized) ||
+        /\bparties\b/.test(normalized) ||
+        /\bprofiles?\b/.test(normalized) && /\bpartner/.test(normalized)
+    ) {
+        return 'b2b';
+    }
+
+    // BRE Rulesets & Vocabularies
+    if (
+        /\brule/i.test(normalized) ||
+        /\bvocabulari?e?s?\b/.test(normalized) ||
+        /\bpolicies?\b/.test(normalized) ||
+        /\bbre\b/.test(normalized)
+    ) {
+        return 'ruleset';
+    }
+
+    // Legacy web services
+    if (/\.asmx$/i.test(normalized) || /\bwebservice/i.test(normalized)) {
+        return 'legacy-webservice';
+    }
+
+    // Sample/test messages — keep in config (not a migration artifact)
+    if (/\bsample/i.test(normalized) || /\btestmessage/i.test(normalized)) {
+        return 'config';
+    }
+
+    return 'config';
+}
 
 // =============================================================================
 // Artifact Scanner
@@ -254,10 +310,10 @@ export class ArtifactScanner implements vscode.Disposable {
                 const ext = path.extname(file.path).toLowerCase();
                 const parser = file.parser || this.parserFactory.getParserForFile(file.path);
                 if (!parser) {
-                    // Dependency files (.cs, .vb, .java, .dll, .jar) don't need a
+                    // Custom code files (.cs, .vb, .java, .dll, .jar) don't need a
                     // parser — create a lightweight inventory entry so they appear
-                    // in the inventory under the "Dependencies" category.
-                    if (DEPENDENCY_EXTENSIONS.has(ext)) {
+                    // in the inventory under the "Custom Code & Assemblies" category.
+                    if (CUSTOM_CODE_EXTENSIONS.has(ext)) {
                         const depArtifact = this.createDependencyArtifact(file.path, folderPath);
                         if (depArtifact) {
                             parsedArtifacts.push(depArtifact);
@@ -458,8 +514,14 @@ export class ArtifactScanner implements vscode.Disposable {
         supportedExtensions.add('.wsdl');
         supportedExtensions.add('.sql');
 
-        // Add dependency file extensions so they are discovered
-        for (const ext of DEPENDENCY_EXTENSIONS) {
+        // BizTalk-specific extensions
+        supportedExtensions.add('.asmx');
+        supportedExtensions.add('.hidx');
+        supportedExtensions.add('.brl');
+        supportedExtensions.add('.bre');
+
+        // Add custom code file extensions so they are discovered
+        for (const ext of CUSTOM_CODE_EXTENSIONS) {
             supportedExtensions.add(ext);
         }
 
@@ -599,6 +661,16 @@ export class ArtifactScanner implements vscode.Disposable {
             category = EXTENSION_TO_CATEGORY[ext] || 'other';
         }
 
+        // Refine generic .xml classification using path heuristics
+        if (category === 'config' && ext === '.xml') {
+            category = classifyXmlByPath(relativePath);
+        }
+
+        // Normalize project artifacts into custom-code for discovery taxonomy
+        if (category === 'project') {
+            category = 'custom-code';
+        }
+
         return {
             id: deterministicId(relativePath),
             name: ir.metadata?.name || fileName,
@@ -684,7 +756,7 @@ export class ArtifactScanner implements vscode.Disposable {
         return {
             id: deterministicId(relativePath),
             name: fileName,
-            type: 'dependency',
+            type: 'custom-code',
             sourcePath: relativePath,
             absolutePath: filePath,
             ir: enrichedIR,

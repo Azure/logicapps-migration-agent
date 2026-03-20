@@ -1501,7 +1501,8 @@
                 },
                 {
                     "id": "logicAppsMigrationAssistant.inventory",
-                    "name": "Artifact Inventory"
+                    "name": "Artifact Inventory",
+                    "when": "config.logicAppsMigrationAssistant.showArtifactInventory"
                 },
                 {
                     "id": "logicAppsMigrationAssistant.actions",
@@ -1511,12 +1512,8 @@
         },
         "viewsWelcome": [
             {
-                "view": "logicAppsMigrationAssistant.inventory",
-                "contents": "No artifacts discovered yet.\n\n[Select Source Folder](command:logicAppsMigrationAssistant.selectSourceFolder) to scan for integration artifacts."
-            },
-            {
-                "view": "logicAppsMigrationAssistant.actions",
-                "contents": "Quick Actions:\n\n[Start Migration](command:logicAppsMigrationAssistant.selectSourceFolder)\n[View Logs](command:logicAppsMigrationAssistant.showLogs)"
+                "view": "logicAppsMigrationAssistant.discovery",
+                "contents": "No artifacts discovered yet.\n\n[Select Source Folder](command:logicAppsMigrationAssistant.selectSourceFolder)"
             }
         ],
         "menus": {
@@ -1621,6 +1618,11 @@
                     "type": "string",
                     "default": "eastus",
                     "description": "Azure region for provisioning resources"
+                },
+                "logicAppsMigrationAssistant.showArtifactInventory": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Show the Artifact Inventory section in the sidebar"
                 }
             }
         }

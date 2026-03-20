@@ -299,7 +299,9 @@ async function initializeServices(context: vscode.ExtensionContext): Promise<voi
 
     LoggingService.getInstance().info('Conversion stage services initialized');
 
-    // =========================================================================\n    // PROJECT AUTO-DETECTION (Phase 6)\n    // =========================================================================", "oldString": "    // =========================================================================\n    // STAGE CHANGE LISTENER\n    // =========================================================================\n\n    // Stage transitions are now handled per-flow from the flow group selector.\n    // Do NOT auto-open Planning/Conversion webviews on stage change — the user\n    // accesses them through the flow card buttons (\"✓ Planned\" / \"✓ Converted\").\n    const stageChangeDisposable = stateMachine.onStageChange(async (event) => {\n        LoggingService.getInstance().info(`Stage changed to ${event.currentStage}`);\n    });\n    disposables.push(stageChangeDisposable);\n\n    // =========================================================================\n    // PROJECT AUTO-DETECTION (Phase 6)\n    // =========================================================================
+    // =========================================================================
+    // PROJECT AUTO-DETECTION (Phase 6)
+    // =========================================================================
 
     // Initialize and run project auto-detection
     const autoDetection = ProjectAutoDetection.getInstance();
