@@ -765,6 +765,19 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     }
 
     /**
+     * Close all open webview panels (flow group selector + per-flow analysis panels).
+     */
+    public static closeAllPanels(): void {
+        if (SourceFlowVisualizer.currentPanel) {
+            SourceFlowVisualizer.currentPanel.panel.dispose();
+        }
+        for (const panel of SourceFlowVisualizer.analysisPanels.values()) {
+            panel.dispose();
+        }
+        SourceFlowVisualizer.analysisPanels.clear();
+    }
+
+    /**
      * Clear cached results for a specific cache key (and its group sub-entries).
      */
     public static clearCacheForKey(cacheKey: string): void {
@@ -3142,7 +3155,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         // ── Zoom State (per flow group) ──
         const ZOOM_STEP = 0.1;
         const ZOOM_MIN = 0.2;
-        const ZOOM_MAX = 3.0;
+        const ZOOM_MAX = 10.0;
         const groupZoomLevels = {};  // { groupId: number }
         let currentGroupId = document.getElementById('flowGroupSelect')
             ? document.getElementById('flowGroupSelect').value

@@ -1538,7 +1538,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
         var _zoomLevels = {};
         function zoomDiagram(containerId, delta) {
             var level = _zoomLevels[containerId] || 1.0;
-            level = Math.max(0.2, Math.min(3.0, level + delta));
+            level = Math.max(0.2, Math.min(10.0, level + delta));
             _zoomLevels[containerId] = level;
             var container = document.getElementById(containerId);
             if (container) {

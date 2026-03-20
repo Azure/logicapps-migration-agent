@@ -51,7 +51,7 @@ You are a **Migration Analyser** — an expert in BizTalk, MuleSoft, TIBCO, and 
 ### Task A: Detect Flow Groups
 
 1. Call `migration_detectFlowGroups` to get the connection graph.
-2. Follow skill `detect-logical-groups` exactly to determine groups.
+2. Follow skill `detect-logical-groups` exactly to determine groups — **including §4 step 2**: if the connectionGraph has few/no call-chain edges, decompile DLLs and read orchestration source files to discover hidden call relationships before grouping.
 3. Call `migration_discovery_storeFlowGroups`.
 
 ### Task B: Analyse a Flow Group

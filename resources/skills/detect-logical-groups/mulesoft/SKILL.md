@@ -53,15 +53,17 @@ Each group MUST have:
 ## 4. Procedure
 
 1. Call `migration_detectFlowGroups` to get the artifact connection graph and summaries.
-2. Determine logical flow groups using the flow-reference chain strategy above.
-3. Call `migration_discovery_storeFlowGroups` with the groups array, `ungroupedArtifactIds`, and explanation.
-4. Do NOT read source files or generate architecture diagrams — only detect and store groups.
+2. **If the connectionGraph has few or no `call-workflow` or `shared-connection` edges**, the flow-ref data may be incomplete. In that case:
+   a. Call `migration_listArtifacts` with `category="custom-code"` to find JARs and custom Java classes.
+   b. Read flow source files (`migration_readSourceFile`) to find `flow-ref` targets and shared config references.
+   c. Use the discovered call chains and shared configs to merge groups that should be together.
+3. Determine logical flow groups using the flow-reference chain strategy above, incorporating both graph edges AND any call chains discovered in step 2.
+4. Call `migration_discovery_storeFlowGroups` with the groups array, `ungroupedArtifactIds`, and explanation.
 
 ---
 
 ## 5. What NOT to Do
 
-- Do NOT read source files during flow group detection.
-- Do NOT generate architecture diagrams.
 - Do NOT create empty `artifactIds` arrays.
 - Do NOT split flows linked by flow-ref chains into separate groups.
+- Do NOT skip source reading when the connectionGraph has missing call-chain edges — incomplete grouping causes downstream analysis failures.

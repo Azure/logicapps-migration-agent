@@ -528,6 +528,18 @@ export class CommandRegistry implements vscode.Disposable {
             // Clear flow visualization cache
             SourceFlowVisualizer.clearCache();
 
+            // Close all open webview panels
+            SourceFlowVisualizer.closeAllPanels();
+            if (DiscoveryWebviewPanel.currentPanel) {
+                DiscoveryWebviewPanel.currentPanel.dispose();
+            }
+            if (PlanningWebviewPanel.currentPanel) {
+                PlanningWebviewPanel.currentPanel.dispose();
+            }
+            if (ConversionWebviewPanel.currentPanel) {
+                ConversionWebviewPanel.currentPanel.dispose();
+            }
+
             // Clear discovery cache (flow groups + per-flow analysis on disk)
             const { DiscoveryCacheService } =
                 await import('../stages/discovery/DiscoveryCacheService');
