@@ -71,6 +71,39 @@ Do NOT draw a flow as a single box. Each flow MUST be a subgraph containing its 
 - For `choice` routers, show each `when` branch condition and the `otherwise` branch.
 - For `scatter-gather`, show parallel routes as parallel branches converging.
 
+### 3.5 Sub-Flow Expansion (MANDATORY)
+
+If any flow invokes a sub-flow via `flow-ref`:
+
+1. **Each invoked sub-flow MUST be expanded** as its own subgraph with full internal processors — exactly like the parent flow (§3.4). Do NOT render sub-flows as collapsed leaf nodes (e.g., `flow-ref_1`, `subflow_2`).
+2. **Read the target sub-flow's source file** using `migration_readSourceFile` to get its processors.
+3. **Connect parent → sub-flow** with an arrow labeled `"flow-ref: {sub-flow-name}"`.
+4. **Recurse**: if the sub-flow itself calls further sub-flows, expand those too — all the way down the call tree.
+
+### 3.6 No Collapsed Invocation Targets
+
+Leaf nodes like `flow-ref_1` or `subflow_2` are NOT acceptable final output. Every invoked sub-flow must be a fully expanded subgraph unless:
+- The target sub-flow is NOT in the flow group's artifact list (in which case, label the node as "External: {name} (not in group)").
+
+### 3.7 Overflow Handling
+
+When the diagram becomes too large (more than ~30 flow/sub-flow subgraphs or ~200 processor nodes):
+- Split into parent diagram + child detail diagrams.
+- The parent diagram shows flow-level boxes with flow-ref relationships.
+- Each child detail diagram shows the full internal processors for one flow.
+- Store the parent diagram via `storeArchitecture`; reference child details in `storeComponents`.
+
+### 3.8 Pre-Store Validation Gates
+
+Before calling `migration_discovery_storeArchitecture` or `migration_discovery_finalize`, verify:
+
+- [ ] ALL invoked sub-flows in the flow group are expanded as subgraphs with internal processors
+- [ ] ALL processors are labeled with doc:name, type, and relevant details
+- [ ] ALL arrows between processors have step-level labels
+- [ ] NO collapsed invocation targets remain (no bare `flow-ref_*` or `subflow_*` leaf nodes)
+
+**If any gate fails, do NOT call storeArchitecture or finalize.** Fix the diagram first.
+
 ---
 
 ## 4. Component Mapping Priority Ladder
