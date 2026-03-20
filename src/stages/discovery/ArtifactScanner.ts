@@ -159,7 +159,7 @@ function classifyXmlByPath(relativePath: string): ArtifactCategory {
         /\bx12\b/.test(normalized) ||
         /\bedifact\b/.test(normalized) ||
         /\bparties\b/.test(normalized) ||
-        /\bprofiles?\b/.test(normalized) && /\bpartner/.test(normalized)
+        (/\bprofiles?\b/.test(normalized) && /\bpartner/.test(normalized))
     ) {
         return 'b2b';
     }
@@ -321,11 +321,13 @@ export class ArtifactScanner implements vscode.Disposable {
                         continue;
                     }
 
-                    skippedFiles.push({
-                        filePath: relativePath,
-                        reason: 'no-parser',
-                        details: `No parser available for ${ext}`,
-                    });
+                    // No parser available — create an "other" inventory entry
+                    // so every file in the source folder is visible in the tree.
+                    const category: ArtifactCategory = EXTENSION_TO_CATEGORY[ext] || 'other';
+                    const otherArtifact = this.createOtherArtifact(file.path, folderPath, category);
+                    if (otherArtifact) {
+                        parsedArtifacts.push(otherArtifact);
+                    }
                     continue;
                 }
 
@@ -568,12 +570,9 @@ export class ArtifactScanner implements vscode.Disposable {
                 }
 
                 if (entry.isFile()) {
-                    const ext = path.extname(entry.name).toLowerCase();
-                    if (supportedExtensions.has(ext)) {
-                        // Find best parser for this file
-                        const parser = parsers.find((p) => p.canParse(fullPath));
-                        files.push({ path: fullPath, parser });
-                    }
+                    // Discover ALL files — parser lookup happens later
+                    const parser = parsers.find((p) => p.canParse(fullPath));
+                    files.push({ path: fullPath, parser });
                 } else if (entry.isDirectory()) {
                     // Skip hidden directories
                     if (entry.name.startsWith('.')) {
@@ -681,6 +680,66 @@ export class ArtifactScanner implements vscode.Disposable {
             fileSize,
             lastModified,
             parserId: parser.capabilities.platform,
+        };
+    }
+
+    /**
+     * Create a lightweight ParsedArtifact for files that have no dedicated
+     * parser. These appear in the inventory under their extension-mapped
+     * category (or 'other') so every file in the source tree is visible.
+     */
+    private createOtherArtifact(
+        filePath: string,
+        rootPath: string,
+        category: ArtifactCategory
+    ): ParsedArtifact | undefined {
+        const relativePath = path.relative(rootPath, filePath);
+        const ext = path.extname(filePath).toLowerCase();
+        const fileName = path.basename(filePath, ext);
+
+        let fileSize = 0;
+        let lastModified = new Date().toISOString();
+        try {
+            const stat = fs.statSync(filePath);
+            fileSize = stat.size;
+            lastModified = stat.mtime.toISOString();
+        } catch {
+            return undefined;
+        }
+
+        const ir = createEmptyIRDocument(`other-${fileName}`, fileName, 'biztalk');
+        const enrichedIR: IRDocument = {
+            ...ir,
+            metadata: {
+                ...ir.metadata,
+                source: {
+                    ...ir.metadata.source,
+                    artifact: {
+                        ...ir.metadata.source.artifact,
+                        name: fileName,
+                        type: 'project',
+                        filePath: relativePath,
+                        fileType: ext.replace('.', ''),
+                    },
+                },
+                migration: {
+                    ...ir.metadata.migration,
+                    status: 'discovered',
+                    notes: [`${ext.toUpperCase().replace('.', '')} file: ${relativePath}`],
+                },
+            },
+        };
+
+        return {
+            id: deterministicId(relativePath),
+            name: fileName,
+            type: category,
+            sourcePath: relativePath,
+            absolutePath: filePath,
+            ir: enrichedIR,
+            fileSize,
+            lastModified,
+            parserId: 'discovery-scanner',
         };
     }
 

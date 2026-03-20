@@ -35,7 +35,7 @@ NEVER generate any of the following:
 For custom code / .NET local function tasks:
 
 1. Read the original source code (`.java`, `.dwl` files) from the workspace.
-2. Read decompiled code from `out/__decompiled__/` if original Java source is unavailable.
+2. Read decompiled code from `out/__decompiled__/` in the current migration workspace directory if original Java source is unavailable.
 3. Translate the actual business logic — not a simplified approximation.
 4. If source code is available in the workspace, use it directly.
 5. For DataWeave scripts, convert the full transformation logic — do NOT leave partial conversions.

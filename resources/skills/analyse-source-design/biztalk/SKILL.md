@@ -67,6 +67,41 @@ Do NOT draw an orchestration as a single box. Each orchestration MUST be a subgr
 - Include for each shape: shape name, shape type, logical port name, message variable, and map name (for transforms).
 - Label every arrow with what happens at that step.
 
+### 3.5 Child Orchestration Expansion (MANDATORY)
+
+If any orchestration invokes another orchestration via `Exec/StartOrchestration`, `Call Orchestration`, or `Start Orchestration` shapes:
+
+1. **Each invoked orchestration MUST be expanded** as its own subgraph with full internal shapes — exactly like the parent orchestration (§3.4). Do NOT render child orchestrations as collapsed leaf nodes (e.g., `StartOrchestration_1`, `StartOrchestration_6`).
+2. **Read the target orchestration's source file** using `migration_readSourceFile` to get its Receive/Send/Construct/Decide/Expression shapes.
+3. **Connect parent → child** with an arrow labeled with the call type (e.g., "Call Orchestration: ChildName").
+4. **Recurse**: if the child orchestration itself calls further orchestrations, expand those too — all the way down the call tree.
+
+### 3.6 No Collapsed Invocation Targets
+
+Leaf nodes like `StartOrchestration_1` or `CallOrchestration_2` are NOT acceptable final output. Every invocation target must be a fully expanded subgraph unless:
+
+- The target orchestration is NOT in the flow group's artifact list (in which case, label the node as "External: {name} (not in group)").
+
+### 3.7 Overflow Handling
+
+When the diagram becomes too large (more than ~30 orchestration subgraphs or ~200 shape nodes):
+
+- Split into parent diagram + child detail diagrams.
+- The parent diagram shows orchestration-level boxes with call relationships.
+- Each child detail diagram shows the full internal shapes for one orchestration.
+- Store the parent diagram via `storeArchitecture`; reference child details in `storeComponents`.
+
+### 3.8 Pre-Store Validation Gates
+
+Before calling `migration_discovery_storeArchitecture` or `migration_discovery_finalize`, verify:
+
+- [ ] ALL invoked orchestrations in the flow group are expanded as subgraphs with internal shapes
+- [ ] ALL orchestration shapes are labeled with shape name, type, and relevant details
+- [ ] ALL arrows between shapes have step-level labels
+- [ ] NO collapsed invocation targets remain (no bare `StartOrchestration_*` or `CallOrchestration_*` leaf nodes)
+
+**If any gate fails, do NOT call storeArchitecture or finalize.** Fix the diagram first.
+
 ---
 
 ## 4. Component Mapping Priority Ladder

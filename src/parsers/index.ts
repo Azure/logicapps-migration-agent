@@ -42,20 +42,16 @@ export {
     BizTalkSchemaParser,
     BizTalkPipelineParser,
     BizTalkBindingsParser,
+    BizTalkHidxParser,
+    BizTalkRulesParser,
+    BizTalkAsmxParser,
 } from './biztalk';
 
 // MuleSoft Parsers (fully implemented)
-export {
-    MuleSoftFlowParser,
-    MuleSoftDataWeaveParser,
-    MuleSoftProjectParser,
-} from './mulesoft';
+export { MuleSoftFlowParser, MuleSoftDataWeaveParser, MuleSoftProjectParser } from './mulesoft';
 
 // Stub Parsers (work in progress)
-export {
-    MuleSoftAPISpecParser,
-    GenericXMLParser,
-} from './stubs';
+export { MuleSoftAPISpecParser, GenericXMLParser } from './stubs';
 
 // Parser registration
 import { defaultParserRegistry } from './ParserRegistry';
@@ -66,16 +62,12 @@ import {
     BizTalkSchemaParser,
     BizTalkPipelineParser,
     BizTalkBindingsParser,
+    BizTalkHidxParser,
+    BizTalkRulesParser,
+    BizTalkAsmxParser,
 } from './biztalk';
-import {
-    MuleSoftFlowParser,
-    MuleSoftDataWeaveParser,
-    MuleSoftProjectParser,
-} from './mulesoft';
-import {
-    MuleSoftAPISpecParser,
-    GenericXMLParser,
-} from './stubs';
+import { MuleSoftFlowParser, MuleSoftDataWeaveParser, MuleSoftProjectParser } from './mulesoft';
+import { MuleSoftAPISpecParser, GenericXMLParser } from './stubs';
 
 /**
  * Initialize all parsers and register them with the default registry.
@@ -89,6 +81,9 @@ export function initializeParsers(): void {
     defaultParserRegistry.register(new BizTalkSchemaParser());
     defaultParserRegistry.register(new BizTalkPipelineParser());
     defaultParserRegistry.register(new BizTalkBindingsParser());
+    defaultParserRegistry.register(new BizTalkHidxParser());
+    defaultParserRegistry.register(new BizTalkRulesParser());
+    defaultParserRegistry.register(new BizTalkAsmxParser());
 
     // MuleSoft parsers (fully implemented)
     defaultParserRegistry.register(new MuleSoftProjectParser());

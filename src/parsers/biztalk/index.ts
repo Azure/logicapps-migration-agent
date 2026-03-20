@@ -13,4 +13,7 @@ export { BizTalkMapParser } from './BizTalkMapParser';
 export { BizTalkSchemaParser } from './BizTalkSchemaParser';
 export { BizTalkPipelineParser } from './BizTalkPipelineParser';
 export { BizTalkBindingsParser } from './BizTalkBindingsParser';
+export { BizTalkHidxParser } from './BizTalkHidxParser';
+export { BizTalkRulesParser } from './BizTalkRulesParser';
+export { BizTalkAsmxParser } from './BizTalkAsmxParser';
 export { enrichConnectionsFromBindings } from './BizTalkPostEnrichment';

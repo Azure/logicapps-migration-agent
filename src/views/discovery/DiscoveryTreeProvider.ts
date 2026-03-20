@@ -30,7 +30,7 @@ type DiscoveryTreeItemType =
     | 'root'
     | 'project-info'
     | 'statistics'
-    | 'category'
+    | 'folder'
     | 'virtual-category'
     | 'artifact'
     | 'virtual-artifact'
@@ -61,6 +61,8 @@ export class DiscoveryTreeItem extends vscode.TreeItem {
             virtualCategory?: VirtualCategory;
             item?: InventoryItem;
             count?: number;
+            /** Folder path prefix (normalized to /) for folder nodes */
+            folderPath?: string;
             /** Virtual sub-items: name + description pairs */
             virtualItems?: { name: string; description?: string; tooltip?: string }[];
         }
@@ -173,8 +175,8 @@ export class DiscoveryTreeProvider
         }
 
         switch (element.itemType) {
-            case 'category':
-                return this.getCategoryItems(element.data?.category, inventory);
+            case 'folder':
+                return this.getFolderChildren(element.data?.folderPath || '', inventory);
             case 'virtual-category':
                 return this.getVirtualCategoryItems(element);
             case 'error-group':
@@ -200,26 +202,15 @@ export class DiscoveryTreeProvider
         // Statistics
         items.push(this.createStatisticsItem(inventory.statistics));
 
-        // Real artifact categories (excluding 'binding' — we show its contents as virtual categories)
-        const categories = this.getCategoriesWithItems(inventory);
-        for (const [category, count] of categories) {
-            if (category === 'binding') {
-                continue; // Skip binding — we'll expand it into virtual categories below
-            }
-            items.push(this.createCategoryItem(category, count));
-        }
+        // Build folder tree from non-error artifacts
+        const okItems = inventory.items.filter((i) => i.status !== 'error');
+        const folderChildren = this.buildFolderLevel(okItems, '');
+        items.push(...folderChildren);
 
         // Virtual categories extracted from binding IR
         const virtualCategories = this.extractVirtualCategories(inventory);
         for (const vc of virtualCategories) {
             items.push(vc);
-        }
-
-        // Show binding category if it exists (after virtual categories, at lower priority)
-        for (const [category, count] of categories) {
-            if (category === 'binding') {
-                items.push(this.createCategoryItem(category, count));
-            }
         }
 
         // Errors group if any
@@ -229,6 +220,79 @@ export class DiscoveryTreeProvider
         }
 
         return items;
+    }
+
+    /**
+     * Build folder and artifact nodes for items at a specific path level.
+     * Items whose normalized sourcePath starts with `prefix` are considered;
+     * the next path segment determines whether a sub-folder or a leaf artifact is created.
+     */
+    private buildFolderLevel(items: InventoryItem[], prefix: string): DiscoveryTreeItem[] {
+        const result: DiscoveryTreeItem[] = [];
+        const subFolders = new Map<string, InventoryItem[]>();
+        const directFiles: InventoryItem[] = [];
+
+        for (const item of items) {
+            const normalized = item.sourcePath.replace(/\\/g, '/');
+            // Only consider items under this prefix
+            if (prefix && !normalized.startsWith(prefix + '/')) {
+                continue;
+            }
+            if (!prefix && normalized.includes('/')) {
+                // Has folder structure — extract first segment
+                const firstSeg = normalized.split('/')[0];
+                const existing = subFolders.get(firstSeg) || [];
+                existing.push(item);
+                subFolders.set(firstSeg, existing);
+            } else if (!prefix) {
+                // File at root level (no folder)
+                directFiles.push(item);
+            } else {
+                // Items under prefix
+                const remaining = normalized.slice(prefix.length + 1);
+                if (remaining.includes('/')) {
+                    const nextSeg = remaining.split('/')[0];
+                    const folderKey = prefix + '/' + nextSeg;
+                    const existing = subFolders.get(folderKey) || [];
+                    existing.push(item);
+                    subFolders.set(folderKey, existing);
+                } else {
+                    directFiles.push(item);
+                }
+            }
+        }
+
+        // Sort folders alphabetically, then add folder nodes
+        const sortedFolders = Array.from(subFolders.entries()).sort((a, b) =>
+            a[0].localeCompare(b[0])
+        );
+        for (const [folderKey, folderItems] of sortedFolders) {
+            const segments = folderKey.split('/');
+            const folderName = segments[segments.length - 1] || folderKey;
+            result.push(this.createFolderItem(folderName, folderKey, folderItems.length));
+        }
+
+        // Sort files alphabetically, then add artifact nodes
+        directFiles.sort((a, b) => a.name.localeCompare(b.name));
+        for (const file of directFiles) {
+            result.push(this.createArtifactItem(file));
+        }
+
+        return result;
+    }
+
+    /**
+     * Get children for a folder node.
+     */
+    private getFolderChildren(
+        folderPath: string,
+        inventory: ArtifactInventory | undefined
+    ): DiscoveryTreeItem[] {
+        if (!inventory) {
+            return [];
+        }
+        const okItems = inventory.items.filter((i) => i.status !== 'error');
+        return this.buildFolderLevel(okItems, folderPath);
     }
 
     /**
@@ -448,22 +512,6 @@ export class DiscoveryTreeProvider
     }
 
     /**
-     * Get items for a category.
-     */
-    private getCategoryItems(
-        category: ArtifactCategory | undefined,
-        inventory: ArtifactInventory | undefined
-    ): DiscoveryTreeItem[] {
-        if (!category || !inventory) {
-            return [];
-        }
-
-        const items = inventory.items.filter((item) => item.category === category);
-
-        return items.map((item) => this.createArtifactItem(item));
-    }
-
-    /**
      * Get items for a virtual category (e.g., Receive Ports extracted from binding).
      */
     private getVirtualCategoryItems(element: DiscoveryTreeItem): DiscoveryTreeItem[] {
@@ -499,29 +547,6 @@ export class DiscoveryTreeProvider
         const errorItems = inventory.items.filter((item) => item.status === 'error');
 
         return errorItems.map((item) => this.createErrorItem(item));
-    }
-
-    /**
-     * Get categories that have items.
-     */
-    private getCategoriesWithItems(inventory: ArtifactInventory): [ArtifactCategory, number][] {
-        const categoryCount = new Map<ArtifactCategory, number>();
-
-        for (const item of inventory.items) {
-            if (item.status !== 'error') {
-                const count = categoryCount.get(item.category) || 0;
-                categoryCount.set(item.category, count + 1);
-            }
-        }
-
-        // Sort by priority
-        const sorted = Array.from(categoryCount.entries()).sort((a, b) => {
-            const priorityA = CATEGORY_INFO[a[0]]?.priority || 99;
-            const priorityB = CATEGORY_INFO[b[0]]?.priority || 99;
-            return priorityA - priorityB;
-        });
-
-        return sorted;
     }
 
     // =========================================================================
@@ -565,17 +590,20 @@ export class DiscoveryTreeProvider
         return item;
     }
 
-    private createCategoryItem(category: ArtifactCategory, count: number): DiscoveryTreeItem {
-        const info = CATEGORY_INFO[category] || CATEGORY_INFO.other;
-
+    private createFolderItem(
+        folderName: string,
+        folderPath: string,
+        childCount: number
+    ): DiscoveryTreeItem {
         const item = new DiscoveryTreeItem(
-            'category',
-            info.label,
+            'folder',
+            folderName,
             vscode.TreeItemCollapsibleState.Collapsed,
-            { category, count }
+            { folderPath, count: childCount }
         );
-        item.description = `(${count})`;
-        item.iconPath = new vscode.ThemeIcon(info.icon);
+        item.description = `(${childCount})`;
+        item.iconPath = new vscode.ThemeIcon('folder');
+        item.tooltip = folderPath;
         return item;
     }
 
@@ -612,8 +640,9 @@ export class DiscoveryTreeProvider
         const statusIcon = this.getStatusIcon(inventoryItem.status);
         item.iconPath = statusIcon;
 
-        // Description
-        item.description = path.dirname(inventoryItem.sourcePath);
+        // Description — show category label so file type is visible in folder view
+        const catInfo = CATEGORY_INFO[inventoryItem.category] || CATEGORY_INFO.other;
+        item.description = catInfo.label;
 
         // Tooltip
         item.tooltip = new vscode.MarkdownString(

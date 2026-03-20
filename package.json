@@ -2,7 +2,7 @@
     "name": "logicapps-migration-assistant",
     "displayName": "Logic Apps Migration Assistant",
     "description": "Migrate BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard with AI-powered assistance",
-    "version": "1.5.5",
+    "version": "1.5.8",
     "publisher": "microsoft",
     "license": "MIT",
     "engines": {
@@ -506,7 +506,56 @@
                             "type": "array",
                             "description": "Array of component detail objects",
                             "items": {
-                                "type": "object"
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string",
+                                        "description": "Unique component ID"
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Component display name"
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "description": "Component type (orchestration, schema, map, send-port, receive-port, pipeline, etc.)"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "What this component does"
+                                    },
+                                    "purpose": {
+                                        "type": "string",
+                                        "description": "Business purpose"
+                                    },
+                                    "connectedTo": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "IDs of connected components"
+                                    },
+                                    "isLogicAppsNative": {
+                                        "type": "boolean",
+                                        "description": "Whether this has a native Logic Apps equivalent"
+                                    },
+                                    "azureEquivalent": {
+                                        "type": "string",
+                                        "description": "Plain text description of the Azure Logic Apps equivalent. Must be a string, NOT an object."
+                                    },
+                                    "sourcePath": {
+                                        "type": "string",
+                                        "description": "Source file path"
+                                    }
+                                },
+                                "required": [
+                                    "id",
+                                    "name",
+                                    "type",
+                                    "description",
+                                    "isLogicAppsNative",
+                                    "azureEquivalent"
+                                ]
                             }
                         }
                     },
@@ -534,7 +583,49 @@
                             "type": "array",
                             "description": "Array of gap analysis entries",
                             "items": {
-                                "type": "object"
+                                "type": "object",
+                                "properties": {
+                                    "component": {
+                                        "type": "string",
+                                        "description": "Component name that has the gap"
+                                    },
+                                    "componentType": {
+                                        "type": "string",
+                                        "description": "Type of the component (orchestration, map, etc.)"
+                                    },
+                                    "gap": {
+                                        "type": "string",
+                                        "description": "Description of the gap"
+                                    },
+                                    "severity": {
+                                        "type": "string",
+                                        "enum": [
+                                            "high",
+                                            "medium",
+                                            "low"
+                                        ],
+                                        "description": "Gap severity"
+                                    },
+                                    "options": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Array of resolution option strings"
+                                    },
+                                    "recommendation": {
+                                        "type": "string",
+                                        "description": "Recommended resolution. Must be a string, NOT an object."
+                                    }
+                                },
+                                "required": [
+                                    "component",
+                                    "componentType",
+                                    "gap",
+                                    "severity",
+                                    "options",
+                                    "recommendation"
+                                ]
                             }
                         }
                     },
@@ -561,7 +652,49 @@
                             "type": "array",
                             "description": "Array of migration pattern entries",
                             "items": {
-                                "type": "object"
+                                "type": "object",
+                                "properties": {
+                                    "pattern": {
+                                        "type": "string",
+                                        "description": "Pattern name"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "What this pattern does"
+                                    },
+                                    "complexity": {
+                                        "type": "string",
+                                        "enum": [
+                                            "high",
+                                            "medium",
+                                            "low"
+                                        ],
+                                        "description": "Implementation complexity"
+                                    },
+                                    "biztalkApproach": {
+                                        "type": "string",
+                                        "description": "How BizTalk implements this"
+                                    },
+                                    "logicAppsApproach": {
+                                        "type": "string",
+                                        "description": "How Logic Apps implements this"
+                                    },
+                                    "components": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Component names involved"
+                                    }
+                                },
+                                "required": [
+                                    "pattern",
+                                    "description",
+                                    "complexity",
+                                    "biztalkApproach",
+                                    "logicAppsApproach",
+                                    "components"
+                                ]
                             }
                         }
                     },
@@ -588,7 +721,72 @@
                             "type": "array",
                             "description": "Array of missing dependency entries",
                             "items": {
-                                "type": "object"
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string",
+                                        "description": "Unique dependency ID"
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Dependency name"
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "description": "Type: dll/assembly/jar/schema/map/pipeline/orchestration/binding/connector/library/module/subflow/custom-code/other"
+                                    },
+                                    "origin": {
+                                        "type": "string",
+                                        "enum": [
+                                            "standard-framework",
+                                            "standard-biztalk",
+                                            "standard-platform",
+                                            "third-party",
+                                            "custom",
+                                            "unknown"
+                                        ],
+                                        "description": "Origin of the dependency"
+                                    },
+                                    "severity": {
+                                        "type": "string",
+                                        "enum": [
+                                            "critical",
+                                            "warning",
+                                            "info"
+                                        ],
+                                        "description": "Severity level"
+                                    },
+                                    "referencedBy": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Artifact names that reference this"
+                                    },
+                                    "reason": {
+                                        "type": "string",
+                                        "description": "Why this dependency is needed"
+                                    },
+                                    "blocksMigration": {
+                                        "type": "boolean",
+                                        "description": "Whether this blocks migration"
+                                    },
+                                    "migrationRelevant": {
+                                        "type": "boolean",
+                                        "description": "Whether this is migration-relevant"
+                                    }
+                                },
+                                "required": [
+                                    "name",
+                                    "type",
+                                    "origin",
+                                    "severity",
+                                    "referencedBy",
+                                    "reason",
+                                    "blocksMigration",
+                                    "migrationRelevant",
+                                    "resolution"
+                                ]
                             }
                         },
                         "summary": {

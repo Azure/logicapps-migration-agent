@@ -3476,7 +3476,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                         \${comp.azureEquivalent ? \`
                             <div class="azure-equivalent \${equivalentClass}">
                                 <strong>\${equivalentLabel}</strong>
-                                \${comp.azureEquivalent}
+                                \${typeof comp.azureEquivalent === 'string' ? comp.azureEquivalent : (comp.azureEquivalent.component || comp.azureEquivalent.service || comp.azureEquivalent.details || JSON.stringify(comp.azureEquivalent))}
                             </div>
                         \` : ''}
                     </div>
@@ -3788,7 +3788,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 const optionsHtml = gap.options && gap.options.length > 0 
                     ? \`<div class="gap-options">
                         <div class="gap-options-title">Available Options:</div>
-                        <ul>\${gap.options.map(o => \`<li>\${typeof o === 'string' ? o : (o.name || o.label || o.description || o.option || JSON.stringify(o))}</li>\`).join('')}</ul>
+                        <ul>\${gap.options.map(o => \`<li>\${o}</li>\`).join('')}</ul>
                        </div>\` 
                     : '';
                 

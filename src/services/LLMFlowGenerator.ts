@@ -160,7 +160,9 @@ interface ArtifactConnection {
         | 'orchestration-uses-map'
         | 'orchestration-calls'
         | 'shared-namespace'
-        | 'binding-references';
+        | 'binding-references'
+        | 'call-workflow'
+        | 'shared-connection';
     evidence: string;
 }
 
@@ -697,6 +699,84 @@ export class LLMFlowGenerator {
                                 evidence: `Orchestration "${a.name}" calls orchestration "${other.name}" (${biztalk.shapeType || 'call-workflow'}: "${targetOrchName}")`,
                             });
                         }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // PASS 2: Generic IR-based edges (platform-agnostic)
+        // These read universal IR fields (actions, triggers, connections)
+        // and work for any platform. They are additive — they never replace
+        // the BizTalk-specific edges above.
+        // =====================================================================
+
+        // ── Generic: call-workflow edges from action.type === 'call-workflow' ──
+        // This covers MuleSoft flow-ref, TIBCO CallProcess, and any future
+        // platform that sets action.type = 'call-workflow'. The BizTalk
+        // orchestration-calls edges (Pass 1 Type 6) already cover BizTalk;
+        // duplicates are removed by the deduplication step below.
+        for (const a of artifacts) {
+            const allActions = this.collectAllActions(a.ir.actions || []);
+            for (const action of allActions) {
+                if (action.type !== 'call-workflow') {
+                    continue;
+                }
+                const config = (action as { config?: { workflowName?: string } }).config;
+                const targetName = config?.workflowName;
+                if (!targetName) {
+                    continue;
+                }
+                for (const other of artifacts) {
+                    if (other.id === a.id) {
+                        continue;
+                    }
+                    if (
+                        targetName === other.name ||
+                        targetName.endsWith('.' + other.name) ||
+                        targetName.endsWith('/' + other.name) ||
+                        other.name.endsWith('.' + targetName) ||
+                        other.name.includes(targetName) ||
+                        targetName.includes(other.name)
+                    ) {
+                        connections.push({
+                            fromId: a.id,
+                            toId: other.id,
+                            type: 'call-workflow',
+                            evidence: `"${a.name}" calls workflow "${other.name}" via call-workflow action (target: "${targetName}")`,
+                        });
+                    }
+                }
+            }
+        }
+
+        // ── Generic: shared-connection edges from ir.connections[].id ──
+        // Flows/orchestrations that share the same connection config are likely
+        // part of the same integration group.
+        const connectionUsers = new Map<string, string[]>(); // connectionId → artifact IDs
+        for (const a of artifacts) {
+            if (a.ir.connections) {
+                for (const conn of a.ir.connections) {
+                    const connId = conn.id || conn.name;
+                    if (connId) {
+                        if (!connectionUsers.has(connId)) {
+                            connectionUsers.set(connId, []);
+                        }
+                        connectionUsers.get(connId)?.push(a.id);
+                    }
+                }
+            }
+        }
+        for (const [connId, userIds] of connectionUsers) {
+            if (userIds.length > 1 && userIds.length <= 8) {
+                for (let i = 0; i < userIds.length; i++) {
+                    for (let j = i + 1; j < userIds.length; j++) {
+                        connections.push({
+                            fromId: userIds[i],
+                            toId: userIds[j],
+                            type: 'shared-connection',
+                            evidence: `Both artifacts use shared connection "${connId}"`,
+                        });
                     }
                 }
             }

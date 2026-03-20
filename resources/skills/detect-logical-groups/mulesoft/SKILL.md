@@ -12,11 +12,11 @@ description: Rules for detecting and grouping MuleSoft integration artifacts int
 ## 1. Grouping Strategy (Flow Reference Chains)
 
 - **HIGHEST PRIORITY**: If multiple flows reference the SAME sub-flow via `flow-ref` (directly or transitively), they MUST be in the SAME group — the shared sub-flow is the unifying element.
-- **Flow-ref Call Chains**: The `connectionGraph` includes `flow-ref` edges when one flow calls another flow or sub-flow. Flows linked by these edges (directly or transitively) MUST be in the SAME group. Example: If Flow-A calls Sub-Flow-B and Sub-Flow-B calls Sub-Flow-C, all three belong in ONE group.
+- **Call-workflow edges**: The `connectionGraph` includes `call-workflow` edges when one flow calls another flow or sub-flow via `flow-ref`. Flows linked by these edges (directly or transitively) MUST be in the SAME group. Example: If Flow-A calls Sub-Flow-B and Sub-Flow-B calls Sub-Flow-C, all three belong in ONE group.
+- **Shared-connection edges**: The `connectionGraph` includes `shared-connection` edges when multiple flows use the same global configuration (e.g., same `http:listener-config`, same `db:config`). Flows sharing configs SHOULD be in the same group unless they are clearly independent.
 - Only create separate groups for flows that use DIFFERENT sub-flows with no transitive connection.
 - Transitively connected artifacts belong in the SAME group.
 - Name each group by business purpose (derived from flow names and HTTP listener paths).
-- Flows within the same Mule XML configuration file that share global configs SHOULD be in the same group unless they are clearly independent.
 
 ---
 
@@ -24,9 +24,9 @@ description: Rules for detecting and grouping MuleSoft integration artifacts int
 
 Do NOT return empty groups. Use this fallback order:
 
-1. **Flow-root grouping** — one group per CONNECTED flow cluster. Follow `flow-ref` edges to find clusters. Do NOT create one group per individual flow when they reference each other.
-2. **Trigger-capability grouping** — flows with sources (http:listener, scheduler, jms:listener, file:listener, vm:listener) as entry points.
-3. **Connected-component grouping** — from the graph edges and shared global config references.
+1. **Flow-root grouping** — one group per CONNECTED flow cluster. Follow `call-workflow` edges to find clusters. Do NOT create one group per individual flow when they reference each other.
+2. **Trigger-capability grouping** — flows with sources (http:listener, scheduler, jms:listener, file:listener, vm:listener) as entry points. `receiveLocationCount` includes all triggers.
+3. **Connected-component grouping** — from graph edges (`call-workflow`, `shared-connection`) and any remaining connections.
 
 Only leave artifacts in `ungroupedArtifactIds` if they are truly isolated with no meaningful edges or entry semantics.
 
