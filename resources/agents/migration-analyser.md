@@ -71,4 +71,5 @@ When the user requests ANY change to an **already-analysed** flow (e.g., "re-ana
 
 1. Call the specific discovery store tool(s) for the change (e.g., `migration_discovery_storeComponents` for component updates, `migration_discovery_storeArchitecture` for diagram updates).
 2. If the change affects the architecture diagram, also update via `migration_discovery_storeArchitecture`.
-3. **MANDATORY — call `migration_discovery_finalize` as the LAST step of EVERY incremental update.** The webview does NOT refresh until finalize is called. If you skip finalize, the user will not see the changes. There are NO exceptions to this rule.
+3. If the change affects dependencies, re-run the gate check from Task B step 7 before finalizing.
+4. **MANDATORY — call `migration_discovery_finalize` as the LAST step of EVERY incremental update.** The webview does NOT refresh until finalize is called. If you skip finalize, the user will not see the changes. There are NO exceptions to this rule.

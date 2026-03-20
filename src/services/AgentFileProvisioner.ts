@@ -32,13 +32,13 @@ const CONVERTER_AGENT_FILENAME = 'migration-converter.agent.md';
  * A version stamp embedded as an HTML comment at the top of the generated file.
  * Bump this when the prompt content changes so existing files get updated.
  */
-const ANALYSER_AGENT_VERSION = '2.2.0';
+const ANALYSER_AGENT_VERSION = '2.3.0';
 const ANALYSER_VERSION_TAG = `<!-- migration-analyser-agent v${ANALYSER_AGENT_VERSION} -->`;
 
-const PLANNER_AGENT_VERSION = '2.8.0';
+const PLANNER_AGENT_VERSION = '2.9.0';
 const PLANNER_VERSION_TAG = `<!-- migration-planner-agent v${PLANNER_AGENT_VERSION} -->`;
 
-const CONVERTER_AGENT_VERSION = '2.19.0';
+const CONVERTER_AGENT_VERSION = '2.20.0';
 const CONVERTER_VERSION_TAG = `<!-- migration-converter-agent v${CONVERTER_AGENT_VERSION} -->`;
 
 // =============================================================================
