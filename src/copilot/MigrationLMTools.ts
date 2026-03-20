@@ -1307,7 +1307,9 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
             // Count receive locations (each receive endpoint is a receive location;
             // a single receive port can have multiple receive locations)
             const receiveLocationCount = parsedArtifacts.reduce((count, a) => {
-                return count + (a.ir.endpoints?.receive?.length ?? 0);
+                return (
+                    count + (a.ir.endpoints?.receive?.length ?? 0) + (a.ir.triggers?.length ?? 0)
+                );
             }, 0);
 
             logger.info(
@@ -1413,7 +1415,7 @@ class StoreFlowGroupsTool implements vscode.LanguageModelTool<StoreFlowGroupsInp
         const parsedArtifacts: ParsedArtifact[] = await inventoryService.getAllParsedArtifacts();
         const inventoryArtifactIds = new Set(parsedArtifacts.map((a) => a.id));
         const receiveLocationCount = parsedArtifacts.reduce((count, a) => {
-            return count + (a.ir.endpoints?.receive?.length ?? 0);
+            return count + (a.ir.endpoints?.receive?.length ?? 0) + (a.ir.triggers?.length ?? 0);
         }, 0);
 
         const groupedArtifactIds = new Set(input.groups.flatMap((g) => g.artifactIds || []));
