@@ -1146,6 +1146,7 @@ BizTalk heavily relies on custom .NET code: helper classes called from orchestra
 | **C# Inline Code Action**               | Execute C# script code directly within the workflow using the "Execute CSharp Script Code" action. No separate function project needed. | In-process (same App Service Plan) | Complex BizTalk expressions that can't be done in WDL: multi-line logic, regex, loops, try/catch, string parsing, type conversions. **Primary replacement for complex XLANG/s expressions.** |
 | **Custom Code Action (Local Function)** | Write C#/.NET code as a local function within the Logic App project. Invoked as a workflow action.                                      | In-process (same App Service Plan) | Replacing BizTalk helper classes, custom pipeline components, heavy-duty transforms, encryption, external SDK calls.                                                                         |
 | **Inline Code Action (JavaScript)**     | Execute inline JavaScript snippets directly in the workflow.                                                                            | In-process                         | Simple transformations, string manipulation, quick calculations.                                                                                                                             |
+| **Powershell Inline Code Action**               | Execute Powershell script code directly within the workflow using the "Execute Powershell Code" action. No separate function project needed. | In-process (same App Service Plan) | **Primary replacement for third party Powershell adapters.** |
 | **Workflow Expression Functions**       | Built-in WDL function library (300+ functions).                                                                                         | Inline (no action needed)          | String ops, math, date/time, collection ops, type conversion.                                                                                                                                |
 | **XSLT with Inline Scripts**            | XSLT maps with embedded `<msxsl:script>` blocks (C# or VB).                                                                             | In-process                         | Complex map logic that needs procedural code within a transform.                                                                                                                             |
 | **NuGet Package References**            | Reference NuGet packages in the Logic App project for use in local functions.                                                           | In-process                         | Reusing existing .NET libraries (encryption, parsing, SDKs).                                                                                                                                 |
@@ -1301,7 +1302,7 @@ Alphabetical index for fast reference:
 | AzureEventHub / EventHub            | Azure Event Hub      |
 | AzureTable / AzureTableStorage      | Azure Table Storage  |
 | BAPI / SAPERP / SapErp              | SAP ERP              |
-| CICS / Cics                         | IBM CICS             |
+| HostApps (CICS)                     | IBM CICS             |
 | CosmosDb / CosmosDB / AzureCosmosDB | Azure Cosmos DB      |
 | DB2 / Db2                           | IBM Db2              |
 | EDIFACT                             | EDIFACT              |
@@ -1310,18 +1311,17 @@ Alphabetical index for fast reference:
 | FTP / Ftp                           | FTP                  |
 | GmailEmail                          | SMTP                 |
 | HL7 (transport)                     | MLLP (HL7)           |
-| HostApps / HostFile                 | IBM Host File        |
+| HostFiles                           | IBM Host File        |
 | HTTP / Http                         | HTTP                 |
-| IMS / Ims                           | IBM IMS              |
+| HostApps (IMS)                      | IBM IMS              |
 | Informix                            | IBM Informix         |
 | Kafka / ConfluentKafka              | Confluent Kafka      |
 | KeyVault / AzureKeyVault            | Azure Key Vault      |
 | MLLP / Mllp                         | MLLP (HL7)           |
 | MQ / IbmMq / MQSeries               | IBM MQ               |
-| MSMQ / NetMsmq                      | Azure Service Bus    |
+| MSMQ / NetMsmq                      | Azure Service Bus/RabbitMQ    |
 | ODP.NET / OracleDb / OracleDatabase | Oracle Database      |
 | OutlookEmail                        | SMTP                 |
-| RabbitMQ                            | RabbitMQ             |
 | SAP / WCF-SAP                       | SAP                  |
 | SB / ServiceBus                     | Azure Service Bus    |
 | SFTP / Sftp                         | SFTP                 |
