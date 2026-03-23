@@ -259,21 +259,36 @@ export class PrerequisitesChecker {
      * Check Azure CLI availability.
      */
     private async checkAzureCLI(): Promise<PrerequisiteResult> {
-        const azureAccountExtension = vscode.extensions.getExtension('ms-vscode.azure-account');
-        const isInstalled = azureAccountExtension !== undefined;
+        const installUrl = 'https://docs.microsoft.com/cli/azure/install-azure-cli';
 
-        return {
-            id: 'azure-cli',
-            name: 'Azure CLI',
-            description: 'Required - needed for Azure provisioning and deployment',
-            status: isInstalled ? 'installed' : 'missing',
-            required: true,
-            helpUrl: 'https://docs.microsoft.com/cli/azure/install-azure-cli',
-            action: {
-                label: 'Install Azure CLI',
-                url: 'https://docs.microsoft.com/cli/azure/install-azure-cli',
-            },
-        };
+        try {
+            const { stdout, stderr } = await execAsync('az --version', { timeout: 10000 });
+            const output = `${stdout || ''}${stderr || ''}`.trim();
+            const match = output.match(/azure-cli\s+(\d+\.\d+\.\d+)/i);
+
+            return {
+                id: 'azure-cli',
+                name: 'Azure CLI',
+                description: 'Required for Azure provisioning and deployment',
+                status: 'installed',
+                required: true,
+                version: match?.[1],
+                helpUrl: installUrl,
+            };
+        } catch {
+            return {
+                id: 'azure-cli',
+                name: 'Azure CLI',
+                description: 'Required for Azure provisioning and deployment',
+                status: 'missing',
+                required: true,
+                helpUrl: installUrl,
+                action: {
+                    label: 'Install Azure CLI',
+                    url: installUrl,
+                },
+            };
+        }
     }
 
     /**

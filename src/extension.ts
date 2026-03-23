@@ -98,6 +98,18 @@ export async function activate(
         // Register LM tools (Phase 14)
         registerMigrationLMTools(context);
 
+        // Run prerequisites check on activation (non-blocking)
+        setTimeout(async () => {
+            try {
+                const { PrerequisitesChecker } = await import('./services/PrerequisitesChecker');
+                const checker = PrerequisitesChecker.getInstance();
+                const result = await checker.checkAll();
+                await checker.showNotificationIfNeeded(result);
+            } catch {
+                // Non-critical — don't block activation
+            }
+        }, 3000);
+
         // Log activation
         LoggingService.getInstance().info('Extension activated successfully', {
             extensionId: context.extension.id,

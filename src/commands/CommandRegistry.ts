@@ -94,6 +94,11 @@ export class CommandRegistry implements vscode.Disposable {
                 handler: this.handleShowLogs.bind(this),
                 title: 'Show Logs',
             },
+            {
+                id: 'logicAppsMigrationAssistant.checkPrerequisites',
+                handler: this.handleCheckPrerequisites.bind(this),
+                title: 'Check Prerequisites',
+            },
             // Discovery Stage Commands (Phase 6)
             {
                 id: 'logicAppsMigrationAssistant.runDiscovery',
@@ -255,7 +260,9 @@ export class CommandRegistry implements vscode.Disposable {
                     );
 
                     if (result === UserPrompts.BUTTON_RUN_DISCOVERY) {
-                        await vscode.commands.executeCommand('logicAppsMigrationAssistant.runDiscovery');
+                        await vscode.commands.executeCommand(
+                            'logicAppsMigrationAssistant.runDiscovery'
+                        );
                     } else if (result === UserPrompts.BUTTON_CHANGE_SOURCE_FOLDER) {
                         await vscode.commands.executeCommand(
                             'logicAppsMigrationAssistant.selectSourceFolder'
@@ -454,6 +461,18 @@ export class CommandRegistry implements vscode.Disposable {
 
             // Keep the workflow in main-page mode without stage transitions
 
+            // Check prerequisites before discovery
+            try {
+                const { PrerequisitesChecker } = await import('../services/PrerequisitesChecker');
+                const prereqResult = await PrerequisitesChecker.getInstance().checkAll();
+                if (!prereqResult.allRequiredMet) {
+                    await PrerequisitesChecker.getInstance().showNotificationIfNeeded(prereqResult);
+                    // Don't block — just warn and continue
+                }
+            } catch {
+                // Non-critical — don't block discovery
+            }
+
             // Run discovery with progress UI
             await vscode.window.withProgress(
                 {
@@ -647,6 +666,30 @@ export class CommandRegistry implements vscode.Disposable {
      */
     private async handleShowLogs(): Promise<void> {
         LoggingService.getInstance().showOutputChannel();
+    }
+
+    /**
+     * Handle checking prerequisites
+     */
+    private async handleCheckPrerequisites(): Promise<void> {
+        const { PrerequisitesChecker } = await import('../services/PrerequisitesChecker');
+        const checker = PrerequisitesChecker.getInstance();
+
+        const result = await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Notification,
+                title: 'Checking prerequisites...',
+            },
+            async () => checker.checkAll()
+        );
+
+        if (result.allRequiredMet && result.missingRecommendedCount === 0) {
+            vscode.window.showInformationMessage(
+                `All prerequisites are met (${result.results.filter((r) => r.status === 'installed').length} checks passed).`
+            );
+        } else {
+            await checker.showNotificationIfNeeded(result);
+        }
     }
 
     // ==================== Discovery Stage Commands ====================

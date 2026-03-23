@@ -1625,6 +1625,11 @@
                 "category": "Logic Apps Migration Assistant"
             },
             {
+                "command": "logicAppsMigrationAssistant.checkPrerequisites",
+                "title": "Check Prerequisites",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
                 "command": "logicAppsMigrationAssistant.runDiscovery",
                 "title": "Run Discovery",
                 "category": "Logic Apps Migration Assistant"
