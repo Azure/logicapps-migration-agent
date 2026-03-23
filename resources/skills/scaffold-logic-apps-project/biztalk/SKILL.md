@@ -396,8 +396,8 @@ The following directories must be created empty (no files inside). They serve as
 
 | Directory                          | Purpose                                                               |
 | ---------------------------------- | --------------------------------------------------------------------- |
-| `Artifacts/Maps/`                  | XSLT or Liquid transformation maps                                    |
-| `Artifacts/Rules/`                 | Business rules files                                                  |
+| `Artifacts/Maps/`                  | XSLT or Liquid transformation maps. HIDX files as well.               |
+| `Artifacts/Rules/`                 | Rules engine files (Rulesets)                                         |
 | `Artifacts/Schemas/`               | XML (XSD) or JSON schemas                                             |
 | `lib/builtinOperationSdks/JAR/`    | Java-based built-in operation SDKs (runtime-managed)                  |
 | `lib/builtinOperationSdks/net472/` | .NET 4.7.2 built-in operation SDKs (runtime-managed)                  |
