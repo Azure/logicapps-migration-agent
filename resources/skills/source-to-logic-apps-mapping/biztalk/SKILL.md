@@ -660,11 +660,11 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 ### Mainframe (IBM)
 
-#### IBM CICS
+#### IBM CICS (TRM Link, TRM User Data, ELM Link, ELM User Data, HTTP Link, HTTP User Data, SNA Link, SNA User Data)
 
 |                         | BizTalk    | Logic Apps Standard                 |
 | ----------------------- | ---------- | ----------------------------------- |
-| **Adapter / Connector** | CICS, Cics | **IBM CICS**                        |
+| **Adapter / Connector** | HostApps   | **IBM CICS**                        |
 | **Service Provider**    | —          | `/serviceProviders/cicsProgramCall` |
 | **Deployment Scope**    | —          | Any                                 |
 | **Category**            | —          | Mainframe                           |
@@ -677,11 +677,11 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 ---
 
-#### IBM IMS
+#### IBM IMS (IMS Connect, IMS LU62)
 
 |                         | BizTalk  | Logic Apps Standard                |
 | ----------------------- | -------- | ---------------------------------- |
-| **Adapter / Connector** | IMS, Ims | **IBM IMS**                        |
+| **Adapter / Connector** | HostApps | **IBM IMS**                        |
 | **Service Provider**    | —        | `/serviceProviders/imsProgramCall` |
 | **Deployment Scope**    | —        | Any                                |
 | **Category**            | —        | Mainframe                          |
@@ -700,7 +700,7 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 |                         | BizTalk    | Logic Apps Standard          |
 | ----------------------- | ---------- | ---------------------------- |
-| **Adapter / Connector** | VSAM, Vsam | **IBM Host File**            |
+| **Adapter / Connector** | HostFiles  | **IBM Host File**            |
 | **Service Provider**    | —          | `/serviceProviders/hostFile` |
 | **Deployment Scope**    | —          | Any                          |
 | **Category**            | —          | Mainframe                    |
