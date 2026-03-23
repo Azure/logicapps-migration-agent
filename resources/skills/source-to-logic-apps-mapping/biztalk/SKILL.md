@@ -714,24 +714,6 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 ---
 
-#### IBM Host File (Host Apps)
-
-|                         | BizTalk            | Logic Apps Standard          |
-| ----------------------- | ------------------ | ---------------------------- |
-| **Adapter / Connector** | HostFile, HostApps | **IBM Host File**            |
-| **Service Provider**    | —                  | `/serviceProviders/hostFile` |
-| **Deployment Scope**    | —                  | Any                          |
-| **Category**            | —                  | Mainframe                    |
-
-| Type   | Operation               | Description                 |
-| ------ | ----------------------- | --------------------------- |
-| Action | `writeFile` _(default)_ | Generate host file contents |
-| Action | `readFile`              | Parse host file contents    |
-
-**Connection Parameters:** `HostName` (required), `Port` (required), `UserName` (required), `Password` (required), `CodePage` (optional)
-
----
-
 ### Security
 
 #### Azure Key Vault
