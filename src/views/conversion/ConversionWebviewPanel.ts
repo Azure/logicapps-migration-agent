@@ -188,12 +188,9 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                     this.logger.info(`Reconvert requested for flow: ${flowId}`);
 
                     // Kill func processes before deleting output
-                    vscode.commands
-                        .executeCommand('logicAppsMigrationAssistant.killFuncProcesses')
-                        .then(
-                            () => {},
-                            () => {}
-                        );
+                    void vscode.commands.executeCommand(
+                        'logicAppsMigrationAssistant.killFuncProcesses'
+                    );
 
                     // Delete generated output folder for this flow
                     const wsFolder = vscode.workspace.workspaceFolders?.[0];

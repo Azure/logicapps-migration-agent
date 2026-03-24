@@ -252,24 +252,19 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                     const state = this.planningService.getState();
                     const flowId = state?.selectedFlowId || '';
                     const prompt = `@migration-planner\nRespond for below, Strictly follow your \`Incremental Updates\` instruction. Re-plan and update the results, then finalize.\n\nFlow ID: ${flowId}\n\n${userMsg}`;
-                    vscode.commands
+                    void vscode.commands
                         .executeCommand('workbench.action.chat.open', {
                             mode: 'agent',
                             query: prompt,
                         })
-                        .then(
-                            () => {},
-                            () => {
-                                vscode.commands
-                                    .executeCommand('workbench.action.chat.newChat', {
-                                        query: prompt,
-                                    })
-                                    .then(
-                                        () => {},
-                                        () => {}
-                                    );
-                            }
-                        );
+                        .then(undefined, () => {
+                            void vscode.commands.executeCommand(
+                                'workbench.action.chat.newChat',
+                                {
+                                    query: prompt,
+                                }
+                            );
+                        });
                 }
                 break;
             }
