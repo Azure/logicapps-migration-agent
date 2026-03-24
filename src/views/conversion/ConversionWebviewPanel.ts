@@ -115,6 +115,11 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                 `[ConversionWebview] update: selectedFlowId=${selectedFlowId}, hasTaskPlan=${!!taskPlan}, flowCount=${flows.length}`
             );
 
+            // Update tab title with flow name
+            const selectedFlowName2 =
+                taskPlan?.flowName || flows.find((f) => f.id === selectedFlowId)?.name;
+            this.panel.title = selectedFlowName2 ? `⚙️ ${selectedFlowName2}` : 'Conversion';
+
             this.panel.webview.html = this.getHtmlContent(flows, selectedFlowId, taskPlan);
         } catch (err) {
             this.logger.error(
@@ -155,7 +160,10 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                     }
                     this.logger.info(`Conversion started for flow: ${flowId}`);
                     vscode.commands
-                        .executeCommand('logicAppsMigrationAssistant.generateConversionForFlow', flowId)
+                        .executeCommand(
+                            'logicAppsMigrationAssistant.generateConversionForFlow',
+                            flowId
+                        )
                         .then(
                             () =>
                                 this.logger.info(
@@ -178,6 +186,61 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                 const flowId = message.data as string;
                 if (flowId) {
                     this.logger.info(`Reconvert requested for flow: ${flowId}`);
+
+                    // Kill func processes before deleting output
+                    vscode.commands
+                        .executeCommand('logicAppsMigrationAssistant.killFuncProcesses')
+                        .then(
+                            () => {},
+                            () => {}
+                        );
+
+                    // Delete generated output folder for this flow
+                    const wsFolder = vscode.workspace.workspaceFolders?.[0];
+                    if (wsFolder) {
+                        const cfs = ConversionFileService.getInstance();
+                        const taskPlan = cfs.readTaskPlan(flowId);
+                        const outCandidates = new Set<string>();
+                        outCandidates.add(flowId);
+                        outCandidates.add(flowId.replace(/[^a-zA-Z0-9_-]/g, '_'));
+                        // From task plan generated files
+                        if (taskPlan?.tasks) {
+                            for (const task of taskPlan.tasks) {
+                                const output = task.output as
+                                    | { generatedFiles?: string[] }
+                                    | undefined;
+                                if (output?.generatedFiles) {
+                                    for (const f of output.generatedFiles) {
+                                        const m = f.replace(/\\/g, '/').match(/^out\/([^/]+)/);
+                                        if (m) {
+                                            outCandidates.add(m[1]);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // From flow name
+                        const state = this.conversionService.getState();
+                        const flowName =
+                            taskPlan?.flowName ||
+                            state?.flows.find((f: ConversionFlow) => f.id === flowId)?.name;
+                        if (flowName) {
+                            outCandidates.add(
+                                flowName
+                                    .replace(/[^a-zA-Z0-9_-]/g, '-')
+                                    .replace(/-+/g, '-')
+                                    .replace(/^-|-$/g, '')
+                            );
+                        }
+                        for (const candidate of outCandidates) {
+                            const outPath = path.join(wsFolder.uri.fsPath, 'out', candidate);
+                            if (fs.existsSync(outPath)) {
+                                fs.rmSync(outPath, { recursive: true, force: true });
+                                this.logger.info(`[Reconvert] Deleted output folder: ${outPath}`);
+                            }
+                        }
+                    }
+
                     ConversionFileService.getInstance().removeFlow(flowId);
 
                     // Reset flow status
@@ -193,7 +256,10 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                     void this.conversionService.selectFlow(flowId);
                     this.update();
                     vscode.commands
-                        .executeCommand('logicAppsMigrationAssistant.generateConversionForFlow', flowId)
+                        .executeCommand(
+                            'logicAppsMigrationAssistant.generateConversionForFlow',
+                            flowId
+                        )
                         .then(
                             () =>
                                 this.logger.info(`Reconvert command completed for flow: ${flowId}`),
@@ -258,7 +324,10 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                 if (flowId) {
                     this.logger.info(`Convert all tasks requested for flow: ${flowId}`);
                     vscode.commands
-                        .executeCommand('logicAppsMigrationAssistant.executeAllConversionTasks', flowId)
+                        .executeCommand(
+                            'logicAppsMigrationAssistant.executeAllConversionTasks',
+                            flowId
+                        )
                         .then(
                             () =>
                                 this.logger.info(
@@ -301,6 +370,13 @@ export class ConversionWebviewPanel implements vscode.Disposable {
 
             case 'goToPlanning': {
                 void vscode.commands.executeCommand('logicAppsMigrationAssistant.openPlanningView');
+                break;
+            }
+
+            case 'goToDiscovery': {
+                void vscode.commands.executeCommand(
+                    'logicAppsMigrationAssistant.viewFlowVisualization'
+                );
                 break;
             }
         }
@@ -358,6 +434,8 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                 f.status === 'thinking' || f.status === 'in-progress' || f.status === 'tasks-ready'
         ).length;
         const notStartedCount = flows.filter((f) => f.status === 'not-started').length;
+        const selectedFlowName =
+            taskPlan?.flowName || flows.find((f) => f.id === selectedFlowId)?.name || '';
 
         return `<!DOCTYPE html>
 <html lang="en">
@@ -436,6 +514,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             background: var(--vscode-button-background);
             color: var(--vscode-button-foreground);
         }
+
         .btn-disabled {
             opacity: 0.5; cursor: not-allowed;
             background: var(--vscode-button-secondaryBackground);
@@ -736,12 +815,18 @@ export class ConversionWebviewPanel implements vscode.Disposable {
     </style>
 </head>
 <body>
+    ${
+        selectedFlowId
+            ? ''
+            : `
     <div class="header">
         <h1>Migration Conversion</h1>
         <div class="header-actions">
             <button class="btn btn-outline" onclick="refresh()">↻ Refresh</button>
         </div>
     </div>
+    `
+    }
 
     ${
         selectedFlowId
@@ -784,10 +869,10 @@ export class ConversionWebviewPanel implements vscode.Disposable {
     `
     }
 
-    <div class="lower-section">
-        <div class="section-title">Conversion Tasks</div>
+    ${selectedFlowId ? '' : '<div class="lower-section">'}
+        ${selectedFlowId ? `<div class="section-title" style="display: flex; justify-content: space-between; align-items: center;"><div><button class="btn" onclick="goToHome()" title="Back to Home" style="padding: 4px 6px; margin-right: 8px; background: transparent; border: none;"><svg viewBox="0 0 24 24" width="20" height="20" style="vertical-align: -4px;" fill="none" stroke="var(--vscode-button-background)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>Conversion Tasks — ${this.escapeHtml(selectedFlowName)}</div></div>` : '<div class="section-title">Conversion Tasks</div>'}
         ${taskSectionHtml}
-    </div>
+    ${selectedFlowId ? '' : '</div>'}
 
     <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
@@ -806,6 +891,10 @@ export class ConversionWebviewPanel implements vscode.Disposable {
 
         function refresh() {
             vscode.postMessage({ command: 'refresh' });
+        }
+
+        function goToHome() {
+            vscode.postMessage({ command: 'goToDiscovery' });
         }
 
         function goToPlanning() {
@@ -933,7 +1022,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                 } else if (isRunning || (canExecute && effectiveFlowBusy)) {
                     taskActionHtml = `<button class="btn btn-sm btn-disabled task-action-btn" disabled>Executing...</button>`;
                 } else if (isDone) {
-                    taskActionHtml = `<span class="task-done-label">✓ Done</span>`;
+                    taskActionHtml = `<span class="task-done-label">✓ Done</span> <button class="btn btn-sm btn-outline" onclick="executeTask('${this.escapeHtml(plan.flowId)}', '${this.escapeHtml(task.id)}')" title="Re-execute this task" style="margin-left: 4px;">↻ Re-Execute</button>`;
                 } else {
                     taskActionHtml = `<button class="btn btn-sm btn-disabled task-action-btn" disabled title="Waiting for dependencies: ${task.dependsOn.join(', ')}">▶ Execute</button>`;
                 }
@@ -993,7 +1082,10 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             <div class="conversion-summary">
                 <div class="conversion-summary-header">
                     <h4>Conversion Plan — ${completedCount}/${totalCount} tasks complete</h4>
-                    <div class="conversion-summary-actions">${convertAllBtnHtml}</div>
+                    <div class="conversion-summary-actions" style="display: flex; gap: 8px;">
+                        <button class="btn btn-sm btn-outline" onclick="reconvertFlow('${this.escapeHtml(plan.flowId)}')" title="Clear and regenerate conversion tasks">↻ Regenerate Tasks</button>
+                        ${convertAllBtnHtml}
+                    </div>
                 </div>
                 <p>${this.escapeHtml(plan.summary)}</p>
                 ${prerequisitesHtml}

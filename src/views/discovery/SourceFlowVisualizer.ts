@@ -342,10 +342,11 @@ export class SourceFlowVisualizer implements vscode.Disposable {
 
                     // Reset button (only if any progress exists)
                     const hasProgress = isAnalysed || isPlanned || isTasksCreated || isConverted;
-                    const resetBtn = hasProgress && !isThisFlowBusy
-                        ? `<button class="btn btn-reset" onclick="event.stopPropagation(); resetFlow('${g.id}')"
+                    const resetBtn =
+                        hasProgress && !isThisFlowBusy
+                            ? `<button class="btn btn-reset" onclick="event.stopPropagation(); resetFlow('${g.id}')"
                             title="Reset all progress for this flow group">↺ Reset Progress</button>`
-                        : '';
+                            : '';
 
                     return `
                     <div class="flow-card">
@@ -661,7 +662,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         } else {
             panel = vscode.window.createWebviewPanel(
                 'logicAppsMigrationAssistant.flowAnalysis',
-                title,
+                `🔍 ${title}`,
                 vscode.ViewColumn.Active,
                 {
                     enableScripts: true,
@@ -1067,17 +1068,10 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             case 'requestCorrection':
                 // Open agent chat with the broken Mermaid code for correction
                 this.logger.info('User requested Mermaid correction via Agent chat');
-                {
-                    const corrData = message.data as { code: string };
-                    this.openFlowChat({
-                        mermaid: corrData.code,
-                        groupName: this.currentFlowGroups?.groups.find(
-                            (g) => g.id === this.currentGroupId
-                        )?.name,
-                        userMessage:
-                            'This Mermaid diagram has a rendering error. Please fix the syntax and call migration_discovery_storeAnalysis with the corrected diagram.',
-                    });
-                }
+                this.askAnalyserAgent({
+                    userMessage:
+                        'This Mermaid diagram has a rendering error. Please fix the syntax and call migration_discovery_storeAnalysis with the corrected diagram.',
+                });
                 break;
 
             case 'regenerate':
@@ -1096,13 +1090,12 @@ export class SourceFlowVisualizer implements vscode.Disposable {
 
             case 'chatAboutFlow': {
                 const chatData = message.data as {
-                    mermaid: string;
-                    groupName?: string;
-                    explanation?: string;
                     userMessage?: string;
                 };
-                this.logger.info('User requested chat about flow');
-                this.openFlowChat(chatData);
+                this.logger.info('User requested ask/suggest via chat');
+                if (chatData.userMessage) {
+                    this.askAnalyserAgent({ userMessage: chatData.userMessage });
+                }
                 break;
             }
 
@@ -1549,9 +1542,9 @@ export class SourceFlowVisualizer implements vscode.Disposable {
 
                             // b. From flow group name
                             const discCache = DiscoveryCacheService.getInstance();
-                            const flowGroup = discCache.getFlowGroups()?.groups.find(
-                                (g) => g.id === resetFlowId
-                            );
+                            const flowGroup = discCache
+                                .getFlowGroups()
+                                ?.groups.find((g) => g.id === resetFlowId);
                             if (flowGroup?.name) {
                                 const safeName = flowGroup.name
                                     .replace(/[^a-zA-Z0-9_-]/g, '-')
@@ -1568,7 +1561,9 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                                 const taskPlan = CFS.getInstance().readTaskPlan(resetFlowId);
                                 if (taskPlan?.tasks) {
                                     for (const task of taskPlan.tasks) {
-                                        const output = task.output as { generatedFiles?: string[] } | undefined;
+                                        const output = task.output as
+                                            | { generatedFiles?: string[] }
+                                            | undefined;
                                         if (output?.generatedFiles) {
                                             for (const f of output.generatedFiles) {
                                                 const normalized = f.replace(/\\\\/g, '/');
@@ -1702,44 +1697,26 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     /**
      * Open a chat session in Agent mode with flow context pre-filled.
      */
-    private async openFlowChat(data: {
-        mermaid: string;
-        groupName?: string;
-        explanation?: string;
-        userMessage?: string;
-    }): Promise<void> {
-        const groupLabel = data.groupName ? ` for flow group "${data.groupName}"` : '';
-        const explanationBlock = data.explanation
-            ? `\n\nCurrent flow explanation: ${data.explanation}`
-            : '';
+    private async askAnalyserAgent(data: { userMessage: string }): Promise<void> {
+        if (!data.userMessage || data.userMessage.trim().length === 0) {
+            return;
+        }
 
-        // Build a prompt for the agent
-        const userQuery =
-            data.userMessage ||
-            'Can you help me review this flow and correct anything that looks wrong?';
-
-        const contextPrefix = ChatPrompts.openFlowChat({
-            groupLabel,
-            explanationBlock,
-            mermaid: data.mermaid,
-            userQuery,
-        });
+        const flowId = this.currentGroupId || '';
+        const prompt = `@migration-analyser\nRespond for below, Strictly follow your \`Incremental Updates\` instruction. Re-analyse and update the results, then finalize.\n\nFlow ID: ${flowId}\n\n${data.userMessage}`;
 
         try {
-            // Open Copilot Chat in Agent mode — the agent can use migration_* tools autonomously
             await vscode.commands.executeCommand('workbench.action.chat.open', {
                 mode: 'agent',
-                query: contextPrefix,
+                query: prompt,
             });
         } catch {
-            // Fallback: try the older newChat command
             try {
                 await vscode.commands.executeCommand('workbench.action.chat.newChat', {
-                    query: contextPrefix,
+                    query: prompt,
                 });
             } catch {
-                // Last resort: copy to clipboard and notify
-                await vscode.env.clipboard.writeText(contextPrefix);
+                await vscode.env.clipboard.writeText(prompt);
                 vscode.window.showInformationMessage(UserPrompts.CHAT_CONTEXT_COPIED);
             }
         }
@@ -1996,23 +1973,77 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             background: var(--vscode-button-background);
             color: var(--vscode-button-foreground);
         }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--vscode-button-background);
+            border: 1px solid var(--vscode-button-background) !important;
+        }
+        .btn-outline:hover {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+        }
         
         .btn-chat {
-            background: #6f42c1;
-            color: white;
+            background: #e67e22;
+            color: #fff;
             display: flex;
             align-items: center;
             gap: 5px;
         }
         
         .btn-chat:hover {
-            background: #8250df;
+            background: #f39c12;
         }
         
         .btn-chat svg {
             width: 14px;
             height: 14px;
             fill: currentColor;
+        }
+
+        .chat-dropdown-wrapper {
+            position: relative;
+        }
+        .chat-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 6px;
+            width: 380px;
+            background: var(--vscode-editor-background, #1e1e1e);
+            border: 1px solid var(--vscode-panel-border, #444);
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            z-index: 200;
+        }
+        .chat-dropdown.open {
+            display: block;
+        }
+        .chat-input {
+            width: 100%;
+            box-sizing: border-box;
+            background: var(--vscode-input-background, #2d2d2d);
+            color: var(--vscode-input-foreground, #ccc);
+            border: 1px solid var(--vscode-input-border, #555);
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 13px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 60px;
+        }
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--vscode-focusBorder, #007acc);
+        }
+        .chat-dropdown-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 8px;
         }
         
         /* Tabs */
@@ -3099,19 +3130,27 @@ export class SourceFlowVisualizer implements vscode.Disposable {
 <body>
     <div class="toolbar">
         <div class="toolbar-title">
+            <button class="btn" onclick="backToFlowGroups()" title="Return to flow group selector" style="padding: 4px 6px; margin-right: 8px;">
+                <svg viewBox="0 0 24 24" width="20" height="20" style="vertical-align: -4px;" fill="none" stroke="var(--vscode-button-background)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </button>
             <span>${title}</span>
             <span class="badge">AI Generated</span>
             ${cachedBadge}
         </div>
         <div class="toolbar-actions">
-            <button class="btn" onclick="backToFlowGroups()" title="Return to flow group selector">← Flow Groups</button>
-            <button class="btn btn-chat" onclick="chatAboutFlow()" title="Open a Copilot chat session to discuss or correct this flow">
-                <svg viewBox="0 0 16 16"><path d="M1 2.5A2.5 2.5 0 0 1 3.5 0h9A2.5 2.5 0 0 1 15 2.5v7a2.5 2.5 0 0 1-2.5 2.5H9.366l-2.866 2.4V12H3.5A2.5 2.5 0 0 1 1 9.5v-7Zm2.5-1A1.5 1.5 0 0 0 2 2.5v7A1.5 1.5 0 0 0 3.5 11H7v1.9l1.934-1.62.166-.28H12.5A1.5 1.5 0 0 0 14 9.5v-7A1.5 1.5 0 0 0 12.5 1h-9Z"/></svg>
-                Chat about Flow
-            </button>
-            <button class="btn btn-primary" onclick="regenerate()">Regenerate</button>
-            <button class="btn" onclick="copyMermaid()">Copy Mermaid</button>
-            <button class="btn" onclick="downloadSvg()">Download SVG</button>
+            <div class="chat-dropdown-wrapper">
+                <button class="btn btn-chat" onclick="toggleChatDropdown()" title="Suggest changes to this flow analysis">
+                        💭 Suggest a Change
+                </button>
+                <div class="chat-dropdown" id="chatDropdown">
+                    <textarea id="chatInput" class="chat-input" rows="4" placeholder="Suggest changes or request re-analysis of specific areas..."></textarea>
+                    <div class="chat-dropdown-actions">
+                        <button class="btn btn-sm" onclick="closeChatDropdown()" style="background: transparent; border: 1px solid #666; color: #ccc;">Cancel</button>
+                        <button class="btn btn-sm btn-primary" onclick="sendChatMessage()">Send ➤</button>
+                    </div>
+                </div>
+            </div>
+            <button class="btn btn-outline" onclick="regenerate()">↻ Regenerate Analysis</button>
         </div>
     </div>
     
@@ -3888,17 +3927,52 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         }
         
         function chatAboutFlow(customMessage) {
-            const groupName = ${JSON.stringify(title)};
+            if (!customMessage || customMessage.trim().length === 0) return;
             vscode.postMessage({
                 command: 'chatAboutFlow',
                 data: {
-                    mermaid: mermaidCode,
-                    groupName: groupName,
-                    explanation: ${JSON.stringify(result.explanation || '')},
-                    userMessage: customMessage || null
+                    userMessage: customMessage
                 }
             });
         }
+
+        function toggleChatDropdown() {
+            var dd = document.getElementById('chatDropdown');
+            dd.classList.toggle('open');
+            if (dd.classList.contains('open')) {
+                document.getElementById('chatInput').focus();
+            }
+        }
+        function closeChatDropdown() {
+            document.getElementById('chatDropdown').classList.remove('open');
+            document.getElementById('chatInput').value = '';
+        }
+        function sendChatMessage() {
+            var msg = document.getElementById('chatInput').value.trim();
+            if (!msg) return;
+            closeChatDropdown();
+            chatAboutFlow(msg);
+        }
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            var wrapper = document.querySelector('.chat-dropdown-wrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                document.getElementById('chatDropdown').classList.remove('open');
+            }
+        });
+        // Send on Enter, Shift+Enter for newline
+        document.addEventListener('keydown', function(e) {
+            var dd = document.getElementById('chatDropdown');
+            if (dd && dd.classList.contains('open')) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                }
+                if (e.key === 'Escape') {
+                    closeChatDropdown();
+                }
+            }
+        });
         
         function downloadSvg() {
             const svg = document.querySelector('.diagram-inner svg');

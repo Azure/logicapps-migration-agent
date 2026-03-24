@@ -119,6 +119,11 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                 `[PlanningWebview] update: selectedFlowId=${selectedFlowId}, hasPlan=${!!selectedPlan}, hasCachedResult=${!!cachedPlanResult}, flowCount=${flows.length}`
             );
 
+            // Update tab title with flow name
+            const selectedFlowName =
+                cachedPlanResult?.flowName || flows.find((f) => f.id === selectedFlowId)?.name;
+            this.panel.title = selectedFlowName ? `📝 ${selectedFlowName}` : 'Planning';
+
             this.panel.webview.html = this.getHtmlContent(
                 flows,
                 selectedFlowId,
@@ -200,7 +205,10 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                             void this.planningService.selectFlow(flowId);
                             this.update();
                             vscode.commands
-                                .executeCommand('logicAppsMigrationAssistant.generatePlanForFlow', flowId)
+                                .executeCommand(
+                                    'logicAppsMigrationAssistant.generatePlanForFlow',
+                                    flowId
+                                )
                                 .then(
                                     () =>
                                         this.logger.info(
@@ -231,8 +239,38 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             }
 
             case 'goToDiscovery': {
-                void vscode.commands.executeCommand('logicAppsMigrationAssistant.viewFlowVisualization');
+                void vscode.commands.executeCommand(
+                    'logicAppsMigrationAssistant.viewFlowVisualization'
+                );
                 void vscode.commands.executeCommand('logicAppsMigrationAssistant.discovery.focus');
+                break;
+            }
+
+            case 'askAgent': {
+                const userMsg = message.data as string;
+                if (userMsg && userMsg.trim().length > 0) {
+                    const state = this.planningService.getState();
+                    const flowId = state?.selectedFlowId || '';
+                    const prompt = `@migration-planner\nRespond for below, Strictly follow your \`Incremental Updates\` instruction. Re-plan and update the results, then finalize.\n\nFlow ID: ${flowId}\n\n${userMsg}`;
+                    vscode.commands
+                        .executeCommand('workbench.action.chat.open', {
+                            mode: 'agent',
+                            query: prompt,
+                        })
+                        .then(
+                            () => {},
+                            () => {
+                                vscode.commands
+                                    .executeCommand('workbench.action.chat.newChat', {
+                                        query: prompt,
+                                    })
+                                    .then(
+                                        () => {},
+                                        () => {}
+                                    );
+                            }
+                        );
+                }
                 break;
             }
         }
@@ -446,6 +484,30 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             background: var(--vscode-button-background);
             color: var(--vscode-button-foreground);
         }
+
+        .chat-dropdown-wrapper { position: relative; }
+        .chat-dropdown {
+            display: none; position: absolute; top: 100%; right: 0; margin-top: 6px;
+            width: 380px; background: var(--vscode-editor-background, #1e1e1e);
+            border: 1px solid var(--vscode-panel-border, #444); border-radius: 8px;
+            padding: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 200;
+        }
+        .chat-dropdown.open { display: block; }
+        .chat-input {
+            width: 100%; box-sizing: border-box;
+            background: var(--vscode-input-background, #2d2d2d);
+            color: var(--vscode-input-foreground, #ccc);
+            border: 1px solid var(--vscode-input-border, #555); border-radius: 4px;
+            padding: 8px; font-size: 13px; font-family: inherit;
+            resize: vertical; min-height: 60px;
+        }
+        .chat-input:focus { outline: none; border-color: var(--vscode-focusBorder, #007acc); }
+        .chat-dropdown-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+        .btn-chat {
+            background: #e67e22; color: #fff; display: flex; align-items: center; gap: 5px;
+            border: none; border-radius: 4px; padding: 4px 12px; font-size: 12px; cursor: pointer;
+        }
+        .btn-chat:hover { background: #f39c12; }
 
         .btn-disabled {
             opacity: 0.5;
@@ -1282,10 +1344,11 @@ export class PlanningWebviewPanel implements vscode.Disposable {
         /* ==================== Plan-Level Tabs (Overview / Workflows) ==================== */
         .plan-tabs {
             display: flex;
+            flex-wrap: wrap;
             gap: 0;
             margin-bottom: 0;
             border-bottom: 2px solid var(--vscode-panel-border);
-            overflow-x: auto;
+            max-width: 100%;
         }
 
         .plan-tab {
@@ -1381,6 +1444,10 @@ export class PlanningWebviewPanel implements vscode.Disposable {
     </style>
 </head>
 <body>
+    ${
+        selectedFlowId
+            ? ''
+            : `
     <div class="header">
         <div>
             <h1>Migration Planning</h1>
@@ -1392,6 +1459,8 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             <button class="btn btn-outline" onclick="refresh()">↻ Refresh</button>
         </div>
     </div>
+    `
+    }
 
     ${
         selectedFlowId
@@ -1442,10 +1511,9 @@ export class PlanningWebviewPanel implements vscode.Disposable {
     }
 
     <!-- Lower Section: Plan Details -->
-    <div class="lower-section">
-        <div class="section-title">Migration Plan</div>
+    ${selectedFlowId ? '' : '<div class="lower-section">'}
         ${planSectionHtml}
-    </div>
+    ${selectedFlowId ? '' : '</div>'}
 
     <!-- Script 1: Core click handlers (must load before mermaid CDN which may block) -->
     <script>
@@ -1526,6 +1594,35 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             window._dbgLog('info', 'refresh');
             vscode.postMessage({ command: 'refresh' });
         }
+
+        function toggleChatDropdown() {
+            var dd = document.getElementById('chatDropdown');
+            if (dd) { dd.classList.toggle('open'); if (dd.classList.contains('open')) { document.getElementById('chatInput').focus(); } }
+        }
+        function closeChatDropdown() {
+            var dd = document.getElementById('chatDropdown');
+            if (dd) { dd.classList.remove('open'); }
+            var inp = document.getElementById('chatInput');
+            if (inp) { inp.value = ''; }
+        }
+        function sendChatMessage() {
+            var inp = document.getElementById('chatInput');
+            var msg = inp ? inp.value.trim() : '';
+            if (!msg) return;
+            closeChatDropdown();
+            vscode.postMessage({ command: 'askAgent', data: msg });
+        }
+        document.addEventListener('click', function(e) {
+            var w = document.querySelector('.chat-dropdown-wrapper');
+            if (w && !w.contains(e.target)) { closeChatDropdown(); }
+        });
+        document.addEventListener('keydown', function(e) {
+            var dd = document.getElementById('chatDropdown');
+            if (dd && dd.classList.contains('open')) {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+                if (e.key === 'Escape') { closeChatDropdown(); }
+            }
+        });
 
         function toggleSection(header) {
             var card = header.closest('.plan-card');
@@ -2053,8 +2150,20 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             <div class="plan-details">
                 <div class="plan-header-sticky">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3 style="margin: 0;">Target Architecture: ${this.escapeHtml(result.flowName)}</h3>
-                        <span class="status-badge status-planned">Planned</span>
+                        <h3 style="margin: 0;"><button class="btn" onclick="vscode.postMessage({ command: 'goToDiscovery' })" title="Back to Home" style="padding: 4px 6px; margin-right: 8px; vertical-align: middle; background: transparent; border: none;"><svg viewBox="0 0 24 24" width="20" height="20" style="vertical-align: -4px;" fill="none" stroke="var(--vscode-button-background)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>Logic Apps Design: ${this.escapeHtml(result.flowName)} <span class="status-badge status-planned" style="vertical-align: middle; margin-left: 8px;">Planned</span></h3>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <div class="chat-dropdown-wrapper">
+                                    <button class="btn btn-sm btn-chat" onclick="toggleChatDropdown()">💭 Suggest a Change</button>
+                                <div class="chat-dropdown" id="chatDropdown">
+                                    <textarea id="chatInput" class="chat-input" rows="4" placeholder="Suggest changes or request re-planning of specific areas..."></textarea>
+                                    <div class="chat-dropdown-actions">
+                                        <button class="btn btn-sm" onclick="closeChatDropdown()" style="background: transparent; border: 1px solid #666; color: #ccc;">Cancel</button>
+                                        <button class="btn btn-sm btn-primary" onclick="sendChatMessage()">Send ➤</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline" onclick="replanFlow('${this.escapeHtml(result.flowId)}')" title="Clear and regenerate the plan">↻ Regenerate Plan</button>
+                        </div>
                     </div>
                 </div>
                 ${overviewContent}
@@ -2112,8 +2221,20 @@ export class PlanningWebviewPanel implements vscode.Disposable {
         <div class="plan-details">
             <div class="plan-header-sticky">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0;">Target Architecture: ${this.escapeHtml(result.flowName)}</h3>
-                    <span class="status-badge status-planned">Planned</span>
+                    <h3 style="margin: 0;"><button class="btn" onclick="vscode.postMessage({ command: 'goToDiscovery' })" title="Back to Home" style="padding: 4px 6px; margin-right: 8px; vertical-align: middle; background: transparent; border: none;"><svg viewBox="0 0 24 24" width="20" height="20" style="vertical-align: -4px;" fill="none" stroke="var(--vscode-button-background)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>Logic Apps Design: ${this.escapeHtml(result.flowName)} <span class="status-badge status-planned" style="vertical-align: middle; margin-left: 8px;">Planned</span></h3>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <div class="chat-dropdown-wrapper">
+                                <button class="btn btn-sm btn-chat" onclick="toggleChatDropdown()">💭 Suggest a Change</button>
+                            <div class="chat-dropdown" id="chatDropdown">
+                                <textarea id="chatInput" class="chat-input" rows="4" placeholder="Suggest changes or request re-planning of specific areas..."></textarea>
+                                <div class="chat-dropdown-actions">
+                                    <button class="btn btn-sm" onclick="closeChatDropdown()" style="background: transparent; border: 1px solid #666; color: #ccc;">Cancel</button>
+                                    <button class="btn btn-sm btn-primary" onclick="sendChatMessage()">Send ➤</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-outline" onclick="replanFlow('${this.escapeHtml(result.flowId)}')" title="Clear and regenerate the plan">↻ Regenerate Plan</button>
+                    </div>
                 </div>
                 <div class="plan-tabs" style="margin-top: 12px;">
                     ${tabButtons}
