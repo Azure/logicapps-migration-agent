@@ -1711,7 +1711,20 @@ class DiscoveryStoreArchitectureTool implements vscode.LanguageModelTool<Discove
                         error: 'Invalid Mermaid diagram. Fix the parser error below and call this tool again.',
                         parserError: validation.error,
                         diagramType: validation.diagramType,
-                        hint: 'Use a flowchart TB/TD/LR/RL diagram. Keep labels inside node brackets or quoted edge labels, and avoid raw unescaped double quotes in label text.',
+                        hint: 'Use a flowchart TB diagram (top-to-bottom). Do NOT use LR or RL. Keep labels inside node brackets or quoted edge labels, and avoid raw unescaped double quotes in label text.',
+                    })
+                ),
+            ]);
+        }
+
+        // Enforce TB (top-to-bottom) direction — reject LR/RL
+        const discDirMatch = mermaid.match(/^\s*flowchart\s+(TB|TD|LR|RL)/im);
+        const discDirection = discDirMatch?.[1]?.toUpperCase();
+        if (discDirection && discDirection !== 'TB' && discDirection !== 'TD') {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(
+                    JSON.stringify({
+                        error: `Mermaid diagram uses "flowchart ${discDirection}" but MUST use "flowchart TB" (top-to-bottom). Change the direction and call this tool again.`,
                     })
                 ),
             ]);
@@ -2987,7 +3000,7 @@ class PlanningStoreWorkflowDefinitionTool implements vscode.LanguageModelTool<Pl
                                 error: 'Invalid workflow Mermaid diagram. Fix the parser error below and call this tool again.',
                                 parserError: mermaidValidation.error,
                                 diagramType: mermaidValidation.diagramType,
-                                hint: 'Use a flowchart TB/TD/LR/RL diagram for per-workflow Mermaid and keep all free text inside node labels.',
+                                hint: 'Use a flowchart TB diagram (top-to-bottom) for per-workflow Mermaid and keep all free text inside node labels.',
                             })
                         ),
                     ]);

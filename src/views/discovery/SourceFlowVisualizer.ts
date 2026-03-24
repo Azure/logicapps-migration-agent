@@ -340,10 +340,18 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                     // Step connector arrows
                     const stepArrow = '<span class="step-arrow">→</span>';
 
+                    // Reset button (only if any progress exists)
+                    const hasProgress = isAnalysed || isPlanned || isTasksCreated || isConverted;
+                    const resetBtn = hasProgress && !isThisFlowBusy
+                        ? `<button class="btn btn-reset" onclick="event.stopPropagation(); resetFlow('${g.id}')"
+                            title="Reset all progress for this flow group">↺ Reset Progress</button>`
+                        : '';
+
                     return `
                     <div class="flow-card">
                         <div class="flow-card-header">
                             <span class="flow-name">${escapeHtml(g.name)}</span>
+                            ${resetBtn}
                         </div>
                         <div class="flow-desc">${escapeHtml(g.description)}</div>
                         <div class="flow-meta">
@@ -403,6 +411,23 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             gap: 8px;
         }
         .flow-name { font-weight: 600; font-size: 15px; }
+        .btn-reset {
+            font-size: 11px;
+            padding: 4px 12px;
+            border: 1px solid #e74c3c !important;
+            background: transparent;
+            color: #e74c3c;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .btn-reset:hover {
+            background: #e74c3c;
+            color: #fff;
+        }
+        .btn-reset:active {
+            transform: scale(0.97);
+        }
         .flow-desc { font-size: 13px; color: var(--vscode-descriptionForeground); margin-bottom: 8px; }
         .flow-meta { display: flex; gap: 16px; font-size: 12px; color: var(--vscode-descriptionForeground); }
         .meta-item { opacity: 0.8; }
@@ -591,6 +616,9 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         }
         function openProject(flowId) {
             vscode.postMessage({ command: 'openProjectFromSelector', data: flowId });
+        }
+        function resetFlow(flowId) {
+            vscode.postMessage({ command: 'resetFlowFromSelector', data: flowId });
         }
         function refreshPage() {
             vscode.postMessage({ command: 'refreshFlowGroupSelector' });
@@ -1461,6 +1489,145 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             case 'refreshFlowGroupSelector': {
                 this.logger.info('[FlowViz] User requested refresh of flow group selector');
                 SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
+                break;
+            }
+
+            case 'resetFlowFromSelector': {
+                const resetFlowId = message.data as string;
+                this.logger.info(`[FlowViz] User requested reset for flow: ${resetFlowId}`);
+                (async () => {
+                    // Confirm via VS Code dialog
+                    const confirm = await vscode.window.showWarningMessage(
+                        `Reset all progress for this flow group? This will delete discovery, planning, and conversion data.`,
+                        { modal: true },
+                        'Reset'
+                    );
+                    if (confirm !== 'Reset') {
+                        return;
+                    }
+
+                    try {
+                        // 1. Reset discovery (analysis files + status flags)
+                        const { DiscoveryCacheService } =
+                            await import('../../stages/discovery/DiscoveryCacheService');
+                        await DiscoveryCacheService.getInstance().resetFlowProgress(resetFlowId);
+
+                        // 2. Remove planning files
+                        const { PlanningCacheService } =
+                            await import('../../stages/planning/PlanningCacheService');
+                        PlanningCacheService.getInstance().remove(resetFlowId);
+
+                        const { PlanningFileService } =
+                            await import('../../stages/planning/PlanningFileService');
+                        PlanningFileService.getInstance().removeFlow(resetFlowId);
+
+                        // 3. Remove conversion files
+                        const { ConversionFileService } =
+                            await import('../../stages/conversion/ConversionFileService');
+                        ConversionFileService.getInstance().removeFlow(resetFlowId);
+
+                        // 4. Kill any running func processes
+                        try {
+                            await vscode.commands.executeCommand(
+                                'logicAppsMigrationAssistant.killFuncProcesses'
+                            );
+                        } catch {
+                            // Command may not exist — non-critical
+                        }
+
+                        // 5. Delete generated output for this flow
+                        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                        if (workspaceFolder) {
+                            const fs = await import('fs');
+                            const pathMod = await import('path');
+
+                            // Gather all possible output folder names
+                            const outCandidates = new Set<string>();
+                            // a. From flowId
+                            outCandidates.add(resetFlowId);
+                            outCandidates.add(resetFlowId.replace(/[^a-zA-Z0-9_-]/g, '_'));
+
+                            // b. From flow group name
+                            const discCache = DiscoveryCacheService.getInstance();
+                            const flowGroup = discCache.getFlowGroups()?.groups.find(
+                                (g) => g.id === resetFlowId
+                            );
+                            if (flowGroup?.name) {
+                                const safeName = flowGroup.name
+                                    .replace(/[^a-zA-Z0-9_-]/g, '-')
+                                    .replace(/-+/g, '-')
+                                    .replace(/^-|-$/g, '');
+                                outCandidates.add(safeName);
+                                outCandidates.add(flowGroup.name);
+                            }
+
+                            // c. From conversion task plan generatedFiles
+                            try {
+                                const { ConversionFileService: CFS } =
+                                    await import('../../stages/conversion/ConversionFileService');
+                                const taskPlan = CFS.getInstance().readTaskPlan(resetFlowId);
+                                if (taskPlan?.tasks) {
+                                    for (const task of taskPlan.tasks) {
+                                        const output = task.output as { generatedFiles?: string[] } | undefined;
+                                        if (output?.generatedFiles) {
+                                            for (const f of output.generatedFiles) {
+                                                const normalized = f.replace(/\\\\/g, '/');
+                                                // Extract the top-level out/ subfolder
+                                                const outMatch = normalized.match(/^out\/([^/]+)/);
+                                                if (outMatch) {
+                                                    outCandidates.add(outMatch[1]);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch {
+                                // Task plan may not exist — non-critical
+                            }
+
+                            // Try deleting each candidate
+                            for (const candidate of outCandidates) {
+                                const outPath = pathMod.join(
+                                    workspaceFolder.uri.fsPath,
+                                    'out',
+                                    candidate
+                                );
+                                if (fs.existsSync(outPath)) {
+                                    fs.rmSync(outPath, { recursive: true, force: true });
+                                    this.logger.info(`[FlowViz] Deleted output folder: ${outPath}`);
+                                }
+                            }
+                        }
+
+                        // 6. Close any open analysis panel for this flow
+                        const existingPanel = SourceFlowVisualizer.analysisPanels.get(resetFlowId);
+                        if (existingPanel) {
+                            existingPanel.dispose();
+                            SourceFlowVisualizer.analysisPanels.delete(resetFlowId);
+                        }
+
+                        // 7. Clear in-memory caches
+                        if (this.currentCacheKey) {
+                            SourceFlowVisualizer.clearGroupCache(this.currentCacheKey, resetFlowId);
+                        }
+
+                        this.logger.info(`[FlowViz] Reset complete for flow: ${resetFlowId}`);
+                        vscode.window.showInformationMessage(
+                            `Progress reset for flow group. Ready for re-analysis.`
+                        );
+
+                        // 8. Refresh the selector page
+                        SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
+                    } catch (err) {
+                        this.logger.error(
+                            '[FlowViz] Failed to reset flow',
+                            err instanceof Error ? err : new Error(String(err))
+                        );
+                        vscode.window.showErrorMessage(
+                            `Failed to reset flow: ${err instanceof Error ? err.message : String(err)}`
+                        );
+                    }
+                })();
                 break;
             }
         }

@@ -328,6 +328,28 @@ export class DiscoveryCacheService {
         }
     }
 
+    /**
+     * Reset all progress for a single flow group — discovery, planning, conversion flags.
+     * Does NOT remove the flow group itself from the groups list.
+     */
+    public async resetFlowProgress(flowId: string): Promise<void> {
+        // 1. Remove discovery analysis files
+        await this.removeAnalysis(flowId);
+
+        // 2. Reset all status flags
+        this.ensureLoaded();
+        const group = this.flowGroupsCache?.groups.find((g) => g.id === flowId);
+        if (group) {
+            group.discovered = false;
+            group.planned = false;
+            group.tasksCreated = false;
+            group.converted = false;
+            await this.saveFlowGroupsToDisk();
+        }
+
+        this.logger.info(`[DiscoveryCache] Reset all progress for flow "${flowId}"`);
+    }
+
     // =========================================================================
     // Partial (Multi-Step) Storage
     // =========================================================================
