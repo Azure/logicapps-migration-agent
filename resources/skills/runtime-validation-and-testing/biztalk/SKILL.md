@@ -75,6 +75,8 @@ During testing, NEVER connect to or use original source platform infrastructure 
 
 After testing, generate `TEST-REPORT.md` in the project root with:
 
+- This report is MANDATORY. Do NOT consider the local testing task complete until `TEST-REPORT.md` has been created and populated.
+
 - Test results per workflow.
 - Azure resources provisioned.
 - Adjustments made during testing.
@@ -86,4 +88,4 @@ After testing, generate `TEST-REPORT.md` in the project root with:
 
 ## 7. Completion Gate
 
-Do NOT call `migration_conversion_finalize` until ALL tests pass. The delivered workspace MUST be fully working with zero manual setup.
+Do NOT call `migration_conversion_finalize` until ALL tests pass and `TEST-REPORT.md` exists. The delivered workspace MUST be fully working with zero manual setup.

@@ -34,6 +34,15 @@ Nothing from the source may be silently dropped.
 
 ## 3. Design Constraints
 
+### 3.00 Integration Account Decision Rule
+
+- Explicitly decide during planning whether this flow needs an Integration Account.
+- Use an Integration Account only for Integration Account-specific capabilities, especially B2B/EDI scenarios such as X12, EDIFACT, AS2, trading partners, agreements, or centrally managed shared B2B artifacts.
+- Do NOT choose Integration Account when Logic Apps Standard artifact folders are sufficient for schemas, maps, and other workflow-local artifacts.
+- If Integration Account is used, use it consistently for the flow's deployable artifacts. Do NOT split artifacts between Integration Account and Logic App artifact folders for the same flow.
+- If Integration Account is used, the plan MUST include a provisioning task that deploys the Integration Account first, then captures the deployed resource ID and callback URL into `local.settings.json` as `WORKFLOWS_INTEGRATION_ACCOUNT_ID` and `WORKFLOW_INTEGRATION_ACCOUNT_CALLBACK_URL`.
+- If Integration Account is used, the plan MUST include a follow-on artifact upload task that uploads the required Integration Account artifacts after provisioning succeeds.
+
 ### 3.0 Preserve Source Design
 
 > **⚠️ MANDATORY DESIGN PRESERVATION RULE:** Do NOT independently simplify, optimize, refactor, merge, reorder, or redesign the BizTalk flow. The target plan MUST preserve the **same source design and execution intent** unless there is a documented platform gap or the user explicitly asks for a redesign.
@@ -90,5 +99,5 @@ Store planning results in THIS order:
 5. `migration_planning_storeActionMappings` — flowId and mappings array (source → target for each component; include `workflowName` when multiple workflows exist).
 6. `migration_planning_storeGaps` — flowId and gaps array (empty if none).
 7. `migration_planning_storePatterns` — flowId and patterns array (empty if none).
-8. `migration_planning_storeArtifactDispositions` — flowId and dispositions array. ONLY include artifacts that need conversion or upload: schemas (.xsd), maps (.btm → XSLT), custom code (.cs/.dll → local function), certificates. Do NOT include orchestrations, pipelines, or bindings. Each entry needs: artifactName, artifactType, conversionRequired, uploadDestination (integration-account / logic-app-artifact-folder / azure-function / not-applicable), uploadNotes (REQUIRED). When conversionRequired=true, also include conversionFrom, conversionTo, conversionNotes.
+8. `migration_planning_storeArtifactDispositions` — flowId and dispositions array. ONLY include artifacts that need conversion or upload: schemas (.xsd), maps (.btm → XSLT), custom code (.cs/.dll → local function), certificates. Do NOT include orchestrations, pipelines, or bindings. Each entry needs: artifactName, artifactType, conversionRequired, uploadDestination (integration-account / logic-app-artifact-folder / azure-function / not-applicable), uploadNotes (REQUIRED). When conversionRequired=true, also include conversionFrom, conversionTo, conversionNotes. If the plan uses Integration Account, artifact dispositions must consistently use `integration-account` instead of mixing destinations.
 9. `migration_planning_finalize` — flowId to validate and display the plan.

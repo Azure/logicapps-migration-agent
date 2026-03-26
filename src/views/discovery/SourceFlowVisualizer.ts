@@ -1811,6 +1811,46 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     /**
      * Get Mermaid HTML for LLM-generated diagrams.
      */
+    private isSupportedViaNativeExtensibility(component: {
+        isLogicAppsNative?: boolean;
+        azureEquivalent?: unknown;
+    }): boolean {
+        if (component.isLogicAppsNative !== false) {
+            return false;
+        }
+
+        const equivalent =
+            typeof component.azureEquivalent === 'string'
+                ? component.azureEquivalent.toLowerCase()
+                : '';
+
+        const extensibilityMarkers = [
+            'local function',
+            'custom code action',
+            'logic apps local function',
+            'call a local function',
+            'inline c#',
+            'execute csharp script code',
+            'inline javascript',
+            'inline powershell',
+            'integration account',
+            'rules engine action',
+            'native custom code support',
+        ];
+
+        return extensibilityMarkers.some((marker) => equivalent.includes(marker));
+    }
+
+    private isPlatformSupportedComponent(component: {
+        isLogicAppsNative?: boolean;
+        azureEquivalent?: unknown;
+    }): boolean {
+        return (
+            component.isLogicAppsNative !== false ||
+            this.isSupportedViaNativeExtensibility(component)
+        );
+    }
+
     private getMermaidHtml(result: GeneratedFlowResult, title: string, isCached = false): string {
         const mermaidCode = result.mermaid.replace(/`/g, '\\`');
         const componentDetailsJson = JSON.stringify(result.componentDetails || []);
@@ -1863,7 +1903,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         // Build gap analysis tab badge
         const gaps = result.gapAnalysis || [];
         const nonNativeCount = (result.componentDetails || []).filter(
-            (c) => c.isLogicAppsNative === false
+            (c) => !this.isPlatformSupportedComponent(c)
         ).length;
         const gapCount = Math.max(gaps.length, nonNativeCount);
         let gapBadge = '';
@@ -2477,6 +2517,15 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         .azure-equivalent.native {
             background: #0078d4;
         }
+
+        .azure-equivalent.supported-extensibility {
+            background: #2e7d32;
+            border: 2px solid #1b5e20;
+        }
+
+        .azure-equivalent.supported-extensibility::before {
+            content: "🧩 ";
+        }
         
         .azure-equivalent.non-native {
             background: #d32f2f;
@@ -2496,6 +2545,11 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         .component-card.non-native-component {
             border-left: 4px solid #d32f2f;
             background: rgba(211, 47, 47, 0.1);
+        }
+
+        .component-card.supported-extensibility-component {
+            border-left: 4px solid #2e7d32;
+            background: rgba(46, 125, 50, 0.1);
         }
         
         /* Component Properties */
@@ -3673,11 +3727,48 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                     }
                 }
                 
-                // Determine if component is Logic Apps Standard native
-                const isNative = comp.isLogicAppsNative !== false;
-                const cardClass = isNative ? '' : 'non-native-component';
-                const equivalentClass = isNative ? 'native' : 'non-native';
-                const equivalentLabel = isNative ? 'Azure Logic Apps Equivalent:' : 'Azure Equivalent (requires custom solution):';
+                function isSupportedViaNativeExtensibility(comp) {
+                    if (comp.isLogicAppsNative !== false) {
+                        return false;
+                    }
+
+                    const equivalent = typeof comp.azureEquivalent === 'string'
+                        ? comp.azureEquivalent.toLowerCase()
+                        : '';
+
+                    const extensibilityMarkers = [
+                        'local function',
+                        'custom code action',
+                        'logic apps local function',
+                        'call a local function',
+                        'inline c#',
+                        'execute csharp script code',
+                        'inline javascript',
+                        'inline powershell',
+                        'integration account',
+                        'rules engine action',
+                        'native custom code support'
+                    ];
+
+                    return extensibilityMarkers.some(marker => equivalent.includes(marker));
+                }
+
+                const supportMode = comp.isLogicAppsNative !== false
+                    ? 'native'
+                    : isSupportedViaNativeExtensibility(comp)
+                        ? 'supported-extensibility'
+                        : 'non-native';
+                const cardClass = supportMode === 'native'
+                    ? ''
+                    : supportMode === 'supported-extensibility'
+                        ? 'supported-extensibility-component'
+                        : 'non-native-component';
+                const equivalentClass = supportMode;
+                const equivalentLabel = supportMode === 'native'
+                    ? 'Azure Logic Apps Equivalent:'
+                    : supportMode === 'supported-extensibility'
+                        ? 'Azure Equivalent (supported via native extensibility):'
+                        : 'Azure Equivalent (requires custom solution):';
                 
                 return \`
                     <div class="component-card type-\${comp.type.replace(/\\s+/g, '')} \${cardClass}">
@@ -3994,14 +4085,41 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         function renderGapAnalysis() {
             const container = document.getElementById('gapAnalysisContainer');
             
-            // Merge explicit gapAnalysis data with inferred gaps from non-native components
+            function isSupportedViaNativeExtensibility(comp) {
+                if (comp.isLogicAppsNative !== false) {
+                    return false;
+                }
+
+                const equivalent = typeof comp.azureEquivalent === 'string'
+                    ? comp.azureEquivalent.toLowerCase()
+                    : '';
+
+                const extensibilityMarkers = [
+                    'local function',
+                    'custom code action',
+                    'logic apps local function',
+                    'call a local function',
+                    'inline c#',
+                    'execute csharp script code',
+                    'inline javascript',
+                    'inline powershell',
+                    'integration account',
+                    'rules engine action',
+                    'native custom code support'
+                ];
+
+                return extensibilityMarkers.some(marker => equivalent.includes(marker));
+            }
+
+            // Merge explicit gapAnalysis data with inferred gaps from unsupported components
             let gaps = gapAnalysis && gapAnalysis.length > 0 ? [...gapAnalysis] : [];
             
-            // Auto-detect gaps from componentDetails where isLogicAppsNative === false
+            // Auto-detect gaps from componentDetails only when the platform lacks support
             if (componentDetails && componentDetails.length > 0) {
                 const explicitComponents = new Set(gaps.map(g => g.component));
                 componentDetails.forEach(comp => {
-                    if (comp.isLogicAppsNative === false && !explicitComponents.has(comp.name)) {
+                    const isPlatformSupported = comp.isLogicAppsNative !== false || isSupportedViaNativeExtensibility(comp);
+                    if (!isPlatformSupported && !explicitComponents.has(comp.name)) {
                         gaps.push({
                             component: comp.name,
                             componentType: comp.type,

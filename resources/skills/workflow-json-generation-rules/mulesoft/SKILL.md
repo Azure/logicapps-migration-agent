@@ -44,6 +44,14 @@ Each `workflow.json` must contain a `definition` key with:
 
 Prefer `ServiceProvider` type with `serviceProviderConfiguration` over `ApiConnection` (managed connector) whenever a built-in equivalent exists. Built-in connectors run in-process with lower latency and no connection overhead.
 
+### Parameterization (keep it simple)
+
+- For Logic Apps Standard, prefer `parameters.json` for cross-environment values.
+- In `workflow.json`, reference values with `@parameters('name')`.
+- In `parameters.json`, `@appsetting('name')` is the only valid expression type.
+- In `connections.json`, only `@parameters(...)` and `@appsetting(...)` are valid.
+- For more details, fetch Microsoft Learn docs about Standard parameters and app settings (`create-parameters-workflows`, `edit-app-settings-host-settings`).
+
 ---
 
 ## 3. SplitOn over ForEach

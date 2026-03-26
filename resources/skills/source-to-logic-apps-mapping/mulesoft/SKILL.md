@@ -62,6 +62,25 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 | Object Store       | Object Store V2                        | Azure Table Storage / Azure Cache for Redis       |
 | Scheduler          | Scheduler source (cron/fixed-freq)     | Recurrence trigger                                |
 
+### When to Use Integration Account
+
+Use an Integration Account only when the target design requires Integration Account-specific capabilities, such as:
+
+- B2B/EDI processing with X12, EDIFACT, or AS2 actions
+- Trading partners, agreements, and partner-specific B2B configuration
+- Shared enterprise artifact management where schemas/maps/partner artifacts are centrally managed outside the workflow project
+
+Do NOT choose Integration Account for ordinary XML, JSON, or DataWeave replacement scenarios if Logic Apps Standard artifact folders and built-in actions are sufficient.
+
+If Integration Account is chosen:
+
+- use it consistently for the flow's deployable artifacts; do not split artifacts between Integration Account and Logic App artifact folders
+- plan for the required app setting `WORKFLOWS_INTEGRATION_ACCOUNT_ID`
+- plan for the required app setting `WORKFLOW_INTEGRATION_ACCOUNT_CALLBACK_URL`
+- deploy the Integration Account first, then set `WORKFLOWS_INTEGRATION_ACCOUNT_ID` to the deployed Integration Account resource ID, for example `/subscriptions/{subId}/resourceGroups/{rg}/providers/Microsoft.Logic/integrationAccounts/{name}`
+- retrieve the deployed callback URL and set `WORKFLOW_INTEGRATION_ACCOUNT_CALLBACK_URL` to that real value
+- plan a separate follow-on task to upload the required Integration Account artifacts after provisioning
+
 ---
 
 ## Connector Mappings
@@ -70,12 +89,12 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 #### File System
 
-|                         | MuleSoft                    | Logic Apps Standard            |
-| ----------------------- | --------------------------- | ------------------------------ |
-| **Connector**           | file:connector (Mule File)  | **File System**                |
-| **Service Provider**    | —                           | `/serviceProviders/fileSystem` |
-| **Deployment Scope**    | —                           | Any (on-premises + cloud)      |
-| **Category**            | —                           | Storage                        |
+|                      | MuleSoft                   | Logic Apps Standard            |
+| -------------------- | -------------------------- | ------------------------------ |
+| **Connector**        | file:connector (Mule File) | **File System**                |
+| **Service Provider** | —                          | `/serviceProviders/fileSystem` |
+| **Deployment Scope** | —                          | Any (on-premises + cloud)      |
+| **Category**         | —                          | Storage                        |
 
 > **Migration Note:** MuleSoft `file:listener` (source) maps to File System trigger. `file:read` / `file:write` operations map to actions.
 
@@ -101,12 +120,12 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 #### FTP
 
-|                         | MuleSoft                       | Logic Apps Standard     |
-| ----------------------- | ------------------------------ | ----------------------- |
-| **Connector**           | ftp:connector (Mule FTP)       | **FTP**                 |
-| **Service Provider**    | —                              | `/serviceProviders/ftp` |
-| **Deployment Scope**    | —                              | Any                     |
-| **Category**            | —                              | Storage                 |
+|                      | MuleSoft                 | Logic Apps Standard     |
+| -------------------- | ------------------------ | ----------------------- |
+| **Connector**        | ftp:connector (Mule FTP) | **FTP**                 |
+| **Service Provider** | —                        | `/serviceProviders/ftp` |
+| **Deployment Scope** | —                        | Any                     |
+| **Category**         | —                        | Storage                 |
 
 > **Migration Note:** MuleSoft `ftp:listener` maps to FTP trigger. `ftp:read` / `ftp:write` operations map to actions.
 
@@ -128,12 +147,12 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 #### SFTP
 
-|                         | MuleSoft                       | Logic Apps Standard      |
-| ----------------------- | ------------------------------ | ------------------------ |
-| **Connector**           | sftp:connector (Mule SFTP)     | **SFTP**                 |
-| **Service Provider**    | —                              | `/serviceProviders/sftp` |
-| **Deployment Scope**    | —                              | Any                      |
-| **Category**            | —                              | Storage                  |
+|                      | MuleSoft                   | Logic Apps Standard      |
+| -------------------- | -------------------------- | ------------------------ |
+| **Connector**        | sftp:connector (Mule SFTP) | **SFTP**                 |
+| **Service Provider** | —                          | `/serviceProviders/sftp` |
+| **Deployment Scope** | —                          | Any                      |
+| **Category**         | —                          | Storage                  |
 
 > **Migration Note:** MuleSoft `sftp:listener` maps to SFTP trigger. `sftp:read` / `sftp:write` operations map to actions.
 
@@ -163,26 +182,26 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 #### Azure Service Bus
 
-|                         | MuleSoft                              | Logic Apps Standard            |
-| ----------------------- | ------------------------------------- | ------------------------------ |
-| **Connector**           | jms:connector, vm:connector, anypoint-mq | **Azure Service Bus**       |
-| **Service Provider**    | —                                     | `/serviceProviders/serviceBus` |
-| **Deployment Scope**    | —                                     | Cloud Only                     |
-| **Category**            | —                                     | Messaging                      |
+|                      | MuleSoft                                 | Logic Apps Standard            |
+| -------------------- | ---------------------------------------- | ------------------------------ |
+| **Connector**        | jms:connector, vm:connector, anypoint-mq | **Azure Service Bus**          |
+| **Service Provider** | —                                        | `/serviceProviders/serviceBus` |
+| **Deployment Scope** | —                                        | Cloud Only                     |
+| **Category**         | —                                        | Messaging                      |
 
 > **Migration Note:** MuleSoft JMS connector, VM connector, and Anypoint MQ all map to Azure Service Bus for cloud-native queuing and topic patterns. JMS queues → Service Bus queues. JMS topics → Service Bus topics. VM queues (intra-app messaging) → Service Bus queues or child workflow calls.
 
-| Type    | Operation                            | Description                        |
-| ------- | ------------------------------------ | ---------------------------------- |
-| Trigger | `receiveQueueMessage` _(default)_    | Receive single queue message       |
-| Trigger | `receiveQueueMessages`               | Receive batch of queue messages    |
-| Trigger | `receiveTopicMessage`                | Receive single topic message       |
-| Trigger | `receiveTopicMessages`               | Receive batch of topic messages    |
-| Action  | `sendMessage` _(default)_            | Send a message                     |
-| Action  | `sendMessages`                       | Send batch of messages             |
-| Action  | `completeMessage`                    | Complete a message                 |
-| Action  | `abandonMessage`                     | Abandon a message                  |
-| Action  | `deadLetterMessage`                  | Dead-letter a message              |
+| Type    | Operation                         | Description                     |
+| ------- | --------------------------------- | ------------------------------- |
+| Trigger | `receiveQueueMessage` _(default)_ | Receive single queue message    |
+| Trigger | `receiveQueueMessages`            | Receive batch of queue messages |
+| Trigger | `receiveTopicMessage`             | Receive single topic message    |
+| Trigger | `receiveTopicMessages`            | Receive batch of topic messages |
+| Action  | `sendMessage` _(default)_         | Send a message                  |
+| Action  | `sendMessages`                    | Send batch of messages          |
+| Action  | `completeMessage`                 | Complete a message              |
+| Action  | `abandonMessage`                  | Abandon a message               |
+| Action  | `deadLetterMessage`               | Dead-letter a message           |
 
 **Connection Parameters:** `ConnectionString` (required)
 
@@ -190,12 +209,12 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 #### RabbitMQ
 
-|                         | MuleSoft                         | Logic Apps Standard          |
-| ----------------------- | -------------------------------- | ---------------------------- |
-| **Connector**           | amqp:connector (Mule AMQP)      | **RabbitMQ**                 |
-| **Service Provider**    | —                                | `/serviceProviders/rabbitmq` |
-| **Deployment Scope**    | —                                | Any                          |
-| **Category**            | —                                | Messaging                    |
+|                      | MuleSoft                   | Logic Apps Standard          |
+| -------------------- | -------------------------- | ---------------------------- |
+| **Connector**        | amqp:connector (Mule AMQP) | **RabbitMQ**                 |
+| **Service Provider** | —                          | `/serviceProviders/rabbitmq` |
+| **Deployment Scope** | —                          | Any                          |
+| **Category**         | —                          | Messaging                    |
 
 > **Migration Note:** MuleSoft AMQP connector maps to RabbitMQ connector in Logic Apps.
 
@@ -212,12 +231,12 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 #### Confluent Kafka
 
-|                         | MuleSoft                              | Logic Apps Standard                |
-| ----------------------- | ------------------------------------- | ---------------------------------- |
-| **Connector**           | kafka:connector (Mule Kafka)          | **Confluent Kafka**                |
-| **Service Provider**    | —                                     | `/serviceProviders/confluentKafka` |
-| **Deployment Scope**    | —                                     | Any                                |
-| **Category**            | —                                     | Messaging                          |
+|                      | MuleSoft                     | Logic Apps Standard                |
+| -------------------- | ---------------------------- | ---------------------------------- |
+| **Connector**        | kafka:connector (Mule Kafka) | **Confluent Kafka**                |
+| **Service Provider** | —                            | `/serviceProviders/confluentKafka` |
+| **Deployment Scope** | —                            | Any                                |
+| **Category**         | —                            | Messaging                          |
 
 > **Migration Note:** MuleSoft Kafka connector maps directly to Confluent Kafka connector in Logic Apps.
 
@@ -234,12 +253,12 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 #### SQL Server
 
-|                         | MuleSoft                          | Logic Apps Standard     |
-| ----------------------- | --------------------------------- | ----------------------- |
-| **Connector**           | db:connector (Mule Database)      | **SQL Server**          |
-| **Service Provider**    | —                                 | `/serviceProviders/sql` |
-| **Deployment Scope**    | —                                 | Any                     |
-| **Category**            | —                                 | Database                |
+|                      | MuleSoft                     | Logic Apps Standard     |
+| -------------------- | ---------------------------- | ----------------------- |
+| **Connector**        | db:connector (Mule Database) | **SQL Server**          |
+| **Service Provider** | —                            | `/serviceProviders/sql` |
+| **Deployment Scope** | —                            | Any                     |
+| **Category**         | —                            | Database                |
 
 > **Migration Note:** MuleSoft `db:select` → `executeQuery`. `db:insert` / `db:update` / `db:delete` → `executeQuery` or specific row actions. `db:stored-procedure` → `executeStoredProcedure`. The Mule Database connector supports multiple DB engines (MySQL, PostgreSQL, Oracle, MSSQL) via JDBC — map each to the specific Logic Apps database connector.
 
@@ -262,12 +281,12 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 #### HTTP
 
-|                         | MuleSoft                                    | Logic Apps Standard      |
-| ----------------------- | ------------------------------------------- | ------------------------ |
-| **Connector**           | http:listener, http:request, wsc:consumer   | **HTTP**                 |
-| **Service Provider**    | —                                           | `/serviceProviders/http` |
-| **Deployment Scope**    | —                                           | Any                      |
-| **Category**            | —                                           | Integration              |
+|                      | MuleSoft                                  | Logic Apps Standard      |
+| -------------------- | ----------------------------------------- | ------------------------ |
+| **Connector**        | http:listener, http:request, wsc:consumer | **HTTP**                 |
+| **Service Provider** | —                                         | `/serviceProviders/http` |
+| **Deployment Scope** | —                                         | Any                      |
+| **Category**         | —                                         | Integration              |
 
 > **Migration Note:** MuleSoft `http:listener` (source) → HTTP Request trigger. `http:request` (operation) → HTTP action (`invokeHttp`). `wsc:consumer` (SOAP web service client) → HTTP action with XML body and SOAPAction header.
 
@@ -284,12 +303,12 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 #### SMTP
 
-|                         | MuleSoft                     | Logic Apps Standard      |
-| ----------------------- | ---------------------------- | ------------------------ |
-| **Connector**           | email:send (Mule Email)      | **SMTP**                 |
-| **Service Provider**    | —                            | `/serviceProviders/Smtp` |
-| **Deployment Scope**    | —                            | Any                      |
-| **Category**            | —                            | Email                    |
+|                      | MuleSoft                | Logic Apps Standard      |
+| -------------------- | ----------------------- | ------------------------ |
+| **Connector**        | email:send (Mule Email) | **SMTP**                 |
+| **Service Provider** | —                       | `/serviceProviders/Smtp` |
+| **Deployment Scope** | —                       | Any                      |
+| **Category**         | —                       | Email                    |
 
 > **Migration Note:** MuleSoft `email:send` maps to SMTP sendEmail action. MuleSoft `email:listener-imap` / `email:listener-pop3` have no direct SMTP trigger — use Outlook 365 connector or a polling pattern.
 
@@ -305,21 +324,21 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 #### SAP
 
-|                         | MuleSoft                        | Logic Apps Standard     |
-| ----------------------- | ------------------------------- | ----------------------- |
-| **Connector**           | sap:connector (MuleSoft SAP)    | **SAP**                 |
-| **Service Provider**    | —                               | `/serviceProviders/sap` |
-| **Deployment Scope**    | —                               | Any (via data gateway)  |
-| **Category**            | —                               | ERP                     |
+|                      | MuleSoft                     | Logic Apps Standard     |
+| -------------------- | ---------------------------- | ----------------------- |
+| **Connector**        | sap:connector (MuleSoft SAP) | **SAP**                 |
+| **Service Provider** | —                            | `/serviceProviders/sap` |
+| **Deployment Scope** | —                            | Any (via data gateway)  |
+| **Category**         | —                            | ERP                     |
 
 > **Migration Note:** MuleSoft `sap:sync-rfc` / `sap:async-rfc` → SAP `callRfc` action. `sap:send-idoc` → SAP `sendIdoc` action. Requires on-premises data gateway for connectivity.
 
-| Type    | Operation       | Description            |
-| ------- | --------------- | ---------------------- |
-| Trigger | `receiveTrfc`   | Receive tRFC from SAP  |
-| Trigger | `receiveIdoc`   | Receive IDoc from SAP  |
+| Type    | Operation       | Description             |
+| ------- | --------------- | ----------------------- |
+| Trigger | `receiveTrfc`   | Receive tRFC from SAP   |
+| Trigger | `receiveIdoc`   | Receive IDoc from SAP   |
 | Action  | `callRfc`       | Call SAP RFC function   |
-| Action  | `sendIdoc`      | Send IDoc to SAP       |
+| Action  | `sendIdoc`      | Send IDoc to SAP        |
 | Action  | `readTable`     | Read SAP table          |
 | Action  | `createSession` | Create stateful session |
 | Action  | `closeSession`  | Close stateful session  |
@@ -330,18 +349,18 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 ## Connectors Not Mapped (Gaps)
 
-| MuleSoft Connector         | Gap Reason                                            | Recommended Alternative                                 |
-| -------------------------- | ----------------------------------------------------- | ------------------------------------------------------- |
-| Anypoint MQ                | CloudHub-native messaging service                     | Azure Service Bus                                       |
-| Object Store V2            | CloudHub-native key-value store                       | Azure Table Storage or Azure Cache for Redis            |
-| Salesforce Connector       | No built-in Logic Apps equivalent                     | Salesforce managed API connector or HTTP + REST API     |
-| Workday Connector          | No built-in Logic Apps equivalent                     | HTTP + REST API                                         |
-| NetSuite Connector         | No built-in Logic Apps equivalent                     | HTTP + REST API                                         |
-| MongoDB Connector          | No built-in Logic Apps equivalent                     | HTTP + REST API or Azure Cosmos DB (MongoDB API)        |
-| Redis Connector            | No built-in Logic Apps equivalent                     | Azure Cache for Redis via HTTP or .NET local function   |
-| Elasticsearch Connector    | No built-in Logic Apps equivalent                     | HTTP + REST API                                         |
-| API Manager Policies       | Anypoint-specific API governance                      | Azure API Management policies                           |
-| CloudHub Properties        | CloudHub deployment-specific configuration            | Logic Apps app settings (`local.settings.json`)         |
+| MuleSoft Connector      | Gap Reason                                 | Recommended Alternative                               |
+| ----------------------- | ------------------------------------------ | ----------------------------------------------------- |
+| Anypoint MQ             | CloudHub-native messaging service          | Azure Service Bus                                     |
+| Object Store V2         | CloudHub-native key-value store            | Azure Table Storage or Azure Cache for Redis          |
+| Salesforce Connector    | No built-in Logic Apps equivalent          | Salesforce managed API connector or HTTP + REST API   |
+| Workday Connector       | No built-in Logic Apps equivalent          | HTTP + REST API                                       |
+| NetSuite Connector      | No built-in Logic Apps equivalent          | HTTP + REST API                                       |
+| MongoDB Connector       | No built-in Logic Apps equivalent          | HTTP + REST API or Azure Cosmos DB (MongoDB API)      |
+| Redis Connector         | No built-in Logic Apps equivalent          | Azure Cache for Redis via HTTP or .NET local function |
+| Elasticsearch Connector | No built-in Logic Apps equivalent          | HTTP + REST API                                       |
+| API Manager Policies    | Anypoint-specific API governance           | Azure API Management policies                         |
+| CloudHub Properties     | CloudHub deployment-specific configuration | Logic Apps app settings (`local.settings.json`)       |
 
 ---
 
@@ -349,80 +368,80 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 ### Core Processors
 
-| MuleSoft Processor    | Logic Apps Equivalent                  | Notes                                          |
-| --------------------- | -------------------------------------- | ---------------------------------------------- |
-| `logger`              | Compose + tracked properties           | Use tracked properties for run-level logging   |
-| `set-payload`         | Compose action                         | Sets the message body                          |
-| `set-variable`        | Set Variable action / Initialize Variable | Creates or updates a workflow variable       |
-| `remove-variable`     | Set Variable (to null)                 | Logic Apps does not have a remove action       |
-| `flow-ref`            | InvokeWorkflow (child workflow)        | Calls another workflow                         |
-| `raise-error`         | Terminate action (Failed)              | Ends the workflow with an error                |
-| `parse-template`      | Compose action                         | Template rendering via expressions             |
+| MuleSoft Processor | Logic Apps Equivalent                     | Notes                                        |
+| ------------------ | ----------------------------------------- | -------------------------------------------- |
+| `logger`           | Compose + tracked properties              | Use tracked properties for run-level logging |
+| `set-payload`      | Compose action                            | Sets the message body                        |
+| `set-variable`     | Set Variable action / Initialize Variable | Creates or updates a workflow variable       |
+| `remove-variable`  | Set Variable (to null)                    | Logic Apps does not have a remove action     |
+| `flow-ref`         | InvokeWorkflow (child workflow)           | Calls another workflow                       |
+| `raise-error`      | Terminate action (Failed)                 | Ends the workflow with an error              |
+| `parse-template`   | Compose action                            | Template rendering via expressions           |
 
 ### Control Flow Processors
 
-| MuleSoft Processor    | Logic Apps Equivalent                  | Notes                                          |
-| --------------------- | -------------------------------------- | ---------------------------------------------- |
-| `choice`              | Condition / Switch action              | `when` → Condition branches, `otherwise` → default |
-| `scatter-gather`      | Parallel branches                      | Direct mapping to parallel branch execution    |
-| `foreach`             | For Each action                        | `collection` → items expression                |
-| `until-successful`    | Until action (with retry)              | Maps to retry loop pattern                     |
-| `first-successful`    | Custom pattern (try sequential)        | No direct equivalent — use Scope + Run After   |
-| `round-robin`         | Custom pattern                         | No direct equivalent — use expressions         |
-| `try`                 | Scope action                           | Scope + error handling via Run After           |
+| MuleSoft Processor | Logic Apps Equivalent           | Notes                                              |
+| ------------------ | ------------------------------- | -------------------------------------------------- |
+| `choice`           | Condition / Switch action       | `when` → Condition branches, `otherwise` → default |
+| `scatter-gather`   | Parallel branches               | Direct mapping to parallel branch execution        |
+| `foreach`          | For Each action                 | `collection` → items expression                    |
+| `until-successful` | Until action (with retry)       | Maps to retry loop pattern                         |
+| `first-successful` | Custom pattern (try sequential) | No direct equivalent — use Scope + Run After       |
+| `round-robin`      | Custom pattern                  | No direct equivalent — use expressions             |
+| `try`              | Scope action                    | Scope + error handling via Run After               |
 
 ### Data Transformation
 
-| MuleSoft Processor    | Logic Apps Equivalent                  | Notes                                          |
-| --------------------- | -------------------------------------- | ---------------------------------------------- |
-| `ee:transform`        | Compose / Liquid / .NET local function | DataWeave → Liquid for simple maps; .NET for complex |
-| DataWeave 2.0 (.dwl)  | Liquid template / XSLT / .NET function | Assess complexity before choosing target       |
-| `set-payload` (DW)    | Compose action with expressions        | Inline DataWeave → workflow expressions        |
+| MuleSoft Processor   | Logic Apps Equivalent                  | Notes                                                |
+| -------------------- | -------------------------------------- | ---------------------------------------------------- |
+| `ee:transform`       | Compose / Liquid / .NET local function | DataWeave → Liquid for simple maps; .NET for complex |
+| DataWeave 2.0 (.dwl) | Liquid template / XSLT / .NET function | Assess complexity before choosing target             |
+| `set-payload` (DW)   | Compose action with expressions        | Inline DataWeave → workflow expressions              |
 
 ### Validation Processors
 
-| MuleSoft Processor                | Logic Apps Equivalent                  | Notes                                   |
-| --------------------------------- | -------------------------------------- | --------------------------------------- |
-| `validation:is-true`              | Condition action                       | Boolean condition check                 |
-| `validation:is-false`             | Condition action                       | Boolean condition check (negated)       |
-| `validation:is-not-null`          | Condition action                       | Null check with expression              |
-| `validation:is-null`              | Condition action                       | Null check with expression              |
-| `validation:validates-size`       | Condition action + `length()` expr     | Size validation via expression          |
-| `validation:is-not-blank-string`  | Condition action + `empty()` expr      | Blank check via expression              |
-| `validation:matches-regex`        | Condition action with inline code      | Regex via .NET local function if needed |
-| `validation:is-email`             | Condition action with regex/expression | Email pattern validation                |
+| MuleSoft Processor               | Logic Apps Equivalent                  | Notes                                   |
+| -------------------------------- | -------------------------------------- | --------------------------------------- |
+| `validation:is-true`             | Condition action                       | Boolean condition check                 |
+| `validation:is-false`            | Condition action                       | Boolean condition check (negated)       |
+| `validation:is-not-null`         | Condition action                       | Null check with expression              |
+| `validation:is-null`             | Condition action                       | Null check with expression              |
+| `validation:validates-size`      | Condition action + `length()` expr     | Size validation via expression          |
+| `validation:is-not-blank-string` | Condition action + `empty()` expr      | Blank check via expression              |
+| `validation:matches-regex`       | Condition action with inline code      | Regex via .NET local function if needed |
+| `validation:is-email`            | Condition action with regex/expression | Email pattern validation                |
 
 ### Error Handling
 
-| MuleSoft Pattern                 | Logic Apps Equivalent                                      | Notes                                             |
-| -------------------------------- | ---------------------------------------------------------- | ------------------------------------------------- |
-| `on-error-propagate`             | Scope + Run After (Failed) + Terminate                     | Error is re-thrown to caller                      |
-| `on-error-continue`              | Scope + Run After (Failed) + Continue                      | Error is caught but flow continues                |
-| `try` scope                      | Scope action                                               | Wraps processors in a protected boundary          |
-| Error type filtering (HTTP:CONNECTIVITY) | Condition inside Run After (Failed) block           | Check error details in the failed action output   |
-| Global error handler             | Add error handling to each workflow + shared error workflow | Centralize via a dedicated error-handling workflow |
+| MuleSoft Pattern                         | Logic Apps Equivalent                                       | Notes                                              |
+| ---------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------- |
+| `on-error-propagate`                     | Scope + Run After (Failed) + Terminate                      | Error is re-thrown to caller                       |
+| `on-error-continue`                      | Scope + Run After (Failed) + Continue                       | Error is caught but flow continues                 |
+| `try` scope                              | Scope action                                                | Wraps processors in a protected boundary           |
+| Error type filtering (HTTP:CONNECTIVITY) | Condition inside Run After (Failed) block                   | Check error details in the failed action output    |
+| Global error handler                     | Add error handling to each workflow + shared error workflow | Centralize via a dedicated error-handling workflow |
 
 ---
 
 ## Flow Construct Mappings
 
-| MuleSoft Construct        | Logic Apps Equivalent                  | Notes                                          |
-| ------------------------- | -------------------------------------- | ---------------------------------------------- |
-| Flow (with source)        | Workflow (with trigger)                | 1:1 mapping — each flow becomes a workflow     |
-| Sub-flow                  | Child workflow (InvokeWorkflow)        | Called from parent via workflow action          |
-| Private flow              | Child workflow (InvokeWorkflow)        | Same as sub-flow for migration purposes        |
-| Global config             | Connection in connections.json         | Shared connector configurations                |
-| Mule application          | Logic Apps Standard project            | One app → one Logic App                        |
-| Mule domain               | Shared connections.json                | Domain-level shared resources                  |
-| Scheduler source          | Recurrence trigger                     | cron/fixed-frequency → recurrence config       |
-| http:listener source      | HTTP Request trigger (manual)          | Direct mapping                                 |
-| jms:listener source       | Service Bus trigger                    | JMS queue/topic → Service Bus queue/topic      |
-| vm:listener source        | Service Bus trigger / child workflow   | VM queue → Service Bus or child workflow call   |
-| file:listener source      | File System trigger                    | Direct mapping                                 |
-| ftp:listener source       | FTP trigger                            | Direct mapping                                 |
-| sftp:listener source      | SFTP trigger                           | Direct mapping                                 |
-| email:listener source     | Outlook 365 trigger / polling pattern  | No built-in SMTP trigger                       |
-| db:listener source        | SQL Server trigger (whenARowIsModified)| Database polling pattern                       |
+| MuleSoft Construct    | Logic Apps Equivalent                   | Notes                                         |
+| --------------------- | --------------------------------------- | --------------------------------------------- |
+| Flow (with source)    | Workflow (with trigger)                 | 1:1 mapping — each flow becomes a workflow    |
+| Sub-flow              | Child workflow (InvokeWorkflow)         | Called from parent via workflow action        |
+| Private flow          | Child workflow (InvokeWorkflow)         | Same as sub-flow for migration purposes       |
+| Global config         | Connection in connections.json          | Shared connector configurations               |
+| Mule application      | Logic Apps Standard project             | One app → one Logic App                       |
+| Mule domain           | Shared connections.json                 | Domain-level shared resources                 |
+| Scheduler source      | Recurrence trigger                      | cron/fixed-frequency → recurrence config      |
+| http:listener source  | HTTP Request trigger (manual)           | Direct mapping                                |
+| jms:listener source   | Service Bus trigger                     | JMS queue/topic → Service Bus queue/topic     |
+| vm:listener source    | Service Bus trigger / child workflow    | VM queue → Service Bus or child workflow call |
+| file:listener source  | File System trigger                     | Direct mapping                                |
+| ftp:listener source   | FTP trigger                             | Direct mapping                                |
+| sftp:listener source  | SFTP trigger                            | Direct mapping                                |
+| email:listener source | Outlook 365 trigger / polling pattern   | No built-in SMTP trigger                      |
+| db:listener source    | SQL Server trigger (whenARowIsModified) | Database polling pattern                      |
 
 ---
 
@@ -430,50 +449,50 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 ### Expression Language Comparison
 
-| Feature           | MuleSoft DataWeave 2.0               | Logic Apps Workflow Expressions         |
-| ----------------- | ------------------------------------ | --------------------------------------- |
-| Syntax            | Functional, pattern-matching         | `@{expression}` C-like syntax           |
-| String concat     | `payload.first ++ " " ++ payload.last` | `@concat(body('action'),'first',' ',body('action'),'last')` |
-| Conditional       | `if (cond) val1 else val2`           | `@if(condition, val1, val2)`            |
-| Null coalescing   | `payload.name default "N/A"`         | `@coalesce(body('action')?['name'],'N/A')` |
-| Array iteration   | `payload map (item) -> item.name`    | `For Each` action + `@items('For_each')` |
-| Array filter      | `payload filter (item) -> item.active` | `Filter Array` action or `@body('Filter_array')` |
-| Type coercion     | `payload.amount as Number`           | `@float(body('action')?['amount'])`     |
-| Date formatting   | `now() as String {format: "yyyy-MM-dd"}` | `@formatDateTime(utcNow(),'yyyy-MM-dd')` |
-| Upper/lower       | `upper(payload.name)`                | `@toUpper(body('action')?['name'])`     |
-| String length     | `sizeOf(payload.name)`               | `@length(body('action')?['name'])`      |
-| Object construction | `{ key: value }`                   | Compose action with JSON body           |
-| Reduce            | `payload reduce (item, acc) -> ...`  | .NET local function (no direct equivalent) |
-| GroupBy           | `payload groupBy $.category`         | .NET local function (no direct equivalent) |
-| Pattern matching  | `payload match { ... }`              | Switch action + conditions              |
+| Feature             | MuleSoft DataWeave 2.0                   | Logic Apps Workflow Expressions                             |
+| ------------------- | ---------------------------------------- | ----------------------------------------------------------- |
+| Syntax              | Functional, pattern-matching             | `@{expression}` C-like syntax                               |
+| String concat       | `payload.first ++ " " ++ payload.last`   | `@concat(body('action'),'first',' ',body('action'),'last')` |
+| Conditional         | `if (cond) val1 else val2`               | `@if(condition, val1, val2)`                                |
+| Null coalescing     | `payload.name default "N/A"`             | `@coalesce(body('action')?['name'],'N/A')`                  |
+| Array iteration     | `payload map (item) -> item.name`        | `For Each` action + `@items('For_each')`                    |
+| Array filter        | `payload filter (item) -> item.active`   | `Filter Array` action or `@body('Filter_array')`            |
+| Type coercion       | `payload.amount as Number`               | `@float(body('action')?['amount'])`                         |
+| Date formatting     | `now() as String {format: "yyyy-MM-dd"}` | `@formatDateTime(utcNow(),'yyyy-MM-dd')`                    |
+| Upper/lower         | `upper(payload.name)`                    | `@toUpper(body('action')?['name'])`                         |
+| String length       | `sizeOf(payload.name)`                   | `@length(body('action')?['name'])`                          |
+| Object construction | `{ key: value }`                         | Compose action with JSON body                               |
+| Reduce              | `payload reduce (item, acc) -> ...`      | .NET local function (no direct equivalent)                  |
+| GroupBy             | `payload groupBy $.category`             | .NET local function (no direct equivalent)                  |
+| Pattern matching    | `payload match { ... }`                  | Switch action + conditions                                  |
 
 ### Common Expression Conversions
 
-| MuleSoft DataWeave                    | Logic Apps Expression                                     |
-| ------------------------------------- | --------------------------------------------------------- |
-| `payload`                             | `@body('Previous_Action')` or `@triggerBody()`            |
-| `payload.orderId`                     | `@body('Previous_Action')?['orderId']`                    |
-| `attributes.headers.'Content-Type'`   | `@triggerOutputs()?['headers']?['Content-Type']`          |
-| `vars.myVariable`                     | `@variables('myVariable')`                                |
-| `flowVars.correlationId`              | `@variables('correlationId')`                             |
-| `payload.items map (item) -> item.id` | For Each + Compose + `@items('For_each')?['id']`          |
-| `sizeOf(payload)`                     | `@length(body('Previous_Action'))`                        |
-| `now()`                               | `@utcNow()`                                               |
-| `uuid()`                              | `@guid()`                                                 |
-| `payload.amount as Number`            | `@float(body('Previous_Action')?['amount'])`              |
-| `upper(payload.name)`                 | `@toUpper(body('Previous_Action')?['name'])`              |
-| `payload.name default "Unknown"`      | `@coalesce(body('Previous_Action')?['name'],'Unknown')`   |
-| `isEmpty(payload)`                    | `@empty(body('Previous_Action'))`                         |
+| MuleSoft DataWeave                    | Logic Apps Expression                                   |
+| ------------------------------------- | ------------------------------------------------------- |
+| `payload`                             | `@body('Previous_Action')` or `@triggerBody()`          |
+| `payload.orderId`                     | `@body('Previous_Action')?['orderId']`                  |
+| `attributes.headers.'Content-Type'`   | `@triggerOutputs()?['headers']?['Content-Type']`        |
+| `vars.myVariable`                     | `@variables('myVariable')`                              |
+| `flowVars.correlationId`              | `@variables('correlationId')`                           |
+| `payload.items map (item) -> item.id` | For Each + Compose + `@items('For_each')?['id']`        |
+| `sizeOf(payload)`                     | `@length(body('Previous_Action'))`                      |
+| `now()`                               | `@utcNow()`                                             |
+| `uuid()`                              | `@guid()`                                               |
+| `payload.amount as Number`            | `@float(body('Previous_Action')?['amount'])`            |
+| `upper(payload.name)`                 | `@toUpper(body('Previous_Action')?['name'])`            |
+| `payload.name default "Unknown"`      | `@coalesce(body('Previous_Action')?['name'],'Unknown')` |
+| `isEmpty(payload)`                    | `@empty(body('Previous_Action'))`                       |
 
 ### Mule Variables → Logic Apps Variables
 
-| MuleSoft Variable Type    | Logic Apps Equivalent                  | Notes                              |
-| ------------------------- | -------------------------------------- | ---------------------------------- |
-| Flow variable (set-variable) | Initialize Variable + Set Variable  | Must declare type at init          |
-| Session variable          | Not applicable                         | Use correlation or pass as params  |
-| Mule message `payload`    | Action/trigger body                    | `@body()` / `@triggerBody()`       |
-| Mule message `attributes` | Trigger/action headers/outputs         | `@triggerOutputs()?['headers']`    |
-| Target variable           | Compose action output                  | Store intermediate results         |
+| MuleSoft Variable Type       | Logic Apps Equivalent              | Notes                             |
+| ---------------------------- | ---------------------------------- | --------------------------------- |
+| Flow variable (set-variable) | Initialize Variable + Set Variable | Must declare type at init         |
+| Session variable             | Not applicable                     | Use correlation or pass as params |
+| Mule message `payload`       | Action/trigger body                | `@body()` / `@triggerBody()`      |
+| Mule message `attributes`    | Trigger/action headers/outputs     | `@triggerOutputs()?['headers']`   |
+| Target variable              | Compose action output              | Store intermediate results        |
 
 ---
 
@@ -481,119 +500,119 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 ### Custom Code Options in Logic Apps Standard
 
-| Option                    | When to Use                                          | Deployment                  |
-| ------------------------- | ---------------------------------------------------- | --------------------------- |
-| .NET Local Function       | Complex DataWeave, Java logic port, custom transforms | In-process with Logic Apps  |
-| Azure Function            | External HTTP services, long-running operations       | Separate Azure Function app |
-| Inline Code (JavaScript)  | Simple string/JSON manipulation                       | Inline in workflow.json     |
+| Option                   | When to Use                                           | Deployment                  |
+| ------------------------ | ----------------------------------------------------- | --------------------------- |
+| .NET Local Function      | Complex DataWeave, Java logic port, custom transforms | In-process with Logic Apps  |
+| Azure Function           | External HTTP services, long-running operations       | Separate Azure Function app |
+| Inline Code (JavaScript) | Simple string/JSON manipulation                       | Inline in workflow.json     |
 
 ### Custom Code Migration Matrix
 
-| MuleSoft Source                    | Logic Apps Target                        | Notes                                    |
-| ---------------------------------- | ---------------------------------------- | ---------------------------------------- |
-| Custom Java class                  | .NET local function                      | Port Java business logic to C#           |
-| Custom Mule module                 | .NET local function or Azure Function    | Depends on complexity                    |
-| DataWeave script (simple)          | Liquid template                          | Field mapping, simple transforms         |
-| DataWeave script (complex)         | .NET local function                      | reduce, groupBy, custom functions        |
-| MEL expression (simple)            | Workflow expression                      | Direct expression conversion             |
-| MEL expression (Java interop)      | .NET local function                      | Java → C# translation needed             |
-| Custom transformer                 | .NET local function                      | Port transformation logic to C#          |
-| Custom message processor           | .NET local function                      | Port processor logic to C#               |
-| Custom policy                      | Azure API Management policy              | API-level concerns move to APIM          |
+| MuleSoft Source               | Logic Apps Target                     | Notes                             |
+| ----------------------------- | ------------------------------------- | --------------------------------- |
+| Custom Java class             | .NET local function                   | Port Java business logic to C#    |
+| Custom Mule module            | .NET local function or Azure Function | Depends on complexity             |
+| DataWeave script (simple)     | Liquid template                       | Field mapping, simple transforms  |
+| DataWeave script (complex)    | .NET local function                   | reduce, groupBy, custom functions |
+| MEL expression (simple)       | Workflow expression                   | Direct expression conversion      |
+| MEL expression (Java interop) | .NET local function                   | Java → C# translation needed      |
+| Custom transformer            | .NET local function                   | Port transformation logic to C#   |
+| Custom message processor      | .NET local function                   | Port processor logic to C#        |
+| Custom policy                 | Azure API Management policy           | API-level concerns move to APIM   |
 
 ---
 
 ## Platform Feature Mappings
 
-| MuleSoft Feature                | Logic Apps Standard Equivalent                     | Notes                                    |
-| ------------------------------- | -------------------------------------------------- | ---------------------------------------- |
-| Anypoint Platform (Management)  | Azure Portal + Logic Apps blade                    | Monitoring, deployment, configuration    |
-| Anypoint API Manager            | Azure API Management                               | API policies, rate limiting, analytics   |
-| Anypoint Exchange               | Azure API Center / custom catalog                  | API/connector catalog                    |
-| Anypoint MQ                     | Azure Service Bus                                  | Cloud messaging                          |
-| Object Store V2                 | Azure Table Storage / Azure Cache for Redis        | Key-value persistence                    |
-| CloudHub (runtime)              | Logic Apps Standard (App Service plan)             | Hosting and scaling                      |
-| CloudHub Auto-scaling           | App Service plan auto-scale rules                  | Scale based on metrics                   |
-| CloudHub VPC                    | Azure VNet integration                             | Network isolation                        |
-| CloudHub DLB                    | Azure Application Gateway / Front Door             | Load balancing                           |
-| Mule Agents (monitoring)        | Application Insights                               | Telemetry, logging, alerting             |
-| MUnit (testing)                 | Logic Apps local testing + curl/PowerShell          | Test via HTTP triggers locally           |
-| Maven build (pom.xml)           | Not applicable (JSON-based project)                | Logic Apps uses folder structure, not Maven |
-| mule-artifact.json              | host.json + local.settings.json                    | Runtime and project configuration        |
-| application.properties          | local.settings.json (app settings)                 | Configuration values                     |
-| Secure properties               | Azure Key Vault references                         | `@Microsoft.KeyVault(...)` references    |
+| MuleSoft Feature               | Logic Apps Standard Equivalent              | Notes                                       |
+| ------------------------------ | ------------------------------------------- | ------------------------------------------- |
+| Anypoint Platform (Management) | Azure Portal + Logic Apps blade             | Monitoring, deployment, configuration       |
+| Anypoint API Manager           | Azure API Management                        | API policies, rate limiting, analytics      |
+| Anypoint Exchange              | Azure API Center / custom catalog           | API/connector catalog                       |
+| Anypoint MQ                    | Azure Service Bus                           | Cloud messaging                             |
+| Object Store V2                | Azure Table Storage / Azure Cache for Redis | Key-value persistence                       |
+| CloudHub (runtime)             | Logic Apps Standard (App Service plan)      | Hosting and scaling                         |
+| CloudHub Auto-scaling          | App Service plan auto-scale rules           | Scale based on metrics                      |
+| CloudHub VPC                   | Azure VNet integration                      | Network isolation                           |
+| CloudHub DLB                   | Azure Application Gateway / Front Door      | Load balancing                              |
+| Mule Agents (monitoring)       | Application Insights                        | Telemetry, logging, alerting                |
+| MUnit (testing)                | Logic Apps local testing + curl/PowerShell  | Test via HTTP triggers locally              |
+| Maven build (pom.xml)          | Not applicable (JSON-based project)         | Logic Apps uses folder structure, not Maven |
+| mule-artifact.json             | host.json + local.settings.json             | Runtime and project configuration           |
+| application.properties         | local.settings.json (app settings)          | Configuration values                        |
+| Secure properties              | Azure Key Vault references                  | `@Microsoft.KeyVault(...)` references       |
 
 ---
 
 ## Deployment Scope Reference
 
-| Scope      | Description                                           | Examples                                 |
-| ---------- | ----------------------------------------------------- | ---------------------------------------- |
-| Any        | Runs anywhere — on-premises via hybrid, or cloud       | File System, SFTP, FTP, SQL, HTTP, SAP   |
-| Cloud Only | Requires Azure cloud resources                         | Service Bus, Event Hub, Cosmos DB, Blob  |
+| Scope      | Description                                      | Examples                                |
+| ---------- | ------------------------------------------------ | --------------------------------------- |
+| Any        | Runs anywhere — on-premises via hybrid, or cloud | File System, SFTP, FTP, SQL, HTTP, SAP  |
+| Cloud Only | Requires Azure cloud resources                   | Service Bus, Event Hub, Cosmos DB, Blob |
 
 ---
 
 ## Connection Type Reference
 
-| Connection Type         | Format in connections.json                      | Notes                                    |
-| ----------------------- | ----------------------------------------------- | ---------------------------------------- |
-| Service Provider        | `serviceProviderConnections.{name}`             | Built-in, runs in-process                |
-| Managed API             | `managedApiConnections.{name}`                  | Azure-hosted connector instance          |
+| Connection Type  | Format in connections.json          | Notes                           |
+| ---------------- | ----------------------------------- | ------------------------------- |
+| Service Provider | `serviceProviderConnections.{name}` | Built-in, runs in-process       |
+| Managed API      | `managedApiConnections.{name}`      | Azure-hosted connector instance |
 
 ---
 
 ## Quick Lookup: MuleSoft Connector → Logic Apps Connector
 
-| MuleSoft Connector / Processor | Logic Apps Connector      | Service Provider ID                  |
-| ------------------------------ | ------------------------- | ------------------------------------ |
-| http:listener                  | HTTP (Request trigger)    | `/serviceProviders/http`             |
-| http:request                   | HTTP (invokeHttp action)  | `/serviceProviders/http`             |
-| file:connector                 | File System               | `/serviceProviders/fileSystem`       |
-| ftp:connector                  | FTP                       | `/serviceProviders/ftp`              |
-| sftp:connector                 | SFTP                      | `/serviceProviders/sftp`             |
-| db:connector (SQL Server)      | SQL Server                | `/serviceProviders/sql`              |
-| db:connector (MySQL)           | SQL Server (via JDBC)     | `/serviceProviders/sql`              |
-| db:connector (Oracle)          | Oracle Database           | `/serviceProviders/oracledb`         |
-| db:connector (PostgreSQL)      | PostgreSQL                | `/serviceProviders/postgresql`       |
-| jms:connector                  | Azure Service Bus         | `/serviceProviders/serviceBus`       |
-| vm:connector                   | Azure Service Bus         | `/serviceProviders/serviceBus`       |
-| amqp:connector                 | RabbitMQ                  | `/serviceProviders/rabbitmq`         |
-| kafka:connector                | Confluent Kafka           | `/serviceProviders/confluentKafka`   |
-| email:send                     | SMTP                      | `/serviceProviders/Smtp`             |
-| wsc:consumer                   | HTTP (SOAP over HTTP)     | `/serviceProviders/http`             |
-| sap:connector                  | SAP                       | `/serviceProviders/sap`              |
-| ee:transform (DataWeave)       | Compose / Liquid / .NET   | (built-in action)                    |
-| choice                         | Condition / Switch        | (built-in action)                    |
-| scatter-gather                 | Parallel branches         | (built-in action)                    |
-| foreach                        | For Each                  | (built-in action)                    |
-| until-successful               | Until                     | (built-in action)                    |
-| try                            | Scope                     | (built-in action)                    |
-| flow-ref                       | InvokeWorkflow            | (built-in action)                    |
-| set-variable                   | Set Variable              | (built-in action)                    |
-| set-payload                    | Compose                   | (built-in action)                    |
-| logger                         | Compose (tracked props)   | (built-in action)                    |
-| raise-error                    | Terminate                 | (built-in action)                    |
-| scheduler                      | Recurrence trigger        | (built-in trigger)                   |
-| os:store / os:retrieve         | Azure Table Storage       | `/serviceProviders/azureTables`      |
-| validation:*                   | Condition action          | (built-in action)                    |
+| MuleSoft Connector / Processor | Logic Apps Connector     | Service Provider ID                |
+| ------------------------------ | ------------------------ | ---------------------------------- |
+| http:listener                  | HTTP (Request trigger)   | `/serviceProviders/http`           |
+| http:request                   | HTTP (invokeHttp action) | `/serviceProviders/http`           |
+| file:connector                 | File System              | `/serviceProviders/fileSystem`     |
+| ftp:connector                  | FTP                      | `/serviceProviders/ftp`            |
+| sftp:connector                 | SFTP                     | `/serviceProviders/sftp`           |
+| db:connector (SQL Server)      | SQL Server               | `/serviceProviders/sql`            |
+| db:connector (MySQL)           | SQL Server (via JDBC)    | `/serviceProviders/sql`            |
+| db:connector (Oracle)          | Oracle Database          | `/serviceProviders/oracledb`       |
+| db:connector (PostgreSQL)      | PostgreSQL               | `/serviceProviders/postgresql`     |
+| jms:connector                  | Azure Service Bus        | `/serviceProviders/serviceBus`     |
+| vm:connector                   | Azure Service Bus        | `/serviceProviders/serviceBus`     |
+| amqp:connector                 | RabbitMQ                 | `/serviceProviders/rabbitmq`       |
+| kafka:connector                | Confluent Kafka          | `/serviceProviders/confluentKafka` |
+| email:send                     | SMTP                     | `/serviceProviders/Smtp`           |
+| wsc:consumer                   | HTTP (SOAP over HTTP)    | `/serviceProviders/http`           |
+| sap:connector                  | SAP                      | `/serviceProviders/sap`            |
+| ee:transform (DataWeave)       | Compose / Liquid / .NET  | (built-in action)                  |
+| choice                         | Condition / Switch       | (built-in action)                  |
+| scatter-gather                 | Parallel branches        | (built-in action)                  |
+| foreach                        | For Each                 | (built-in action)                  |
+| until-successful               | Until                    | (built-in action)                  |
+| try                            | Scope                    | (built-in action)                  |
+| flow-ref                       | InvokeWorkflow           | (built-in action)                  |
+| set-variable                   | Set Variable             | (built-in action)                  |
+| set-payload                    | Compose                  | (built-in action)                  |
+| logger                         | Compose (tracked props)  | (built-in action)                  |
+| raise-error                    | Terminate                | (built-in action)                  |
+| scheduler                      | Recurrence trigger       | (built-in trigger)                 |
+| os:store / os:retrieve         | Azure Table Storage      | `/serviceProviders/azureTables`    |
+| validation:\*                  | Condition action         | (built-in action)                  |
 
 ---
 
 ## Coverage Summary
 
-| Category                    | MuleSoft Components Covered | Logic Apps Equivalents | Gaps |
-| --------------------------- | --------------------------- | ---------------------- | ---- |
-| File & Storage Connectors   | 3 (file, ftp, sftp)        | 3                      | 0    |
-| Messaging Connectors        | 4 (jms, vm, amqp, kafka)   | 4                      | 0    |
-| Database Connectors         | 1 (db:connector, multi-DB) | 4+ (SQL, Oracle, etc.) | 0    |
-| HTTP / Web Services         | 3 (listener, request, wsc) | 1 (HTTP)               | 0    |
-| Email                       | 1 (email:send)             | 1 (SMTP)               | 0    |
-| ERP                         | 1 (SAP)                    | 1 (SAP)                | 0    |
-| Core Processors             | 7                          | 7                      | 0    |
-| Control Flow                | 7                          | 5 + patterns           | 2    |
-| Data Transformation         | 3 (DataWeave variants)     | 3 (Compose/Liquid/.NET)| 0    |
-| Validation                  | 8                          | 8 (Condition)          | 0    |
-| Error Handling              | 3 patterns                 | 3 patterns             | 0    |
-| Platform Features           | 15                         | 15                     | 0    |
-| **Total**                   | **~56 components**         | **~55 equivalents**    | **2** |
+| Category                  | MuleSoft Components Covered | Logic Apps Equivalents  | Gaps  |
+| ------------------------- | --------------------------- | ----------------------- | ----- |
+| File & Storage Connectors | 3 (file, ftp, sftp)         | 3                       | 0     |
+| Messaging Connectors      | 4 (jms, vm, amqp, kafka)    | 4                       | 0     |
+| Database Connectors       | 1 (db:connector, multi-DB)  | 4+ (SQL, Oracle, etc.)  | 0     |
+| HTTP / Web Services       | 3 (listener, request, wsc)  | 1 (HTTP)                | 0     |
+| Email                     | 1 (email:send)              | 1 (SMTP)                | 0     |
+| ERP                       | 1 (SAP)                     | 1 (SAP)                 | 0     |
+| Core Processors           | 7                           | 7                       | 0     |
+| Control Flow              | 7                           | 5 + patterns            | 2     |
+| Data Transformation       | 3 (DataWeave variants)      | 3 (Compose/Liquid/.NET) | 0     |
+| Validation                | 8                           | 8 (Condition)           | 0     |
+| Error Handling            | 3 patterns                  | 3 patterns              | 0     |
+| Platform Features         | 15                          | 15                      | 0     |
+| **Total**                 | **~56 components**          | **~55 equivalents**     | **2** |

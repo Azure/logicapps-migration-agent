@@ -243,7 +243,7 @@ export class AgentFileProvisioner {
     // Skills
     // -------------------------------------------------------------------------
 
-    private static readonly SKILLS_VERSION = '10.3.0';
+    private static readonly SKILLS_VERSION = '10.10.0';
     private static readonly SKILLS_VERSION_TAG = `<!-- skills v${AgentFileProvisioner.SKILLS_VERSION} -->`;
 
     /**

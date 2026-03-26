@@ -37,6 +37,21 @@ After scaffold, add tasks for:
 - Connections → `{outputLogicAppRoot}/connections.json`
 - Cloud resource provisioning (only for connectors with no local alternative)
 
+**IMPORTANT Integration Account decision rule:**
+
+- For every artifact-related task, the agent MUST explicitly think through whether an Integration Account is required.
+- Use an Integration Account when the design requires Integration Account-only capabilities, especially B2B/EDI scenarios such as X12, EDIFACT, AS2, trading partners, agreements, or centralized shared artifact management.
+- If an Integration Account is used for the flow, then ALL deployable artifacts for that flow must be planned for the Integration Account path/use model consistently.
+- Do NOT split artifacts between Integration Account and the Logic App artifact folders. These two models are mutually exclusive for a given flow plan.
+- If an Integration Account is used, create/provision/configure the Integration Account BEFORE any schema/map/certificate/trading-partner artifact task that depends on it.
+- If an Integration Account is used, the Integration Account provisioning task MUST actually deploy/create the Integration Account resource in Azure in that task itself. It must NOT stop at generating deployment scripts or templates only.
+- That Integration Account provisioning task MUST retrieve the deployed Integration Account resource ID and callback URL, then update `local.settings.json` with `WORKFLOWS_INTEGRATION_ACCOUNT_ID` and `WORKFLOW_INTEGRATION_ACCOUNT_CALLBACK_URL` in that same task.
+- The NEXT Integration Account-related artifact task MUST upload the required schemas/maps/certificates/partners/agreements into the Integration Account itself. Do NOT leave artifact upload implicit or deferred.
+- If the flow does NOT require an Integration Account, then use the Logic App artifact folders only.
+- If an Integration Account is used, the plan MUST also account for the required Logic Apps Standard app settings: `WORKFLOWS_INTEGRATION_ACCOUNT_ID`, with the Integration Account resource ID as its value (example: `/subscriptions/{subId}/resourceGroups/{rg}/providers/Microsoft.Logic/integrationAccounts/{name}`), and `WORKFLOW_INTEGRATION_ACCOUNT_CALLBACK_URL`, with the correct Integration Account callback URL value.
+- Any Integration Account provisioning/configuration task MUST put that app setting requirement directly into its `executionPrompt`, not only in the high-level summary.
+- The task plan MUST make this choice explicit in the artifact task descriptions or execution prompts.
+
 ### 2.3 Runtime Validation (REQUIRED)
 
 - Type: `validate-runtime`

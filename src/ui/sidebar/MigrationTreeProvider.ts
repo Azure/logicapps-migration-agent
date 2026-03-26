@@ -473,24 +473,6 @@ export function registerTreeViewProviders(context: vscode.ExtensionContext): voi
     });
     context.subscriptions.push(homeTreeView);
 
-    const showArtifactInventory = vscode.workspace
-        .getConfiguration('logicAppsMigrationAssistant')
-        .get<boolean>('showArtifactInventory', false);
-
-    // Register inventory tree view (optional)
-    let inventoryProvider: MigrationTreeProvider | undefined;
-    if (showArtifactInventory) {
-        inventoryProvider = MigrationTreeProvider.getInstance('inventory');
-        const inventoryTreeView = vscode.window.createTreeView(
-            'logicAppsMigrationAssistant.inventory',
-            {
-                treeDataProvider: inventoryProvider,
-                showCollapseAll: true,
-            }
-        );
-        context.subscriptions.push(inventoryTreeView);
-    }
-
     // Register actions tree view
     const actionsProvider = MigrationTreeProvider.getInstance('actions');
     const actionsTreeView = vscode.window.createTreeView('logicAppsMigrationAssistant.actions', {
@@ -502,7 +484,6 @@ export function registerTreeViewProviders(context: vscode.ExtensionContext): voi
     const refreshCommand = vscode.commands.registerCommand(
         'logicAppsMigrationAssistant.refreshViews',
         () => {
-            inventoryProvider?.refresh();
             actionsProvider.refresh();
         }
     );

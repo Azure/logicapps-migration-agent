@@ -1703,11 +1703,6 @@
                     "name": "Discovery Results"
                 },
                 {
-                    "id": "logicAppsMigrationAssistant.inventory",
-                    "name": "Artifact Inventory",
-                    "when": "config.logicAppsMigrationAssistant.showArtifactInventory"
-                },
-                {
                     "id": "logicAppsMigrationAssistant.actions",
                     "name": "Actions"
                 }
@@ -1821,11 +1816,6 @@
                     "type": "string",
                     "default": "eastus",
                     "description": "Azure region for provisioning resources"
-                },
-                "logicAppsMigrationAssistant.showArtifactInventory": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Show the Artifact Inventory section in the sidebar"
                 }
             }
         }

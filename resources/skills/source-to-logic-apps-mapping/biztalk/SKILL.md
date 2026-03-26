@@ -67,6 +67,25 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 | Maps / Transforms  | XSLT Map                       | XML Operations → Xslt action                      |
 | Schema Validation  | XML Validator pipeline         | XML Operations → XmlValidation action             |
 
+### When to Use Integration Account
+
+Use an Integration Account only when the target design requires Integration Account-specific capabilities, such as:
+
+- B2B/EDI processing with X12, EDIFACT, or AS2 actions
+- Trading partners, agreements, and partner resolution
+- Shared enterprise artifact management where schemas/maps/partner artifacts are centrally managed outside the workflow project
+
+Do NOT choose Integration Account for ordinary XML/XSLT/schema usage if Logic Apps Standard artifact folders are sufficient.
+
+If Integration Account is chosen:
+
+- use it consistently for the flow's deployable artifacts; do not split artifacts between Integration Account and Logic App artifact folders
+- plan for the required app setting `WORKFLOWS_INTEGRATION_ACCOUNT_ID`
+- plan for the required app setting `WORKFLOW_INTEGRATION_ACCOUNT_CALLBACK_URL`
+- deploy the Integration Account first, then set `WORKFLOWS_INTEGRATION_ACCOUNT_ID` to the deployed Integration Account resource ID, for example `/subscriptions/{subId}/resourceGroups/{rg}/providers/Microsoft.Logic/integrationAccounts/{name}`
+- retrieve the deployed callback URL and set `WORKFLOW_INTEGRATION_ACCOUNT_CALLBACK_URL` to that real value
+- plan a separate follow-on task to upload the required Integration Account artifacts after provisioning
+
 ---
 
 ## Adapter Mappings
@@ -662,12 +681,12 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 #### IBM CICS (TRM Link, TRM User Data, ELM Link, ELM User Data, HTTP Link, HTTP User Data, SNA Link, SNA User Data)
 
-|                         | BizTalk    | Logic Apps Standard                 |
-| ----------------------- | ---------- | ----------------------------------- |
-| **Adapter / Connector** | HostApps   | **IBM CICS**                        |
-| **Service Provider**    | —          | `/serviceProviders/cicsProgramCall` |
-| **Deployment Scope**    | —          | Any                                 |
-| **Category**            | —          | Mainframe                           |
+|                         | BizTalk  | Logic Apps Standard                 |
+| ----------------------- | -------- | ----------------------------------- |
+| **Adapter / Connector** | HostApps | **IBM CICS**                        |
+| **Service Provider**    | —        | `/serviceProviders/cicsProgramCall` |
+| **Deployment Scope**    | —        | Any                                 |
+| **Category**            | —        | Mainframe                           |
 
 | Type   | Operation                   | Description           |
 | ------ | --------------------------- | --------------------- |
@@ -698,12 +717,12 @@ Azure Logic Apps Standard provides built-in **service provider connectors** that
 
 #### IBM Host File (VSAM)
 
-|                         | BizTalk    | Logic Apps Standard          |
-| ----------------------- | ---------- | ---------------------------- |
-| **Adapter / Connector** | HostFiles  | **IBM Host File**            |
-| **Service Provider**    | —          | `/serviceProviders/hostFile` |
-| **Deployment Scope**    | —          | Any                          |
-| **Category**            | —          | Mainframe                    |
+|                         | BizTalk   | Logic Apps Standard          |
+| ----------------------- | --------- | ---------------------------- |
+| **Adapter / Connector** | HostFiles | **IBM Host File**            |
+| **Service Provider**    | —         | `/serviceProviders/hostFile` |
+| **Deployment Scope**    | —         | Any                          |
+| **Category**            | —         | Mainframe                    |
 
 | Type   | Operation               | Description                 |
 | ------ | ----------------------- | --------------------------- |
@@ -1123,15 +1142,15 @@ BizTalk heavily relies on custom .NET code: helper classes called from orchestra
 
 ### Custom Code Options in Logic Apps Standard
 
-| Option                                  | Description                                                                                                                             | Runs                               | Best For                                                                                                                                                                                     |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **C# Inline Code Action**               | Execute C# script code directly within the workflow using the "Execute CSharp Script Code" action. No separate function project needed. | In-process (same App Service Plan) | Complex BizTalk expressions that can't be done in WDL: multi-line logic, regex, loops, try/catch, string parsing, type conversions. **Primary replacement for complex XLANG/s expressions.** |
-| **Custom Code Action (Local Function)** | Write C#/.NET code as a local function within the Logic App project. Invoked as a workflow action.                                      | In-process (same App Service Plan) | Replacing BizTalk helper classes, custom pipeline components, heavy-duty transforms, encryption, external SDK calls.                                                                         |
-| **Inline Code Action (JavaScript)**     | Execute inline JavaScript snippets directly in the workflow.                                                                            | In-process                         | Simple transformations, string manipulation, quick calculations.                                                                                                                             |
-| **Powershell Inline Code Action**               | Execute Powershell script code directly within the workflow using the "Execute Powershell Code" action. No separate function project needed. | In-process (same App Service Plan) | **Primary replacement for third party Powershell adapters.** |
-| **Workflow Expression Functions**       | Built-in WDL function library (300+ functions).                                                                                         | Inline (no action needed)          | String ops, math, date/time, collection ops, type conversion.                                                                                                                                |
-| **XSLT with Inline Scripts**            | XSLT maps with embedded `<msxsl:script>` blocks (C# or VB).                                                                             | In-process                         | Complex map logic that needs procedural code within a transform.                                                                                                                             |
-| **NuGet Package References**            | Reference NuGet packages in the Logic App project for use in local functions.                                                           | In-process                         | Reusing existing .NET libraries (encryption, parsing, SDKs).                                                                                                                                 |
+| Option                                  | Description                                                                                                                                  | Runs                               | Best For                                                                                                                                                                                     |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **C# Inline Code Action**               | Execute C# script code directly within the workflow using the "Execute CSharp Script Code" action. No separate function project needed.      | In-process (same App Service Plan) | Complex BizTalk expressions that can't be done in WDL: multi-line logic, regex, loops, try/catch, string parsing, type conversions. **Primary replacement for complex XLANG/s expressions.** |
+| **Custom Code Action (Local Function)** | Write C#/.NET code as a local function within the Logic App project. Invoked as a workflow action.                                           | In-process (same App Service Plan) | Replacing BizTalk helper classes, custom pipeline components, heavy-duty transforms, encryption, external SDK calls.                                                                         |
+| **Inline Code Action (JavaScript)**     | Execute inline JavaScript snippets directly in the workflow.                                                                                 | In-process                         | Simple transformations, string manipulation, quick calculations.                                                                                                                             |
+| **Powershell Inline Code Action**       | Execute Powershell script code directly within the workflow using the "Execute Powershell Code" action. No separate function project needed. | In-process (same App Service Plan) | **Primary replacement for third party Powershell adapters.**                                                                                                                                 |
+| **Workflow Expression Functions**       | Built-in WDL function library (300+ functions).                                                                                              | Inline (no action needed)          | String ops, math, date/time, collection ops, type conversion.                                                                                                                                |
+| **XSLT with Inline Scripts**            | XSLT maps with embedded `<msxsl:script>` blocks (C# or VB).                                                                                  | In-process                         | Complex map logic that needs procedural code within a transform.                                                                                                                             |
+| **NuGet Package References**            | Reference NuGet packages in the Logic App project for use in local functions.                                                                | In-process                         | Reusing existing .NET libraries (encryption, parsing, SDKs).                                                                                                                                 |
 
 ### Custom Code Migration Matrix
 
@@ -1277,48 +1296,48 @@ public class MessageHelper
 
 Alphabetical index for fast reference:
 
-| BizTalk Adapter                     | Logic Apps Connector |
-| ----------------------------------- | -------------------- |
-| AS2                                 | AS2                  |
-| AzureBlob / AzureBlobStorage        | Azure Blob Storage   |
-| AzureEventHub / EventHub            | Azure Event Hub      |
-| AzureTable / AzureTableStorage      | Azure Table Storage  |
-| BAPI / SAPERP / SapErp              | SAP ERP              |
-| HostApps (CICS)                     | IBM CICS             |
-| CosmosDb / CosmosDB / AzureCosmosDB | Azure Cosmos DB      |
-| DB2 / Db2                           | IBM Db2              |
-| EDIFACT                             | EDIFACT              |
-| ExchangeOnlineEmail                 | SMTP                 |
-| FILE / FileSystem                   | File System          |
-| FTP / Ftp                           | FTP                  |
-| GmailEmail                          | SMTP                 |
-| HL7 (transport)                     | MLLP (HL7)           |
-| HostFiles                           | IBM Host File        |
-| HTTP / Http                         | HTTP                 |
-| HostApps (IMS)                      | IBM IMS              |
-| Informix                            | IBM Informix         |
-| Kafka / ConfluentKafka              | Confluent Kafka      |
-| KeyVault / AzureKeyVault            | Azure Key Vault      |
-| MLLP / Mllp                         | MLLP (HL7)           |
-| MQ / IbmMq / MQSeries               | IBM MQ               |
-| MSMQ / NetMsmq                      | Azure Service Bus/RabbitMQ    |
-| ODP.NET / OracleDb / OracleDatabase | Oracle Database      |
-| OutlookEmail                        | SMTP                 |
-| SAP / WCF-SAP                       | SAP                  |
-| SB / ServiceBus                     | Azure Service Bus    |
-| SFTP / Sftp                         | SFTP                 |
-| SMTP / Smtp                         | SMTP                 |
-| SOAP                                | HTTP                 |
-| SQL / Sql                           | SQL Server           |
-| SWIFT                               | SWIFT                |
-| VSAM / Vsam                         | IBM Host File        |
-| WCF-BasicHttp                       | HTTP                 |
-| WCF-Custom                          | HTTP                 |
-| WCF-CustomIsolated                  | HTTP                 |
-| WCF-NetTcp                          | HTTP                 |
-| WCF-SQL                             | SQL Server           |
-| WCF-WSHttp                          | HTTP                 |
-| X12                                 | X12                  |
+| BizTalk Adapter                     | Logic Apps Connector       |
+| ----------------------------------- | -------------------------- |
+| AS2                                 | AS2                        |
+| AzureBlob / AzureBlobStorage        | Azure Blob Storage         |
+| AzureEventHub / EventHub            | Azure Event Hub            |
+| AzureTable / AzureTableStorage      | Azure Table Storage        |
+| BAPI / SAPERP / SapErp              | SAP ERP                    |
+| HostApps (CICS)                     | IBM CICS                   |
+| CosmosDb / CosmosDB / AzureCosmosDB | Azure Cosmos DB            |
+| DB2 / Db2                           | IBM Db2                    |
+| EDIFACT                             | EDIFACT                    |
+| ExchangeOnlineEmail                 | SMTP                       |
+| FILE / FileSystem                   | File System                |
+| FTP / Ftp                           | FTP                        |
+| GmailEmail                          | SMTP                       |
+| HL7 (transport)                     | MLLP (HL7)                 |
+| HostFiles                           | IBM Host File              |
+| HTTP / Http                         | HTTP                       |
+| HostApps (IMS)                      | IBM IMS                    |
+| Informix                            | IBM Informix               |
+| Kafka / ConfluentKafka              | Confluent Kafka            |
+| KeyVault / AzureKeyVault            | Azure Key Vault            |
+| MLLP / Mllp                         | MLLP (HL7)                 |
+| MQ / IbmMq / MQSeries               | IBM MQ                     |
+| MSMQ / NetMsmq                      | Azure Service Bus/RabbitMQ |
+| ODP.NET / OracleDb / OracleDatabase | Oracle Database            |
+| OutlookEmail                        | SMTP                       |
+| SAP / WCF-SAP                       | SAP                        |
+| SB / ServiceBus                     | Azure Service Bus          |
+| SFTP / Sftp                         | SFTP                       |
+| SMTP / Smtp                         | SMTP                       |
+| SOAP                                | HTTP                       |
+| SQL / Sql                           | SQL Server                 |
+| SWIFT                               | SWIFT                      |
+| VSAM / Vsam                         | IBM Host File              |
+| WCF-BasicHttp                       | HTTP                       |
+| WCF-Custom                          | HTTP                       |
+| WCF-CustomIsolated                  | HTTP                       |
+| WCF-NetTcp                          | HTTP                       |
+| WCF-SQL                             | SQL Server                 |
+| WCF-WSHttp                          | HTTP                       |
+| X12                                 | X12                        |
 
 ### Additional Adapters (Not in Registry)
 

@@ -79,11 +79,17 @@ After provisioning cloud resources, retrieve the connection string and UPDATE `l
 
 If ANY workflow uses X12/EDIFACT/AS2 encode/decode actions:
 
-- Provision an Integration Account with trading partners and agreements.
+- Provision and deploy the Integration Account with trading partners and agreements in Azure before any Integration Account artifact upload task.
 - Add to `local.settings.json`:
     - `WORKFLOWS_SUBSCRIPTION_ID`
     - `WORKFLOWS_TENANT_ID`
     - `WORKFLOWS_RESOURCE_GROUP_NAME`
     - `WORKFLOWS_LOCATION_NAME`
     - `WORKFLOWS_MANAGEMENT_BASE_URI`
-- Schemas and XSLT maps go in LOCAL `Artifacts/Schemas/` and `Artifacts/Maps/` folders — NOT uploaded to Integration Account.
+- Retrieve the deployed Integration Account resource ID and add `WORKFLOWS_INTEGRATION_ACCOUNT_ID` with that value.
+- Retrieve the deployed Integration Account callback URL and add `WORKFLOW_INTEGRATION_ACCOUNT_CALLBACK_URL` with that value.
+- The provisioning task itself must update `local.settings.json` with those real deployed values.
+- In the NEXT Integration Account artifact task, upload the required schemas/maps/certificates/partners/agreements into the Integration Account.
+- If this flow chooses the Integration Account model, schemas/maps/certificates/partner artifacts for that flow must be uploaded and managed through the Integration Account path consistently.
+- Do NOT split the same flow between Integration Account artifacts and local `Artifacts/Schemas/` / `Artifacts/Maps/` folders.
+- Use local `Artifacts/Schemas/` and `Artifacts/Maps/` folders only when the flow does NOT choose the Integration Account model.

@@ -4249,6 +4249,7 @@ class ConversionStoreTaskPlanTool implements vscode.LanguageModelTool<Conversion
                     (t.executionPrompt && t.executionPrompt.trim().length > 0
                         ? t.executionPrompt
                         : rawDescription) || 'Execute this task as planned.';
+
                 const description = summarizeForCard(rawDescription || executionPrompt);
 
                 return {
@@ -4450,6 +4451,9 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
         }
 
         if (task && (task.type === 'test-workflows' || task.type === 'test-workflow')) {
+            const normalizedGeneratedFiles = (generatedFiles || []).map((f) =>
+                (f || '').replace(/\\/g, '/').toLowerCase()
+            );
             // Get all workflow names from the task plan
             const workflowTasks =
                 taskPlan?.tasks.filter(
@@ -4489,6 +4493,12 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                 summaryLower.includes('all paths') ||
                 summaryLower.includes('scenario');
 
+            const hasTestReportEvidence =
+                summaryLower.includes('test-report.md') ||
+                summaryLower.includes('test report') ||
+                normalizedGeneratedFiles.some((f) => f.endsWith('/test-report.md')) ||
+                normalizedGeneratedFiles.some((f) => f === 'test-report.md');
+
             if (!hasTestResults) {
                 logger.warn(
                     `[LMTool] migration_conversion_storeTaskOutput: REJECTED test-workflows task — summary does not contain test results`
@@ -4525,6 +4535,21 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                                 '(4) Resubmission path — if the flow supports resubmission, test the full resubmit cycle. ' +
                                 'Include the word "error path", "scenario", "invalid", "chain", or "all paths" in your summary to confirm multi-path coverage. ' +
                                 'Report EACH test scenario: name, input, expected outcome, actual outcome (Pass/Fail), and any fixes applied.',
+                        })
+                    ),
+                ]);
+            }
+
+            if (!hasTestReportEvidence) {
+                logger.warn(
+                    `[LMTool] migration_conversion_storeTaskOutput: REJECTED test-workflows — TEST-REPORT.md evidence missing`
+                );
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({
+                            error:
+                                'REJECTED: Local end-to-end testing is not complete until TEST-REPORT.md is generated in the project root. ' +
+                                'Generate TEST-REPORT.md, include it in generatedFiles when possible, and mention it in the summary before storing task output.',
                         })
                     ),
                 ]);
@@ -4633,6 +4658,9 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
         // This task is optional and only executed when the user explicitly clicks Execute.
         // The agent should always deploy and test — never skip on its own.
         if (task && (task.type === 'cloud-deploy-test' || task.type === 'cloud-deployment-test')) {
+            const normalizedGeneratedFiles = (generatedFiles || []).map((f) =>
+                (f || '').replace(/\\/g, '/').toLowerCase()
+            );
             const hasCloudDeployment =
                 summaryLower.includes('deployed') ||
                 summaryLower.includes('logicapp') ||
@@ -4641,6 +4669,11 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                 summaryLower.includes('cloud test') ||
                 summaryLower.includes('arm') ||
                 summaryLower.includes('bicep');
+            const hasCloudReportEvidence =
+                summaryLower.includes('cloud-test-report.md') ||
+                summaryLower.includes('cloud test report') ||
+                normalizedGeneratedFiles.some((f) => f.endsWith('/cloud-test-report.md')) ||
+                normalizedGeneratedFiles.some((f) => f === 'cloud-test-report.md');
 
             if (!hasCloudDeployment) {
                 logger.warn(
@@ -4654,6 +4687,21 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                                 'You must deploy the project to Azure and run tests. Include proof of Azure deployment ' +
                                 'using ARM/Bicep template (NOT zip deploy) and cloud test results in the summary. ' +
                                 'Generate CLOUD-TEST-REPORT.md with deployment details and test results.',
+                        })
+                    ),
+                ]);
+            }
+
+            if (!hasCloudReportEvidence) {
+                logger.warn(
+                    `[LMTool] migration_conversion_storeTaskOutput: REJECTED cloud-deploy-test — CLOUD-TEST-REPORT.md evidence missing`
+                );
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({
+                            error:
+                                'REJECTED: Cloud deployment/testing is not complete until CLOUD-TEST-REPORT.md is generated. ' +
+                                'Generate CLOUD-TEST-REPORT.md, include it in generatedFiles when possible, and mention it in the summary before storing task output.',
                         })
                     ),
                 ]);
