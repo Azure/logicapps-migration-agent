@@ -40,6 +40,21 @@ If a workflow fails, fix the issue and re-test until all scenarios pass.
 
 ---
 
+## 2a. Output Content Validation
+
+Workflow completion (status = Succeeded) is NOT sufficient. For every output produced during E2E testing, perform **field-level content validation**:
+
+1. **Parse every output file/message** — read the actual XML/JSON content produced by each workflow action that writes to an external destination (file, HTTP response, queue message).
+2. **Verify non-empty fields** — every element/property that should carry a value from the source message MUST be non-empty. Flag any empty elements that should contain propagated data.
+3. **Verify value propagation** — trace key business fields (IDs, amounts, dates, counts) from input through every transformation to output. Confirm the correct value appears at each stage.
+4. **Verify constant/static values** — check that hardcoded values (status codes, acknowledgment strings, booleans) match the expected constants from the source orchestration logic.
+5. **Verify collection preservation** — if the source message contains repeating elements (arrays/lists), confirm all items survive through mass-copy/pass-through transforms (not just the first item).
+6. **Compare against source behavior** — determine what the source platform (BizTalk, MuleSoft, TIBCO, etc.) would produce for the same input, and verify the migrated Logic App produces semantically equivalent output.
+
+If any field is empty, truncated, or contains the wrong value, treat it as a **test failure** even if the workflow status is Succeeded. Fix the root cause (wrong action input, incorrect XSLT XPath, missing mapping) and re-test.
+
+---
+
 ## 3. Test Adaptation Rules
 
 - NEVER skip tests due to long delays, timers, retry intervals, or timeouts.
@@ -78,6 +93,7 @@ After testing, generate `TEST-REPORT.md` in the project root with:
 - This report is MANDATORY. Do NOT consider the local testing task complete until `TEST-REPORT.md` has been created and populated.
 
 - Test results per workflow.
+- **Output content validation results** — for each workflow, list fields checked, values found, and pass/fail per field. Flag any empty/wrong values.
 - Azure resources provisioned.
 - Adjustments made during testing.
 - Design deviations from plan (should be none — see plan adherence).

@@ -2,7 +2,7 @@
     "name": "logicapps-migration-assistant",
     "displayName": "Logic Apps Migration Assistant",
     "description": "Migrate BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard with AI-powered assistance",
-    "version": "1.5.12",
+    "version": "1.5.13",
     "publisher": "microsoft",
     "license": "MIT",
     "engines": {
@@ -1680,6 +1680,11 @@
             {
                 "command": "logicAppsMigrationAssistant.executeAllConversionTasks",
                 "title": "Execute All Conversion Tasks",
+                "category": "Logic Apps Migration Assistant"
+            },
+            {
+                "command": "logicAppsMigrationAssistant.executeBlackBoxTest",
+                "title": "Execute Black Box Test",
                 "category": "Logic Apps Migration Assistant"
             }
         ],

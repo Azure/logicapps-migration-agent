@@ -4264,7 +4264,10 @@ class ConversionStoreTaskPlanTool implements vscode.LanguageModelTool<Conversion
                     status: 'pending' as const,
                     artifactIds: t.artifactIds,
                     estimatedMinutes: t.estimatedMinutes,
-                    optional: t.type === 'cloud-deploy-test' || t.type === 'cloud-deployment-test',
+                    optional:
+                        t.type === 'cloud-deploy-test' ||
+                        t.type === 'cloud-deployment-test' ||
+                        t.type === 'local-blackbox-test',
                 };
             });
 
@@ -4703,6 +4706,61 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                             error:
                                 'REJECTED: Cloud deployment/testing is not complete until CLOUD-TEST-REPORT.md is generated. ' +
                                 'Generate CLOUD-TEST-REPORT.md, include it in generatedFiles when possible, and mention it in the summary before storing task output.',
+                        })
+                    ),
+                ]);
+            }
+        }
+
+        // Enforce local black box testing completeness — BLACKBOX-TEST-REPORT.md is mandatory
+        // Also reject agent self-skips: this task requires user-provided test data via folder picker.
+        if (task && task.type === 'local-blackbox-test') {
+            const isAgentSelfSkip =
+                summaryLower.includes('skipped') ||
+                summaryLower.includes('not required') ||
+                summaryLower.includes('not needed') ||
+                summaryLower.includes('no test data') ||
+                summaryLower.includes('optional task');
+
+            if (isAgentSelfSkip) {
+                logger.warn(
+                    `[LMTool] migration_conversion_storeTaskOutput: REJECTED local-blackbox-test — agent cannot self-skip this task`
+                );
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({
+                            error:
+                                'REJECTED: You cannot skip the local black box testing task. ' +
+                                'This task is executed by the user via the UI with a test data folder selection. ' +
+                                'Do NOT attempt to execute or skip this task — it is handled separately by the extension. ' +
+                                'Move on to the next non-optional task or call migration_conversion_finalize if all required tasks are done.',
+                        })
+                    ),
+                ]);
+            }
+
+            const normalizedGeneratedFiles = (generatedFiles || []).map((f) =>
+                (f || '').replace(/\\/g, '/').toLowerCase()
+            );
+            const hasBlackBoxReportEvidence =
+                summaryLower.includes('blackbox-test-report.md') ||
+                summaryLower.includes('blackbox test report') ||
+                summaryLower.includes('black box test report') ||
+                normalizedGeneratedFiles.some((f) => f.endsWith('/blackbox-test-report.md')) ||
+                normalizedGeneratedFiles.some((f) => f === 'blackbox-test-report.md');
+
+            if (!hasBlackBoxReportEvidence) {
+                logger.warn(
+                    `[LMTool] migration_conversion_storeTaskOutput: REJECTED local-blackbox-test — BLACKBOX-TEST-REPORT.md evidence missing`
+                );
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({
+                            error:
+                                'REJECTED: Local black box testing is not complete until BLACKBOX-TEST-REPORT.md is generated in the project root. ' +
+                                'The report must include: test date, flow name, per-test-case results (input file, expected output, actual result, pass/fail, mismatch details), ' +
+                                'and a summary table with total/passed/failed counts. ' +
+                                'Generate BLACKBOX-TEST-REPORT.md, include it in generatedFiles, and mention it in the summary before storing task output.',
                         })
                     ),
                 ]);

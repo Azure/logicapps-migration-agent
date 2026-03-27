@@ -152,6 +152,11 @@ export class CommandRegistry implements vscode.Disposable {
                 handler: this.handleExecuteAllConversionTasks.bind(this),
                 title: 'Execute All Conversion Tasks',
             },
+            {
+                id: 'logicAppsMigrationAssistant.executeBlackBoxTest',
+                handler: this.handleExecuteBlackBoxTest.bind(this),
+                title: 'Execute Black Box Test',
+            },
         ];
 
         for (const command of commands) {
@@ -1424,6 +1429,148 @@ export class CommandRegistry implements vscode.Disposable {
             );
             vscode.window.showErrorMessage(
                 UserPrompts.failedToStartConversion(
+                    err instanceof Error ? err.message : String(err)
+                )
+            );
+        }
+    }
+
+    /**
+     * Handle executing a local black box test task.
+     * Prompts the user to select a test data folder, then opens the
+     * @migration-converter agent chat with the test instructions.
+     */
+    private async handleExecuteBlackBoxTest(flowId?: string, taskId?: string): Promise<void> {
+        const logger = LoggingService.getInstance();
+
+        if (!flowId || !taskId) {
+            vscode.window.showWarningMessage(UserPrompts.NO_FLOW_OR_TASK_SPECIFIED);
+            return;
+        }
+
+        logger.info(`[Conversion] handleExecuteBlackBoxTest: flow=${flowId} task=${taskId}`);
+
+        const conversionService = ConversionService.getInstance();
+        const taskPlan = conversionService.getTaskPlan(flowId);
+
+        if (!taskPlan) {
+            vscode.window.showWarningMessage(UserPrompts.NO_TASK_PLAN_FOUND);
+            return;
+        }
+
+        const task = taskPlan.tasks.find((t) => t.id === taskId);
+        if (!task) {
+            vscode.window.showWarningMessage(UserPrompts.taskNotFound(taskId));
+            return;
+        }
+
+        // Check dependencies
+        const unmetDeps = task.dependsOn.filter((depId) => {
+            const dep = taskPlan.tasks.find((t) => t.id === depId);
+            return !dep || (dep.status !== 'completed' && dep.status !== 'skipped');
+        });
+        if (unmetDeps.length > 0) {
+            vscode.window.showWarningMessage(
+                UserPrompts.cannotExecuteTaskWaiting(task.name, unmetDeps.join(', '))
+            );
+            return;
+        }
+
+        // Prompt user to select the test data folder
+        const folderUris = await vscode.window.showOpenDialog({
+            canSelectFiles: false,
+            canSelectFolders: true,
+            canSelectMany: false,
+            openLabel: 'Select Test Data Folder',
+            title: 'Select the folder containing TEST-INSTRUCTIONS.md and input/output test files',
+        });
+
+        if (!folderUris || folderUris.length === 0) {
+            logger.info('[Conversion] Black box test cancelled — no folder selected');
+            return;
+        }
+
+        const testDataFolder = folderUris[0].fsPath;
+        logger.info(`[Conversion] Black box test data folder: ${testDataFolder}`);
+
+        // Validate that TEST-INSTRUCTIONS.md exists in the selected folder
+        const fs = await import('fs');
+        const pathMod = await import('path');
+        const instructionsPath = pathMod.join(testDataFolder, 'TEST-INSTRUCTIONS.md');
+        if (!fs.existsSync(instructionsPath)) {
+            logger.warn(
+                `[Conversion] Black box test failed — TEST-INSTRUCTIONS.md not found in: ${testDataFolder}`
+            );
+            vscode.window.showErrorMessage(
+                `The selected folder does not contain a TEST-INSTRUCTIONS.md file. Please select a folder that includes TEST-INSTRUCTIONS.md with test instructions and input/output test files.`
+            );
+            return;
+        }
+
+        // Mark task as in-progress
+        await conversionService.updateTask(flowId, taskId, { status: 'in-progress' });
+
+        // Ensure agent files are provisioned
+        try {
+            const stateManager = StateManager.getInstance();
+            const projectPath = stateManager.getState().projectPath;
+            if (projectPath) {
+                await AgentFileProvisioner.getInstance().provision(projectPath);
+            }
+        } catch (err) {
+            logger.warn(
+                `[Conversion] Failed to provision agent files: ${err instanceof Error ? err.message : String(err)}`
+            );
+        }
+
+        // Build context about completed tasks
+        const completedTasks = taskPlan.tasks
+            .filter((t) => t.status === 'completed' && t.output)
+            .map(
+                (t) =>
+                    `- ${t.name}: ${t.output?.summary ?? ''}${t.output?.generatedFiles?.length ? ' (files: ' + t.output.generatedFiles.join(', ') + ')' : ''}`
+            )
+            .join('\n');
+
+        const completedContext = completedTasks
+            ? `\nAlready completed tasks:\n${completedTasks}\n`
+            : '';
+
+        const taskExecutionPrompt = task.executionPrompt || task.description;
+        const outputProjectName = taskPlan.flowName
+            .replace(/[^a-zA-Z0-9_-]/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '');
+        const outputProjectRoot = `out/${outputProjectName}`;
+        const outputLogicAppName = `${outputProjectName}-logicapp`;
+        const outputLogicAppRoot = `${outputProjectRoot}/${outputLogicAppName}`;
+
+        try {
+            await vscode.commands.executeCommand('workbench.action.chat.open', {
+                mode: 'agent',
+                query: ChatPrompts.executeBlackBoxTest({
+                    taskName: task.name,
+                    taskId: taskId as string,
+                    flowName: taskPlan.flowName,
+                    flowId: flowId as string,
+                    taskDescription: task.description,
+                    taskExecutionPrompt,
+                    taskOrder: task.order,
+                    taskDependsOn: task.dependsOn.length > 0 ? task.dependsOn.join(', ') : 'none',
+                    completedContext,
+                    outputProjectRoot,
+                    outputLogicAppRoot,
+                    testDataFolder,
+                }),
+            });
+            logger.info(`[Conversion] Black box test agent chat opened for task: ${taskId}`);
+        } catch (err) {
+            await conversionService.updateTask(flowId, taskId, { status: 'pending' });
+            logger.error(
+                `[Conversion] Failed to open agent chat for black box test: ${err instanceof Error ? err.message : String(err)}`
+            );
+            vscode.window.showErrorMessage(
+                UserPrompts.failedToStartTaskExecution(
                     err instanceof Error ? err.message : String(err)
                 )
             );

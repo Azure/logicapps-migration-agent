@@ -316,6 +316,36 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                 break;
             }
 
+            case 'executeBlackBoxTest': {
+                const bbPayload = message.data as { flowId: string; taskId: string };
+                if (bbPayload?.flowId && bbPayload?.taskId) {
+                    this.logger.info(
+                        `Black box test requested: flow=${bbPayload.flowId} task=${bbPayload.taskId}`
+                    );
+                    vscode.commands
+                        .executeCommand(
+                            'logicAppsMigrationAssistant.executeBlackBoxTest',
+                            bbPayload.flowId,
+                            bbPayload.taskId
+                        )
+                        .then(
+                            () =>
+                                this.logger.info(
+                                    `Black box test command completed: ${bbPayload.taskId}`
+                                ),
+                            (err) => {
+                                this.logger.error(
+                                    `Black box test command failed: ${bbPayload.taskId} — ${err}`
+                                );
+                                vscode.window.showErrorMessage(
+                                    UserPrompts.failedToExecuteTask(err)
+                                );
+                            }
+                        );
+                }
+                break;
+            }
+
             case 'convertAll': {
                 const flowId = message.data as string;
                 if (flowId) {
@@ -906,6 +936,10 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             vscode.postMessage({ command: 'executeTask', data: { flowId, taskId } });
         }
 
+        function executeBlackBoxTest(flowId, taskId) {
+            vscode.postMessage({ command: 'executeBlackBoxTest', data: { flowId, taskId } });
+        }
+
         function skipTask(flowId, taskId) {
             vscode.postMessage({ command: 'skipTask', data: { flowId, taskId } });
         }
@@ -1010,16 +1044,25 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                 let taskActionHtml = '';
                 // Optional tasks remain actionable even during Execute All (since they're excluded from it)
                 const effectiveFlowBusy = flowBusy && !task.optional;
+                const isBlackBoxTest = task.type === 'local-blackbox-test';
                 const skipBtnHtml =
                     task.optional && canExecute && !effectiveFlowBusy
                         ? ` <button class="btn btn-sm btn-secondary task-action-btn" onclick="skipTask('${this.escapeHtml(plan.flowId)}', '${this.escapeHtml(task.id)}')" title="Skip this optional task">⏭ Skip</button>`
                         : '';
                 if (canExecute && !effectiveFlowBusy) {
-                    taskActionHtml = `<button class="btn btn-sm btn-primary task-action-btn" onclick="executeTask('${this.escapeHtml(plan.flowId)}', '${this.escapeHtml(task.id)}')" title="Execute this conversion task">▶ Execute</button>${skipBtnHtml}`;
+                    if (isBlackBoxTest) {
+                        taskActionHtml = `<button class="btn btn-sm btn-primary task-action-btn" onclick="executeBlackBoxTest('${this.escapeHtml(plan.flowId)}', '${this.escapeHtml(task.id)}')" title="Select test data folder and run black box tests">📂 Select Test Data & Execute</button>${skipBtnHtml}`;
+                    } else {
+                        taskActionHtml = `<button class="btn btn-sm btn-primary task-action-btn" onclick="executeTask('${this.escapeHtml(plan.flowId)}', '${this.escapeHtml(task.id)}')" title="Execute this conversion task">▶ Execute</button>${skipBtnHtml}`;
+                    }
                 } else if (isRunning || (canExecute && effectiveFlowBusy)) {
                     taskActionHtml = `<button class="btn btn-sm btn-disabled task-action-btn" disabled>Executing...</button>`;
                 } else if (isDone) {
-                    taskActionHtml = `<span class="task-done-label">✓ Done</span> <button class="btn btn-sm btn-outline" onclick="executeTask('${this.escapeHtml(plan.flowId)}', '${this.escapeHtml(task.id)}')" title="Re-execute this task" style="margin-left: 4px;">↻ Re-Execute</button>`;
+                    if (isBlackBoxTest) {
+                        taskActionHtml = `<span class="task-done-label">✓ Done</span> <button class="btn btn-sm btn-outline" onclick="executeBlackBoxTest('${this.escapeHtml(plan.flowId)}', '${this.escapeHtml(task.id)}')" title="Re-execute with test data folder" style="margin-left: 4px;">↻ Re-Execute</button>`;
+                    } else {
+                        taskActionHtml = `<span class="task-done-label">✓ Done</span> <button class="btn btn-sm btn-outline" onclick="executeTask('${this.escapeHtml(plan.flowId)}', '${this.escapeHtml(task.id)}')" title="Re-execute this task" style="margin-left: 4px;">↻ Re-Execute</button>`;
+                    }
                 } else {
                     taskActionHtml = `<button class="btn btn-sm btn-disabled task-action-btn" disabled title="Waiting for dependencies: ${task.dependsOn.join(', ')}">▶ Execute</button>`;
                 }

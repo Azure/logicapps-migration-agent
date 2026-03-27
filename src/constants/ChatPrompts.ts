@@ -87,6 +87,21 @@ interface ExecuteAllTasksParams {
     location: string;
 }
 
+interface BlackBoxTestParams {
+    taskName: string;
+    taskId: string;
+    flowName: string;
+    flowId: string;
+    taskDescription: string;
+    taskExecutionPrompt: string;
+    taskOrder: number;
+    taskDependsOn: string;
+    completedContext: string;
+    outputProjectRoot: string;
+    outputLogicAppRoot: string;
+    testDataFolder: string;
+}
+
 interface FlowAnalysisParams {
     flowName: string;
     flowId: string;
@@ -237,7 +252,7 @@ export class ChatPrompts {
             '   c. Call migration_conversion_storeTaskOutput with flowId, taskId, summary, generatedFiles.\n' +
             '   d. Move to the NEXT pending task — do NOT stop.\n' +
             '3. After ALL tasks complete, call migration_conversion_finalize.\n' +
-            'Execute tasks sequentially. Do NOT stop between tasks. Do NOT execute optional tasks (like cloud-deploy-test).\n' +
+            'Execute tasks sequentially. Do NOT stop between tasks. Do NOT execute optional tasks (like local-blackbox-test or cloud-deploy-test).\n' +
             'PLAN ADHERENCE: Do not deviate from the planned design. If a fix requires design changes, STOP and report.'
         );
     }
@@ -264,6 +279,44 @@ export class ChatPrompts {
             '5. Look up every component in skill `source-to-logic-apps-mapping`, then search reference docs with those names.\n' +
             '6. Generate Mermaid architecture diagram per skill `analyse-source-design` rules.\n' +
             `7. Store discovery results in the exact order specified by skill \`analyse-source-design\` (storeMeta → storeArchitecture → storeComponents → storeMessageFlow → storeGaps → storePatterns → storeDependencies → finalize), all with flowId="${params.flowId}".`
+        );
+    }
+
+    // ========================================================================
+    // Execute Black Box Test Task
+    // ========================================================================
+
+    static executeBlackBoxTest(params: BlackBoxTestParams): string {
+        return (
+            `@migration-converter Execute local black box testing task "${params.taskName}" (taskId: "${params.taskId}") ` +
+            `for flow "${params.flowName}" (flowId: "${params.flowId}").\n` +
+            AUTONOMOUS_MODE_SHORT +
+            SKILL_AUTHORITY +
+            GLOBAL_LOOKUP_POLICY +
+            `\nOUTPUT PATHS: Project="${params.outputProjectRoot}/", LogicApp="${params.outputLogicAppRoot}/".\n` +
+            `\nTask details:\n- Type: local-blackbox-test\n- Description: ${params.taskDescription}\n` +
+            `- Execution Prompt: ${params.taskExecutionPrompt}\n- Order: ${params.taskOrder}\n- Dependencies: ${params.taskDependsOn}\n` +
+            `${params.completedContext}` +
+            `\nTEST DATA FOLDER: "${params.testDataFolder}"\n` +
+            '\nPROCEDURE:\n' +
+            `1. Read the file "${params.testDataFolder}/TEST-INSTRUCTIONS.md" to understand the test scenarios and expected behavior.\n` +
+            `2. List and read all input/output files in "${params.testDataFolder}" to understand the test data.\n` +
+            '3. The test instructions may be source-platform-specific (BizTalk, MuleSoft, TIBCO, etc.) — understand them in context of the migrated Logic App.\n' +
+            '4. Ensure the Logic App runtime is running locally (use `func start --verbose` if not already running).\n' +
+            '5. For each test case described in TEST-INSTRUCTIONS.md:\n' +
+            '   a. Send the input payload to the appropriate workflow trigger endpoint.\n' +
+            '   b. Capture the actual output.\n' +
+            '   c. Compare against the expected output file.\n' +
+            '   d. Record pass/fail with details on any mismatches.\n' +
+            '6. Report a summary of all test results (pass/fail counts, specific failures).\n' +
+            `7. Generate a mandatory **BLACKBOX-TEST-REPORT.md** file in the project root ("${params.outputProjectRoot}/BLACKBOX-TEST-REPORT.md") with:\n` +
+            '   - Test execution date and flow name\n' +
+            '   - For each test case: test name, input file, expected output file, actual result, pass/fail status, and mismatch details (if any)\n' +
+            '   - Summary table with total/passed/failed counts\n' +
+            '   - Any environment notes or observations\n' +
+            '   This report is MANDATORY. Do NOT consider the task complete until BLACKBOX-TEST-REPORT.md has been created.\n' +
+            `8. Call migration_conversion_storeTaskOutput with flowId="${params.flowId}", taskId="${params.taskId}", summary of test results, and generatedFiles including BLACKBOX-TEST-REPORT.md.\n` +
+            'Do NOT re-plan or modify the Logic App code — only run the tests and report results.'
         );
     }
 
@@ -314,7 +367,7 @@ export class ChatPrompts {
                 'After calling migration_conversion_storeTaskOutput for this task, ' +
                 'IMMEDIATELY proceed to execute the next pending task in order — ' +
                 'do NOT wait for user input. Continue until all tasks are done, then call migration_conversion_finalize. ' +
-                'NOTE: Optional tasks (like cloud-deploy-test) are NOT included — do NOT execute them. They are handled separately by the user.\n'
+                'NOTE: Optional tasks (like local-blackbox-test or cloud-deploy-test) are NOT included — do NOT execute them. They are handled separately by the user.\n'
             );
         }
         return '\nThis is the LAST task. After calling migration_conversion_storeTaskOutput, call migration_conversion_finalize to complete the flow.\n';
