@@ -162,11 +162,25 @@ When transforming XML documents:
 When constructing XML output documents:
 
 - **FIRST**: Use `XmlCompose` built-in action (XML Operations) to compose XML from structured data. This assembles XML output from structured fields.
+- `XmlCompose` can reference schemas from **either** the local `Artifacts/Schemas/` folder **or** an **Integration Account** — select the source via the `Source` parameter (`LogicApp` or `IntegrationAccount`). If the flow uses the Integration Account model, use `IntegrationAccount` as the source.
 - If the source uses .NET code to build XML (e.g. `XmlDocument`, `XElement`) with complex business logic, use a **.NET local function**.
 - If the output is a simple static template with field substitution, `Compose` is acceptable.
 - Do NOT approximate XML construction with `Compose` + `concat()` when `XmlCompose` or a local function is more appropriate.
 
-### 8.5 JSON Parsing
+### 8.5 EDI Decode Output Handling
+
+> **⚠️ CRITICAL**: The EDIFACT `EdifactDecode` and X12 `X12Decode` built-in actions return **JSON**, not XML. If a downstream action or function expects XML (e.g. `XmlDocument.LoadXml()`), you MUST add an `XmlCompose` action after the decode action to convert the JSON back to XML using the appropriate message schema.
+
+Pattern:
+```
+Decode_EDIFACT (EdifactDecode) → JSON output
+  → Compose_EDIFACT_XML (XmlCompose, Source: IntegrationAccount, Schema: message schema) → XML output
+    → downstream action expecting XML
+```
+
+Do NOT pass the JSON decode output directly to XML-expecting code. Do NOT try to parse the JSON as XML — it will fail with "Data at the root level is invalid".
+
+### 8.6 JSON Parsing
 
 When parsing JSON payloads:
 
@@ -185,7 +199,8 @@ Before storing workflow definitions, cross-check EVERY action against this table
 | XML field extraction        | `XmlParse` action + schema                           | `xpath()` expression when schema exists                |
 | XML validation              | `XmlValidation` action                               | Skip validation or custom code                         |
 | XML transformation          | `Xslt` action + map file                             | `Compose` + string concat                              |
-| XML output assembly         | `XmlCompose` action                                  | `Compose` + `concat()` for XML                         |
+| XML output assembly         | `XmlCompose` action (Source: LogicApp or IntegrationAccount) | `Compose` + `concat()` for XML                         |
+| EDI decode → XML needed     | Add `XmlCompose` after EdifactDecode/X12Decode       | Pass JSON decode output directly to XML-expecting code |
 | Complex XML with .NET logic | .NET local function                                  | `Compose` + `concat()` approximation                   |
 | JSON parsing                | `Parse JSON` action                                  | `json()` expression for structured access              |
 | Array trigger debatching    | `splitOn` on trigger                                 | `For_each` loop wrapping all actions                   |

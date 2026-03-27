@@ -51,6 +51,7 @@ If the flow uses File System connector:
 - Do NOT add `connectionString` or `rootFolder` to the FileSystem connection — they are NOT valid parameters.
 - Use `@appsetting("FileSystem_mountPath")` for the value.
 - Add `FileSystem_mountPath` to `local.settings.json`.
+- For Azure/cloud execution, `FileSystem_mountPath` must NOT be `/home`, `/home/site`, or `/home/site/wwwroot`; use a dedicated non-overlapping path.
 
 ---
 
@@ -90,6 +91,7 @@ If ANY workflow uses X12/EDIFACT/AS2 encode/decode actions:
 - Retrieve the deployed Integration Account callback URL and add `WORKFLOW_INTEGRATION_ACCOUNT_CALLBACK_URL` with that value.
 - The provisioning task itself must update `local.settings.json` with those real deployed values.
 - In the NEXT Integration Account artifact task, upload the required schemas/maps/certificates/partners/agreements into the Integration Account.
+- **CRITICAL — Agreement Schema References**: After uploading schemas AND creating agreements, the agreement's `schemaReferences` array in BOTH `receiveAgreement.protocolSettings` and `sendAgreement.protocolSettings` MUST be populated with references to the uploaded message schemas. An agreement with empty `schemaReferences: []` will cause EdifactDecode/X12Decode actions to fail at runtime with "UnexpectedSegment" errors. For each message type the flow processes, add an entry like `{"messageId": "<messageType>", "schemaVersion": "<version>", "schemaName": "<schemaNameInIA>"}`. Use a PATCH or re-PUT of the agreement after schema upload to add these references.
 - If this flow chooses the Integration Account model, schemas/maps/certificates/partner artifacts for that flow must be uploaded and managed through the Integration Account path consistently.
 - Do NOT split the same flow between Integration Account artifacts and local `Artifacts/Schemas/` / `Artifacts/Maps/` folders.
 - Use local `Artifacts/Schemas/` and `Artifacts/Maps/` folders only when the flow does NOT choose the Integration Account model.

@@ -74,17 +74,6 @@ out/
     │   │   ├── settings.json                    ← Logic App project settings
     │   │   └── tasks.json                       ← Build & run tasks
     │   │
-    │   ├── Artifacts/                           ← Logic App artifacts
-    │   │   ├── Maps/                            ← XSLT/Liquid maps (empty initially)
-    │   │   ├── Rules/                           ← Business rules (empty initially)
-    │   │   └── Schemas/                         ← XML/JSON schemas (empty initially)
-    │   │
-    │   ├── lib/
-    │   │   ├── builtinOperationSdks/
-    │   │   │   ├── JAR/                         ← Java SDKs (empty, runtime-managed)
-    │   │   │   └── net472/                      ← .NET 472 SDKs (empty, runtime-managed)
-    │   │   └── custom/                          ← Custom code outputs (populated by build later)
-    │   │
     │   └── workflow-designtime/                 ← Design-time configuration
     │       ├── host.json                        ← Enables function discovery in designer
     │       └── local.settings.json              ← Design-time runtime settings
@@ -101,6 +90,8 @@ out/
 4. **`Functions/` is NOT created** — it's a provision for the custom code task, created later using the local functions skill
 5. **No workflow folders are created** — workflow directories (e.g., `my-workflow/workflow.json`) are added during conversion
 6. **No `connections.json`** — created when connectors are configured, not during scaffold
+7. **No `Artifacts/` folder** — create it later only when maps, schemas, rules, or HIDX files are actually required
+8. **No `lib/custom/` folder** — create it later when the local functions project is added and built
 
 ---
 
@@ -392,21 +383,9 @@ workflow-designtime/
 
 ### 4.12 Empty Directories
 
-The following directories must be created empty (no files inside). They serve as required structural placeholders.
+No empty directories need to be created during scaffold.
 
-| Directory                          | Purpose                                                               |
-| ---------------------------------- | --------------------------------------------------------------------- |
-| `Artifacts/Maps/`                  | XSLT or Liquid transformation maps                                    |
-| `Artifacts/Rules/`                 | Business rules files                                                  |
-| `Artifacts/Schemas/`               | XML (XSD) or JSON schemas                                             |
-| `lib/builtinOperationSdks/JAR/`    | Java-based built-in operation SDKs (runtime-managed)                  |
-| `lib/builtinOperationSdks/net472/` | .NET 4.7.2 built-in operation SDKs (runtime-managed)                  |
-| `lib/custom/`                      | Custom code build outputs — populated when Functions project is built |
-
-> **⚠️ CRITICAL — ALL empty directories MUST be truly empty (no `.gitkeep`, no files).**
-> Do **NOT** put `.gitkeep` or any other file in any of these directories. For `lib/builtinOperationSdks/JAR/` and `lib/builtinOperationSdks/net472/`, the Azure Functions runtime detects non-empty folders and attempts to load Java (JdbcJavaTriggerFunction) and .NET Framework (NetFxLanguageWorkerFunction) workers. If JAVA_HOME is not set or the workers fail to initialize, the .NET 8 worker also fails — causing `InvokeFunction` to error with "function does not exist". For `Artifacts/Maps/`, `Artifacts/Rules/`, `Artifacts/Schemas/`, and `lib/custom/`, `.gitkeep` files are unnecessary and should not be added.
-
-> **Tip for agents**: To create empty directories, use the filesystem API to create the directory directly (e.g., `mkdir -p` or `fs.mkdirSync`). Do **NOT** place `.gitkeep` or any placeholder file in any scaffold directory.
+Do **NOT** scaffold `Artifacts/`, `lib/custom/`, or `lib/builtinOperationSdks/` by default. Create them later only when actually required.
 
 ---
 
@@ -468,23 +447,14 @@ Create these files in `out/{workspaceName}/{logicAppName}/workflow-designtime/`:
 
 ### Step 7: Create Empty Directories
 
-Create these empty directories under `out/{workspaceName}/{logicAppName}/`:
-
-| #   | Directory                          |
-| --- | ---------------------------------- |
-| 11  | `Artifacts/Maps/`                  |
-| 12  | `Artifacts/Rules/`                 |
-| 13  | `Artifacts/Schemas/`               |
-| 14  | `lib/builtinOperationSdks/JAR/`    |
-| 15  | `lib/builtinOperationSdks/net472/` |
-| 16  | `lib/custom/`                      |
+Do not create any empty directories during scaffold.
 
 ### Step 8: Verify
 
 Verify the scaffold by checking:
 
 - [ ] All 10 files exist with correct content
-- [ ] All 6 empty directories exist
+- [ ] No extra empty directories were scaffolded
 - [ ] `local.settings.json` has the correct `ProjectDirectoryPath`
 - [ ] `workflow-designtime/local.settings.json` has the correct `ProjectDirectoryPath`
 - [ ] Workspace file references the `{logicAppName}` folder correctly
@@ -493,27 +463,21 @@ Verify the scaffold by checking:
 
 ## 6. File Manifest & Verification Checklist
 
-### Complete File List (10 files + 6 empty directories)
+### Complete File List (10 files)
 
-| #   | Relative Path (from workspace root)                      | Type      | Template?                      |
-| --- | -------------------------------------------------------- | --------- | ------------------------------ |
-| 1   | `{workspaceName}.code-workspace`                         | File      | Yes — `{logicAppName}`         |
-| 2   | `{logicAppName}/host.json`                               | File      | No — static content            |
-| 3   | `{logicAppName}/local.settings.json`                     | File      | Yes — `{absoluteLogicAppPath}` |
-| 4   | `{logicAppName}/.funcignore`                             | File      | No — static content            |
-| 5   | `{logicAppName}/.gitignore`                              | File      | No — static content            |
-| 6   | `{logicAppName}/.vscode/extensions.json`                 | File      | No — static content            |
-| 7   | `{logicAppName}/.vscode/launch.json`                     | File      | Yes — `{logicAppName}`         |
-| 8   | `{logicAppName}/.vscode/settings.json`                   | File      | No — static content            |
-| 9   | `{logicAppName}/.vscode/tasks.json`                      | File      | No — static content            |
-| 10  | `{logicAppName}/workflow-designtime/host.json`           | File      | No — static content            |
-| 11  | `{logicAppName}/workflow-designtime/local.settings.json` | File      | Yes — `{absoluteLogicAppPath}` |
-| 12  | `{logicAppName}/Artifacts/Maps/`                         | Empty Dir | —                              |
-| 13  | `{logicAppName}/Artifacts/Rules/`                        | Empty Dir | —                              |
-| 14  | `{logicAppName}/Artifacts/Schemas/`                      | Empty Dir | —                              |
-| 15  | `{logicAppName}/lib/builtinOperationSdks/JAR/`           | Empty Dir | —                              |
-| 16  | `{logicAppName}/lib/builtinOperationSdks/net472/`        | Empty Dir | —                              |
-| 17  | `{logicAppName}/lib/custom/`                             | Empty Dir | —                              |
+| #   | Relative Path (from workspace root)                      | Type | Template?                      |
+| --- | -------------------------------------------------------- | ---- | ------------------------------ |
+| 1   | `{workspaceName}.code-workspace`                         | File | Yes — `{logicAppName}`         |
+| 2   | `{logicAppName}/host.json`                               | File | No — static content            |
+| 3   | `{logicAppName}/local.settings.json`                     | File | Yes — `{absoluteLogicAppPath}` |
+| 4   | `{logicAppName}/.funcignore`                             | File | No — static content            |
+| 5   | `{logicAppName}/.gitignore`                              | File | No — static content            |
+| 6   | `{logicAppName}/.vscode/extensions.json`                 | File | No — static content            |
+| 7   | `{logicAppName}/.vscode/launch.json`                     | File | Yes — `{logicAppName}`         |
+| 8   | `{logicAppName}/.vscode/settings.json`                   | File | No — static content            |
+| 9   | `{logicAppName}/.vscode/tasks.json`                      | File | No — static content            |
+| 10  | `{logicAppName}/workflow-designtime/host.json`           | File | No — static content            |
+| 11  | `{logicAppName}/workflow-designtime/local.settings.json` | File | Yes — `{absoluteLogicAppPath}` |
 
 ### Verification Checklist
 
@@ -532,10 +496,12 @@ Verify the scaffold by checking:
 - [ ] **settings.json** has `"azureFunctions.suppressProject": true`
 - [ ] **workflow-designtime/host.json** has `Runtime.WorkflowOperationDiscoveryHostMode` = `"true"`
 - [ ] **workflow-designtime/local.settings.json** has `FUNCTIONS_WORKER_RUNTIME` = `"node"` (design-time!)
-- [ ] **All 6 empty directories** exist
+- [ ] **No scaffold-only empty directories** exist
 - [ ] **No `Functions/` folder** exists (created later by local functions task)
 - [ ] **No workflow folders** exist (created during conversion)
 - [ ] **No `connections.json`** exists (created when connectors are configured)
+- [ ] **No `Artifacts/` folder** exists unless a later task actually needs artifacts
+- [ ] **No `lib/custom/` folder** exists until the local functions task creates/builds it
 
 ---
 
@@ -543,17 +509,17 @@ Verify the scaffold by checking:
 
 ### Common Scaffold Issues
 
-| Issue                                                 | Cause                                                               | Fix                                                                                      |
-| ----------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Logic Apps extension doesn't recognize project        | Missing `APP_KIND` in local.settings.json                           | Add `"APP_KIND": "workflowapp"`                                                          |
-| Designer shows no operations                          | Missing `workflow-designtime/` folder                               | Create `workflow-designtime/host.json` with `Runtime.WorkflowOperationDiscoveryHostMode` |
-| F5 debugging fails                                    | Missing `launch.json` or wrong `type`                               | Ensure `"type": "logicapp"` in launch.json                                               |
-| "Not a Functions project" warning                     | `azureFunctions.suppressProject` not set                            | Add `"azureFunctions.suppressProject": true` to `.vscode/settings.json`                  |
-| Storage errors on run                                 | `AzureWebJobsStorage` missing or Azurite not running                | Ensure `"UseDevelopmentStorage=true"` and start Azurite                                  |
-| Workflows not found                                   | `ProjectDirectoryPath` incorrect                                    | Set to the correct absolute path of the Logic App folder                                 |
-| Custom code not discovered later                      | `AzureWebJobsFeatureFlags` missing                                  | Add `"EnableMultiLanguageWorker"` from the start                                         |
-| Workspace doesn't open correctly                      | `.code-workspace` file malformed                                    | Ensure `folders[0].path` matches the Logic App folder name                               |
-| `InvokeFunction` fails with "function does not exist" | `.gitkeep` or files in `lib/builtinOperationSdks/JAR/` or `net472/` | Remove ALL files from those directories — they must be truly empty. See §4.12 warning.   |
+| Issue                                                 | Cause                                                                                   | Fix                                                                                                                                       |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Logic Apps extension doesn't recognize project        | Missing `APP_KIND` in local.settings.json                                               | Add `"APP_KIND": "workflowapp"`                                                                                                           |
+| Designer shows no operations                          | Missing `workflow-designtime/` folder                                                   | Create `workflow-designtime/host.json` with `Runtime.WorkflowOperationDiscoveryHostMode`                                                  |
+| F5 debugging fails                                    | Missing `launch.json` or wrong `type`                                                   | Ensure `"type": "logicapp"` in launch.json                                                                                                |
+| "Not a Functions project" warning                     | `azureFunctions.suppressProject` not set                                                | Add `"azureFunctions.suppressProject": true` to `.vscode/settings.json`                                                                   |
+| Storage errors on run                                 | `AzureWebJobsStorage` missing or Azurite not running                                    | Ensure `"UseDevelopmentStorage=true"` and start Azurite                                                                                   |
+| Workflows not found                                   | `ProjectDirectoryPath` incorrect                                                        | Set to the correct absolute path of the Logic App folder                                                                                  |
+| Custom code not discovered later                      | `AzureWebJobsFeatureFlags` missing                                                      | Add `"EnableMultiLanguageWorker"` from the start                                                                                          |
+| Workspace doesn't open correctly                      | `.code-workspace` file malformed                                                        | Ensure `folders[0].path` matches the Logic App folder name                                                                                |
+| `InvokeFunction` fails with "function does not exist" | Files placed under `lib/builtinOperationSdks/` if that folder was created unnecessarily | Delete the unused `lib/builtinOperationSdks/` folder, or remove all files from it and keep it truly empty. Do not scaffold it by default. |
 
 ### Post-Scaffold: Adding Workflows
 
@@ -626,11 +592,9 @@ When connectors (e.g., Service Bus, SQL, HTTP) are used in workflows, a `connect
 │        ├── .funcignore                                               │
 │        ├── .gitignore                                                │
 │        ├── .vscode/                    ← 4 files                    │
-│        ├── Artifacts/{Maps,Rules,Schemas}/                           │
-│        ├── lib/{builtinOperationSdks,custom}/                        │
 │        └── workflow-designtime/        ← 2 files                    │
 │                                                                      │
-│  TOTAL: 10 files + 6 empty directories                               │
+│  TOTAL: 10 files                                                     │
 │                                                                      │
 │  PLACEHOLDERS TO SUBSTITUTE:                                         │
 │    {workspaceName}      → workspace folder + filename                │

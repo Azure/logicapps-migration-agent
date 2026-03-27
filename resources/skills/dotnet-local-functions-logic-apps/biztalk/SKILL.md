@@ -97,15 +97,7 @@ Logic Apps Standard supports calling custom .NET code directly from workflows us
     │   ├── settings.json
     │   └── tasks.json
     │
-    ├── Artifacts/                          ← Logic App artifacts (maps, schemas, rules)
-    │   ├── Maps/
-    │   ├── Rules/
-    │   └── Schemas/
-    │
     ├── lib/
-    │   ├── builtinOperationSdks/
-    │   │   ├── JAR/
-    │   │   └── net472/
     │   └── custom/                        ← Build outputs auto-copied here
     │       ├── <FunctionName>/            ← Contains function.json (auto-generated)
     │       │   └── function.json
@@ -779,31 +771,17 @@ workflow-designtime/
 
 ### 6.12 Artifacts/ Folder
 
-Create these empty directories:
+Do **NOT** create `Artifacts/` by default as part of the local-functions setup.
 
-```
-Artifacts/
-├── Maps/
-├── Rules/
-└── Schemas/
-```
-
-These are used for Logic Apps artifacts like XSLT maps, business rules, and XML schemas. Create them empty initially.
+Only create `Artifacts/Maps/`, `Artifacts/Rules/`, or `Artifacts/Schemas/` later if the migrated solution actually needs maps, schemas, HIDX files, or rules.
 
 ### 6.13 lib/builtinOperationSdks/ Folder
 
-Create these empty directories:
+Do **NOT** create `lib/builtinOperationSdks/` by default as part of the local-functions setup.
 
-```
-lib/
-└── builtinOperationSdks/
-    ├── JAR/
-    └── net472/
-```
+Only create that folder later if runtime/tooling explicitly requires it. If it ever exists, keep it completely empty.
 
-These are placeholders for built-in operation SDKs. Create them empty — the runtime may populate them.
-
-> **⚠️ CRITICAL — These directories MUST be truly empty. Never put `.gitkeep` or any file inside `lib/builtinOperationSdks/JAR/` or `lib/builtinOperationSdks/net472/`.** The Azure Functions runtime detects non-empty folders here and attempts to load Java and .NET Framework workers. If those workers fail (e.g., JAVA_HOME not set), the .NET 8 worker also fails to initialize — causing all `InvokeFunction` calls to error with "function does not exist". Keep these directories completely empty.
+> **⚠️ CRITICAL — Never put `.gitkeep` or any file inside `lib/builtinOperationSdks/JAR/` or `lib/builtinOperationSdks/net472/` if those folders are ever created.** The Azure Functions runtime detects non-empty folders there and attempts to load Java and .NET Framework workers. If those workers fail (for example, because `JAVA_HOME` is not set), the .NET 8 worker can also fail to initialize — causing `InvokeFunction` calls to error with "function does not exist".
 
 ---
 
@@ -1237,14 +1215,7 @@ weather-net8-workspace/
     │   ├── launch.json
     │   ├── settings.json
     │   └── tasks.json
-    ├── Artifacts/
-    │   ├── Maps/
-    │   ├── Rules/
-    │   └── Schemas/
     ├── lib/
-    │   ├── builtinOperationSdks/
-    │   │   ├── JAR/
-    │   │   └── net472/
     │   └── custom/          ← populated by build
     ├── my-workflow/
     │   └── workflow.json
@@ -1565,7 +1536,6 @@ namespace test
 │    └── my-logicapp/                                                      │
 │        ├── host.json, local.settings.json                                │
 │        ├── .vscode/{extensions,launch,settings,tasks}.json               │
-│        ├── Artifacts/{Maps,Rules,Schemas}/                               │
 │        ├── lib/custom/{<FuncName>/function.json, net8|net472/*.dll}      │
 │        ├── <workflow-name>/workflow.json                                  │
 │        └── workflow-designtime/{host.json, local.settings.json}          │
@@ -1656,23 +1626,13 @@ When creating a custom code project from scratch, follow these steps in order:
 <workspace-root>/my-logicapp/workflow-designtime/local.settings.json
 ```
 
-### Step 4: Create empty artifact directories
-
-```
-<workspace-root>/my-logicapp/Artifacts/Maps/         (create empty)
-<workspace-root>/my-logicapp/Artifacts/Rules/        (create empty)
-<workspace-root>/my-logicapp/Artifacts/Schemas/      (create empty)
-<workspace-root>/my-logicapp/lib/builtinOperationSdks/JAR/     (create empty)
-<workspace-root>/my-logicapp/lib/builtinOperationSdks/net472/  (create empty)
-```
-
-### Step 5: Create workflow(s)
+### Step 4: Create workflow(s)
 
 ```
 <workspace-root>/my-logicapp/<workflow-name>/workflow.json
 ```
 
-### Step 6: Build the Functions project
+### Step 5: Build the Functions project
 
 ```powershell
 cd <workspace-root>/Functions

@@ -563,6 +563,8 @@ If Integration Account is chosen:
 
 **Connection Parameters:** None listed (uses Integration Account)
 
+> **⚠️ OUTPUT FORMAT**: `X12Decode` returns **JSON** (not XML). If downstream processing expects XML, add an `XmlCompose` action (Source: IntegrationAccount, Schema: message schema) after the decode action to convert JSON → XML.
+
 ---
 
 #### EDIFACT
@@ -581,6 +583,8 @@ If Integration Account is chosen:
 | Action | `EdifactBatchEncode`        | Batch-encode EDIFACT messages |
 
 **Connection Parameters:** `IntegrationAccountName` (required)
+
+> **⚠️ OUTPUT FORMAT**: `EdifactDecode` returns **JSON** (not XML). If downstream processing expects XML, add an `XmlCompose` action (Source: IntegrationAccount, Schema: message schema) after the decode action to convert JSON → XML.
 
 ---
 

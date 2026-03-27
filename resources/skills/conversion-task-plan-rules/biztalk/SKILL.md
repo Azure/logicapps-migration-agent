@@ -32,6 +32,8 @@ After scaffold, add tasks for:
 
 - Schemas → `{outputLogicAppRoot}/Artifacts/Schemas/`
 - Maps → `{outputLogicAppRoot}/Artifacts/Maps/`
+- Rules → `{outputLogicAppRoot}/Artifacts/Rules/`
+- Certificates → `{outputLogicAppRoot}/Artifacts/Certificates/`
 - Local functions → using skill `dotnet-local-functions-logic-apps`
 - Workflows → `{outputLogicAppRoot}/<Name>/workflow.json`
 - Connections → `{outputLogicAppRoot}/connections.json`
@@ -47,6 +49,7 @@ After scaffold, add tasks for:
 - If an Integration Account is used, the Integration Account provisioning task MUST actually deploy/create the Integration Account resource in Azure in that task itself. It must NOT stop at generating deployment scripts or templates only.
 - That Integration Account provisioning task MUST retrieve the deployed Integration Account resource ID and callback URL, then update `local.settings.json` with `WORKFLOWS_INTEGRATION_ACCOUNT_ID` and `WORKFLOW_INTEGRATION_ACCOUNT_CALLBACK_URL` in that same task.
 - The NEXT Integration Account-related artifact task MUST upload the required schemas/maps/certificates/partners/agreements into the Integration Account itself. Do NOT leave artifact upload implicit or deferred.
+- **CRITICAL — Agreement Schema References:** When EDIFACT/X12 agreements are created, their `schemaReferences` arrays MUST NOT be left empty. After schemas are uploaded to the Integration Account, the agreements MUST be updated via PATCH or re-PUT so `schemaReferences` links each agreement to the correct message schemas for decode/encode. Empty `schemaReferences` causes `EdifactDecode` or `X12Decode` actions to fail at runtime with `UnexpectedSegment` errors. The schema-upload task's `executionPrompt` MUST explicitly instruct the agent to update agreement `schemaReferences` after uploading schemas.
 - If the flow does NOT require an Integration Account, then use the Logic App artifact folders only.
 - If an Integration Account is used, the plan MUST also account for the required Logic Apps Standard app settings: `WORKFLOWS_INTEGRATION_ACCOUNT_ID`, with the Integration Account resource ID as its value (example: `/subscriptions/{subId}/resourceGroups/{rg}/providers/Microsoft.Logic/integrationAccounts/{name}`), and `WORKFLOW_INTEGRATION_ACCOUNT_CALLBACK_URL`, with the correct Integration Account callback URL value.
 - Any Integration Account provisioning/configuration task MUST put that app setting requirement directly into its `executionPrompt`, not only in the high-level summary.
