@@ -17,14 +17,14 @@
 // Shared prompt fragments (kept minimal — detail lives in skills)
 // ============================================================================
 
-const AUTONOMOUS_MODE =
-    'AUTONOMOUS MODE: Execute ALL steps without asking for confirmation or approval. Do NOT pause to ask questions. Run all commands, tool calls, and file operations directly. Only stop if a tool returns an error that requires user input. ';
-
 const AUTONOMOUS_MODE_SHORT =
     'AUTONOMOUS MODE: Execute ALL steps without asking for confirmation. Do NOT pause to ask questions. Run all tool calls directly. ';
 
 const SKILL_AUTHORITY =
     'SKILL AUTHORITY: You MUST read every referenced skill BEFORE starting work. Treat skills as authoritative — if this prompt and a skill conflict, the skill wins. Your output will be rejected if it violates a skill. ';
+
+const GLOBAL_LOOKUP_POLICY =
+    'SCOPE POLICY: Start from the selected flow/task artifacts, but if any required dependency, import/using, schema, map, connector, class, or configuration detail is missing or unclear, you MUST expand to full-project lookup using migration_listArtifacts, migration_searchArtifacts, migration_getArtifactDetails, and migration_readSourceFile. Do NOT assume dependencies are group-local. ';
 
 // ============================================================================
 // ChatPrompts class
@@ -122,8 +122,9 @@ export class ChatPrompts {
     static planForFlow(params: PlanForFlowParams): string {
         return (
             `@migration-planner Plan the migration for flow "${params.flowName}" (flowId: "${params.flowId}").\n` +
-            AUTONOMOUS_MODE +
+            AUTONOMOUS_MODE_SHORT +
             SKILL_AUTHORITY +
+            GLOBAL_LOOKUP_POLICY +
             '\nREQUIRED SKILLS (read ALL before starting):\n' +
             '- `logic-apps-planning-rules` — workflow split policy, coverage requirements, planning store sequence\n' +
             '- `dependency-and-decompilation-analysis` — MUST decompile any .dll/.exe whose source is missing before designing workflows\n' +
@@ -134,10 +135,11 @@ export class ChatPrompts {
             '\nPROCEDURE:\n' +
             `1. Call migration_detectFlowGroups with groupId="${params.flowId}", then call migration_getDiscoveryAnalysis to get cached analysis.\n` +
             '2. If discovery analysis is available, use it. Otherwise fall back to migration_getArtifactDetails and migration_readSourceFile.\n' +
-            '3. Design the target architecture per skill `logic-apps-planning-rules`.\n' +
-            '4. Generate Mermaid flowchart TB showing target architecture.\n' +
-            '5. Look up every component in skill `source-to-logic-apps-mapping`, then search reference workflows with those names.\n' +
-            '6. Store planning results in the exact order specified by skill `logic-apps-planning-rules` (storeMeta → storeArchitecture → storeWorkflowDefinition per workflow → storeAzureComponents → storeActionMappings → storeGaps → storePatterns → storeArtifactDispositions → finalize).'
+            '3. If any dependency or detail cannot be resolved from this flow group context, run full-project artifact search and source reads before finalizing the plan.\n' +
+            '4. Design the target architecture per skill `logic-apps-planning-rules`.\n' +
+            '5. Generate Mermaid flowchart TB showing target architecture.\n' +
+            '6. Look up every component in skill `source-to-logic-apps-mapping`, then search reference workflows with those names.\n' +
+            '7. Store planning results in the exact order specified by skill `logic-apps-planning-rules` (storeMeta → storeArchitecture → storeWorkflowDefinition per workflow → storeAzureComponents → storeActionMappings → storeGaps → storePatterns → storeArtifactDispositions → finalize).'
         );
     }
 
@@ -151,8 +153,9 @@ export class ChatPrompts {
             : '';
         return (
             `@migration-converter Convert the flow "${params.flowName}" (flowId: "${params.flowId}").\n` +
-            AUTONOMOUS_MODE +
+            AUTONOMOUS_MODE_SHORT +
             SKILL_AUTHORITY +
+            GLOBAL_LOOKUP_POLICY +
             '\nREQUIRED SKILLS (read ALL before starting):\n' +
             '- `conversion-task-plan-rules` — task ordering, required types, ID rules, output paths\n' +
             '- `scaffold-logic-apps-project` — exact scaffold files and structure\n' +
@@ -186,6 +189,7 @@ export class ChatPrompts {
             `for flow "${params.flowName}" (flowId: "${params.flowId}").\n` +
             AUTONOMOUS_MODE_SHORT +
             SKILL_AUTHORITY +
+            GLOBAL_LOOKUP_POLICY +
             '\nREQUIRED SKILLS: Read `workflow-json-generation-rules`, `connections-json-generation-rules`, `no-stubs-code-generation`, ' +
             '`dependency-and-decompilation-analysis` (decompile .dll/.exe when source is unavailable), `runtime-validation-and-testing`, `source-to-logic-apps-mapping` as needed for this task type.\n' +
             `\nAZURE SETTINGS: Resource Group="${params.resourceGroup}", Location="${params.location}".\n` +
@@ -210,8 +214,9 @@ export class ChatPrompts {
     static executeAllTasks(params: ExecuteAllTasksParams): string {
         return (
             `@migration-converter Execute ALL remaining conversion tasks for flow "${params.flowName}" (flowId: "${params.flowId}"), starting with task "${params.nextTaskName}" (taskId: "${params.nextTaskId}").\n` +
-            AUTONOMOUS_MODE +
+            AUTONOMOUS_MODE_SHORT +
             SKILL_AUTHORITY +
+            GLOBAL_LOOKUP_POLICY +
             '\nREQUIRED SKILLS (read ALL before starting):\n' +
             '- `workflow-json-generation-rules` — workflow.json authoring\n' +
             '- `connections-json-generation-rules` — connections.json format\n' +
@@ -246,6 +251,7 @@ export class ChatPrompts {
             `@migration-analyser Analyse the "${params.flowName}" flow group (groupId: "${params.flowId}") and generate a full architecture visualization.\n` +
             AUTONOMOUS_MODE_SHORT +
             SKILL_AUTHORITY +
+            GLOBAL_LOOKUP_POLICY +
             '\nREQUIRED SKILLS (read ALL before starting):\n' +
             '- `analyse-source-design` — source reading depth, Mermaid diagram rules, MessageBox modeling, orchestration shapes, component mapping priority ladder, store tool sequence\n' +
             '- `dependency-and-decompilation-analysis` — DLL decompilation, missing dependency classification\n' +
@@ -253,10 +259,11 @@ export class ChatPrompts {
             `\nPROCEDURE:\n` +
             `1. Call migration_detectFlowGroups with groupId="${params.flowId}" to retrieve the cached group artifact list.\n` +
             '2. Call migration_getArtifactDetails and migration_readSourceFile for EVERY artifact per skill `analyse-source-design`.\n' +
-            '3. Perform dependency analysis per skill `dependency-and-decompilation-analysis` (decompile DLLs, classify missing deps).\n' +
-            '4. Look up every component in skill `source-to-logic-apps-mapping`, then search reference docs with those names.\n' +
-            '5. Generate Mermaid architecture diagram per skill `analyse-source-design` rules.\n' +
-            `6. Store discovery results in the exact order specified by skill \`analyse-source-design\` (storeMeta → storeArchitecture → storeComponents → storeMessageFlow → storeGaps → storePatterns → storeDependencies → finalize), all with flowId="${params.flowId}".`
+            '3. If any required dependency/detail is unresolved, expand to full-project lookup (all artifacts), then continue analysis.\n' +
+            '4. Perform dependency analysis per skill `dependency-and-decompilation-analysis` (decompile DLLs/JARs, classify missing deps).\n' +
+            '5. Look up every component in skill `source-to-logic-apps-mapping`, then search reference docs with those names.\n' +
+            '6. Generate Mermaid architecture diagram per skill `analyse-source-design` rules.\n' +
+            `7. Store discovery results in the exact order specified by skill \`analyse-source-design\` (storeMeta → storeArchitecture → storeComponents → storeMessageFlow → storeGaps → storePatterns → storeDependencies → finalize), all with flowId="${params.flowId}".`
         );
     }
 

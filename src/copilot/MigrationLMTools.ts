@@ -1203,7 +1203,8 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
                                 instructions:
                                     'This is a CACHED flow group. The artifacts listed belong to this group. ' +
                                     'Call migration_getArtifactDetails and migration_readSourceFile for each artifact to extract configuration details, ' +
-                                    'then generate the Mermaid diagram and proceed with your workflow.',
+                                    'then generate the Mermaid diagram and proceed with your workflow. ' +
+                                    'If any required dependency or detail is unresolved, expand to full-project lookup using migration_listArtifacts/migration_searchArtifacts and read additional artifacts outside this group before finalizing results.',
                             })
                         ),
                     ]);
