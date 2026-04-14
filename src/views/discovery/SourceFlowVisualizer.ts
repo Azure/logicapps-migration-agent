@@ -31,7 +31,7 @@ import { ChatPrompts } from '../../constants/ChatPrompts';
  */
 export class SourceFlowVisualizer implements vscode.Disposable {
     public static currentPanel: SourceFlowVisualizer | undefined;
-    public static readonly viewType = 'logicAppsMigrationAssistant.sourceFlowVisualizer';
+    public static readonly viewType = 'logicAppsMigrationAgent.sourceFlowVisualizer';
 
     // Track whether the initial full visualization generation is in progress
     // (guards against double-clicking the "View Flow Visualization" command)
@@ -661,7 +661,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             panel.reveal(vscode.ViewColumn.Active);
         } else {
             panel = vscode.window.createWebviewPanel(
-                'logicAppsMigrationAssistant.flowAnalysis',
+                'logicAppsMigrationAgent.flowAnalysis',
                 `🔍 ${title}`,
                 vscode.ViewColumn.Active,
                 {
@@ -877,7 +877,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         );
 
         // Refresh sidebar tree views
-        void vscode.commands.executeCommand('logicAppsMigrationAssistant.refreshViews');
+        void vscode.commands.executeCommand('logicAppsMigrationAgent.refreshViews');
     }
 
     /**
@@ -1099,6 +1099,21 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 break;
             }
 
+            case 'exportAnalysisReport': {
+                this.logger.info('[FlowViz] User requested analysis report export');
+                if (this.currentLLMResult && this.currentGroupId) {
+                    void vscode.commands.executeCommand(
+                        'logicAppsMigrationAgent.exportAnalysisReport',
+                        this.currentGroupId,
+                        this.currentTitle || 'Integration Flow',
+                        this.currentLLMResult
+                    );
+                } else {
+                    vscode.window.showWarningMessage('No analysis data available to export.');
+                }
+                break;
+            }
+
             case 'selectGroup': {
                 const selectedGroupId = message.data as string;
                 // Block if THIS specific group is already being generated
@@ -1256,7 +1271,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
 
                         // Open planning agent chat for this flow (does NOT open Planning webview)
                         await vscode.commands.executeCommand(
-                            'logicAppsMigrationAssistant.generatePlanForFlow',
+                            'logicAppsMigrationAgent.generatePlanForFlow',
                             flowId
                         );
                     } catch (err) {
@@ -1313,7 +1328,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                         try {
                             // Open conversion planning agent chat for this flow
                             await vscode.commands.executeCommand(
-                                'logicAppsMigrationAssistant.generateConversionForFlow',
+                                'logicAppsMigrationAgent.generateConversionForFlow',
                                 flowId
                             );
                         } catch (err) {
@@ -1384,7 +1399,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                         // Trigger Execute All after a short delay to let the webview render
                         setTimeout(() => {
                             void vscode.commands.executeCommand(
-                                'logicAppsMigrationAssistant.executeAllConversionTasks',
+                                'logicAppsMigrationAgent.executeAllConversionTasks',
                                 flowId
                             );
                         }, 500);
@@ -1522,7 +1537,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                         // 4. Kill any running func processes
                         try {
                             await vscode.commands.executeCommand(
-                                'logicAppsMigrationAssistant.killFuncProcesses'
+                                'logicAppsMigrationAgent.killFuncProcesses'
                             );
                         } catch {
                             // Command may not exist — non-critical
@@ -3205,6 +3220,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 </div>
             </div>
             <button class="btn btn-outline" onclick="regenerate()">↻ Regenerate Analysis</button>
+            <button class="btn btn-outline" onclick="exportReport()" title="Export this analysis as a DOCX report">📄 Export Report</button>
         </div>
     </div>
     
@@ -4005,6 +4021,10 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             vscode.postMessage({ 
                 command: 'regenerate'
             });
+        }
+
+        function exportReport() {
+            vscode.postMessage({ command: 'exportAnalysisReport' });
         }
 
         function backToFlowGroups() {

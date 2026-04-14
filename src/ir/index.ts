@@ -2,7 +2,7 @@
  * IR (Intermediate Representation) Module
  *
  * This module provides the complete IR v3 implementation for the
- * Logic Apps Migration Assistant. It includes:
+ * Logic Apps Migration Agent. It includes:
  *
  * - **Types**: Complete TypeScript definitions for the IR schema
  * - **Serialization**: JSON serialization/deserialization with type safety

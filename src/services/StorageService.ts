@@ -25,7 +25,7 @@ export const StorageKeys = {
     IR_CACHE: 'irCache',
     MIGRATION_PLAN: 'migrationPlan',
     CONVERSION_STATE: 'conversionState',
-    STATE_MACHINE: 'logicAppsMigrationAssistant.stateMachine',
+    STATE_MACHINE: 'logicAppsMigrationAgent.stateMachine',
     DISCOVERY_RESULT: 'discoveryResult',
     MSI_EXTRACTION_PATH: 'msiExtractionPath',
 

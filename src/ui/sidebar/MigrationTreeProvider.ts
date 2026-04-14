@@ -147,7 +147,7 @@ export class MigrationTreeProvider
             icon: new vscode.ThemeIcon('home'),
             tooltip: 'Open discovery main page (logical groups loading/selector)',
             command: {
-                command: 'logicAppsMigrationAssistant.viewFlowVisualization',
+                command: 'logicAppsMigrationAgent.viewFlowVisualization',
                 title: 'Home Page',
             },
             contextValue: 'migration.action.primary',
@@ -340,7 +340,7 @@ export class MigrationTreeProvider
                     type: 'action',
                     icon: new vscode.ThemeIcon('refresh'),
                     command: {
-                        command: 'logicAppsMigrationAssistant.resetMigration',
+                        command: 'logicAppsMigrationAgent.resetMigration',
                         title: 'Reset Migration',
                     },
                     contextValue: 'migration.action.primary migration.action.destructive',
@@ -353,7 +353,7 @@ export class MigrationTreeProvider
                 type: 'action',
                 icon: new vscode.ThemeIcon('rocket'),
                 command: {
-                    command: 'logicAppsMigrationAssistant.selectSourceFolder',
+                    command: 'logicAppsMigrationAgent.selectSourceFolder',
                     title: 'Start Migration',
                 },
                 contextValue: 'migration.action.primary',
@@ -367,7 +367,7 @@ export class MigrationTreeProvider
             type: 'action',
             icon: new vscode.ThemeIcon('preview'),
             command: {
-                command: 'logicAppsMigrationAssistant.viewFlowVisualization',
+                command: 'logicAppsMigrationAgent.viewFlowVisualization',
                 title: 'Open Main Flow View',
             },
             contextValue: 'migration.action.primary',
@@ -395,7 +395,7 @@ export class MigrationTreeProvider
                     type: 'action',
                     icon: new vscode.ThemeIcon('refresh'),
                     command: {
-                        command: 'logicAppsMigrationAssistant.resetMigration',
+                        command: 'logicAppsMigrationAgent.resetMigration',
                         title: 'Reset Migration',
                     },
                     contextValue: 'migration.action.destructive',
@@ -425,7 +425,7 @@ export class MigrationTreeProvider
                 type: 'action',
                 icon: new vscode.ThemeIcon('output'),
                 command: {
-                    command: 'logicAppsMigrationAssistant.showLogs',
+                    command: 'logicAppsMigrationAgent.showLogs',
                     title: 'View Logs',
                 },
                 contextValue: 'migration.action',
@@ -467,7 +467,7 @@ export class MigrationTreeProvider
 export function registerTreeViewProviders(context: vscode.ExtensionContext): void {
     // Register home tree view
     const homeProvider = MigrationTreeProvider.getInstance('home');
-    const homeTreeView = vscode.window.createTreeView('logicAppsMigrationAssistant.home', {
+    const homeTreeView = vscode.window.createTreeView('logicAppsMigrationAgent.home', {
         treeDataProvider: homeProvider,
         showCollapseAll: false,
     });
@@ -475,14 +475,14 @@ export function registerTreeViewProviders(context: vscode.ExtensionContext): voi
 
     // Register actions tree view
     const actionsProvider = MigrationTreeProvider.getInstance('actions');
-    const actionsTreeView = vscode.window.createTreeView('logicAppsMigrationAssistant.actions', {
+    const actionsTreeView = vscode.window.createTreeView('logicAppsMigrationAgent.actions', {
         treeDataProvider: actionsProvider,
     });
     context.subscriptions.push(actionsTreeView);
 
     // Register command to refresh all views
     const refreshCommand = vscode.commands.registerCommand(
-        'logicAppsMigrationAssistant.refreshViews',
+        'logicAppsMigrationAgent.refreshViews',
         () => {
             actionsProvider.refresh();
         }

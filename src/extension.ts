@@ -1,5 +1,5 @@
 /**
- * Logic Apps Migration Assistant - VS Code Extension
+ * Logic Apps Migration Agent - VS Code Extension
  *
  * Main entry point for the extension. Handles activation, deactivation,
  * and orchestrates all services and commands.
@@ -34,7 +34,7 @@ import {
     initializeParsers,
     ParserPluginLoader,
     createExtensionAPI,
-    LogicAppsMigrationAssistantAPI,
+    logicAppsMigrationAgentAPI,
 } from './parsers';
 
 // Project Auto-Detection (Phase 6)
@@ -62,7 +62,7 @@ const disposables: vscode.Disposable[] = [];
  */
 export async function activate(
     context: vscode.ExtensionContext
-): Promise<LogicAppsMigrationAssistantAPI> {
+): Promise<logicAppsMigrationAgentAPI> {
     try {
         // Detect version change and prompt reload to refresh cached manifest contributions
         const currentVersion = context.extension.packageJSON.version as string;
@@ -151,7 +151,7 @@ export async function activate(
                         const newFolder = event.added[0];
                         isSyncingFolders = true;
                         await vscode.commands.executeCommand(
-                            'logicAppsMigrationAssistant.selectSourceFolder',
+                            'logicAppsMigrationAgent.selectSourceFolder',
                             newFolder.uri
                         );
                         isSyncingFolders = false;
@@ -353,8 +353,8 @@ function createStatusBarItem(context: vscode.ExtensionContext): vscode.StatusBar
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
 
     statusBarItem.text = '$(layers) Migration';
-    statusBarItem.tooltip = 'Logic Apps Migration Assistant - Click to start';
-    statusBarItem.command = 'logicAppsMigrationAssistant.start';
+    statusBarItem.tooltip = 'Logic Apps Migration Agent - Click to start';
+    statusBarItem.command = 'logicAppsMigrationAgent.start';
     statusBarItem.show();
 
     context.subscriptions.push(statusBarItem);

@@ -24,7 +24,7 @@ import { ArtifactInventory, DependencyGraph } from '../../stages/discovery/types
  */
 export class DiscoveryWebviewPanel implements vscode.Disposable {
     public static currentPanel: DiscoveryWebviewPanel | undefined;
-    public static readonly viewType = 'logicAppsMigrationAssistant.discoveryResults';
+    public static readonly viewType = 'logicAppsMigrationAgent.discoveryResults';
 
     private readonly panel: vscode.WebviewPanel;
     private readonly logger = LoggingService.getInstance();

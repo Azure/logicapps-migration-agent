@@ -508,7 +508,7 @@ export class ToolRegistry implements vscode.Disposable {
         for (const [toolId, tool] of this.tools) {
             await vscode.commands.executeCommand(
                 'setContext',
-                `logicAppsMigrationAssistant.tool.${toolId}.enabled`,
+                `logicAppsMigrationAgent.tool.${toolId}.enabled`,
                 tool.isEnabled
             );
         }
@@ -517,7 +517,7 @@ export class ToolRegistry implements vscode.Disposable {
         const enabledIds = this.getEnabledTools().map((t) => t.definition.id);
         await vscode.commands.executeCommand(
             'setContext',
-            'logicAppsMigrationAssistant.enabledTools',
+            'logicAppsMigrationAgent.enabledTools',
             enabledIds
         );
     }

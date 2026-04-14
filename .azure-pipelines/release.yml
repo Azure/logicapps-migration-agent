@@ -1,4 +1,4 @@
-# Release Pipeline for Logic Apps Migration Assistant
+# Release Pipeline for Logic Apps Migration Agent
 # Publishes the signed VSIX to the VS Code Marketplace
 trigger: none
 
@@ -24,7 +24,7 @@ resources:
 
 variables:
     - name: TeamName
-      value: 'Azure Logic Apps Migration Assistant'
+      value: 'Azure Logic Apps Migration Agent'
 
 extends:
     template: azure-pipelines/release-extension.yml@azExtTemplates

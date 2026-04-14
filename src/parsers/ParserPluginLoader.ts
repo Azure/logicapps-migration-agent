@@ -88,7 +88,7 @@ interface ParserContribution {
  *
  * Provides two mechanisms for loading external parsers:
  * 1. **API Registration**: Partner extensions call `registerParser()` directly
- * 2. **Contribution Points**: Parsers declared in `contributes.logicAppsMigrationAssistant.parsers`
+ * 2. **Contribution Points**: Parsers declared in `contributes.logicAppsMigrationAgent.parsers`
  *
  * @example
  * ```typescript
@@ -306,7 +306,7 @@ export class ParserPluginLoader implements vscode.Disposable {
     /**
      * Discover and load parsers from extension contribution points.
      *
-     * Looks for `contributes.logicAppsMigrationAssistant.parsers` in other extensions.
+     * Looks for `contributes.logicAppsMigrationAgent.parsers` in other extensions.
      */
     private async discoverContributedParsers(): Promise<void> {
         const contributions: {
@@ -418,7 +418,7 @@ export class ParserPluginLoader implements vscode.Disposable {
  * This interface is returned by the extension's activate function
  * and can be used by other extensions to register parsers.
  */
-export interface LogicAppsMigrationAssistantAPI {
+export interface logicAppsMigrationAgentAPI {
     /**
      * Extension version
      */
@@ -459,7 +459,7 @@ export interface LogicAppsMigrationAssistantAPI {
  * @param version - Extension version
  * @returns API object for partner extensions
  */
-export function createExtensionAPI(version: string): LogicAppsMigrationAssistantAPI {
+export function createExtensionAPI(version: string): logicAppsMigrationAgentAPI {
     const loader = ParserPluginLoader.getInstance();
 
     return {

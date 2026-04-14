@@ -1,4 +1,4 @@
-# Official Build Pipeline for Logic Apps Migration Assistant
+# Official Build Pipeline for Logic Apps Migration Agent
 # Uses 1ES MicroBuild template for compliance, signing, and artifact staging
 trigger: none
 pr: none
@@ -36,7 +36,7 @@ parameters:
 
 variables:
     - name: TeamName
-      value: 'Azure Logic Apps Migration Assistant'
+      value: 'Azure Logic Apps Migration Agent'
     - name: working_directory
       value: '.'
 

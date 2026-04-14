@@ -29,7 +29,7 @@ export class LoggingService implements vscode.Disposable {
     private static instance: LoggingService | undefined;
     private outputChannel: vscode.OutputChannel | undefined;
     private logLevel: LogLevel = LogLevel.Info;
-    private readonly channelName = 'Logic Apps Migration Assistant';
+    private readonly channelName = 'Logic Apps Migration Agent';
 
     private constructor() {}
 
@@ -54,7 +54,7 @@ export class LoggingService implements vscode.Disposable {
 
         // Listen for configuration changes
         vscode.workspace.onDidChangeConfiguration((event) => {
-            if (event.affectsConfiguration('logicAppsMigrationAssistant.logLevel')) {
+            if (event.affectsConfiguration('logicAppsMigrationAgent.logLevel')) {
                 this.updateLogLevel();
             }
         });

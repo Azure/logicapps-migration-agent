@@ -32,7 +32,7 @@ import { UserPrompts } from '../../constants/UserMessages';
  */
 export class ConversionWebviewPanel implements vscode.Disposable {
     public static currentPanel: ConversionWebviewPanel | undefined;
-    public static readonly viewType = 'logicAppsMigrationAssistant.conversionView';
+    public static readonly viewType = 'logicAppsMigrationAgent.conversionView';
 
     private readonly panel: vscode.WebviewPanel;
     private readonly logger = LoggingService.getInstance();
@@ -161,7 +161,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                     this.logger.info(`Conversion started for flow: ${flowId}`);
                     vscode.commands
                         .executeCommand(
-                            'logicAppsMigrationAssistant.generateConversionForFlow',
+                            'logicAppsMigrationAgent.generateConversionForFlow',
                             flowId
                         )
                         .then(
@@ -189,7 +189,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
 
                     // Kill func processes before deleting output
                     void vscode.commands.executeCommand(
-                        'logicAppsMigrationAssistant.killFuncProcesses'
+                        'logicAppsMigrationAgent.killFuncProcesses'
                     );
 
                     // Delete generated output folder for this flow
@@ -254,7 +254,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                     this.update();
                     vscode.commands
                         .executeCommand(
-                            'logicAppsMigrationAssistant.generateConversionForFlow',
+                            'logicAppsMigrationAgent.generateConversionForFlow',
                             flowId
                         )
                         .then(
@@ -293,7 +293,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                     );
                     vscode.commands
                         .executeCommand(
-                            'logicAppsMigrationAssistant.executeConversionTask',
+                            'logicAppsMigrationAgent.executeConversionTask',
                             payload.flowId,
                             payload.taskId,
                             { origin: 'single-ui' }
@@ -324,7 +324,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                     );
                     vscode.commands
                         .executeCommand(
-                            'logicAppsMigrationAssistant.executeBlackBoxTest',
+                            'logicAppsMigrationAgent.executeBlackBoxTest',
                             bbPayload.flowId,
                             bbPayload.taskId
                         )
@@ -352,7 +352,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                     this.logger.info(`Convert all tasks requested for flow: ${flowId}`);
                     vscode.commands
                         .executeCommand(
-                            'logicAppsMigrationAssistant.executeAllConversionTasks',
+                            'logicAppsMigrationAgent.executeAllConversionTasks',
                             flowId
                         )
                         .then(
@@ -396,13 +396,13 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             }
 
             case 'goToPlanning': {
-                void vscode.commands.executeCommand('logicAppsMigrationAssistant.openPlanningView');
+                void vscode.commands.executeCommand('logicAppsMigrationAgent.openPlanningView');
                 break;
             }
 
             case 'goToDiscovery': {
                 void vscode.commands.executeCommand(
-                    'logicAppsMigrationAssistant.viewFlowVisualization'
+                    'logicAppsMigrationAgent.viewFlowVisualization'
                 );
                 break;
             }

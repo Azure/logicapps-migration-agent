@@ -25,7 +25,7 @@ export { ParserFactory, defaultParserFactory } from './ParserFactory';
 export {
     ParserPluginLoader,
     createExtensionAPI,
-    type LogicAppsMigrationAssistantAPI,
+    type logicAppsMigrationAgentAPI,
     type ParserRegistrationOptions,
     type ParserRegistrationResult,
     type ExternalParserInfo,

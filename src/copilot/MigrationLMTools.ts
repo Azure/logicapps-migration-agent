@@ -3962,7 +3962,7 @@ class PlanningFinalizeTool implements vscode.LanguageModelTool<PlanningFinalizeI
             });
 
             // Step 5: Do NOT auto-open Planning webview — let the user click "✓ Planned" from the flow group page
-            // void vscode.commands.executeCommand('logicAppsMigrationAssistant.openPlanningView');
+            // void vscode.commands.executeCommand('logicAppsMigrationAgent.openPlanningView');
 
             // Step 6: Mark flow as planned in DiscoveryCacheService (for per-flow progressive UI)
             try {
@@ -4289,7 +4289,7 @@ class ConversionStoreTaskPlanTool implements vscode.LanguageModelTool<Conversion
             await conversionService.storeTaskPlan(flowId, taskPlan);
 
             // Do NOT auto-open conversion webview — let the user click "✓ Converted" from the flow group page
-            // void vscode.commands.executeCommand('logicAppsMigrationAssistant.openConversionView');
+            // void vscode.commands.executeCommand('logicAppsMigrationAgent.openConversionView');
 
             // Mark flow as converted in DiscoveryCacheService (for per-flow progressive UI)
             try {
@@ -4906,7 +4906,7 @@ class ConversionFinalizeTool implements vscode.LanguageModelTool<ConversionFinal
             }
 
             // Open conversion webview
-            void vscode.commands.executeCommand('logicAppsMigrationAssistant.openConversionView');
+            void vscode.commands.executeCommand('logicAppsMigrationAgent.openConversionView');
 
             logger.info(
                 `[LMTool] migration_conversion_finalize: flow "${flowId}" conversion completed (${plan.tasks.length} tasks)`

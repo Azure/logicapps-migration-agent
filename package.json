@@ -1,7 +1,7 @@
 {
-    "name": "logicapps-migration-assistant",
-    "displayName": "Logic Apps Migration Assistant",
-    "description": "Migrate BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard with AI-powered assistance",
+    "name": "logicapps-migration-agent",
+    "displayName": "Logic Apps Migration Agent",
+    "description": "Migrate BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard with AI-powered agent",
     "version": "1.6.0",
     "publisher": "microsoft",
     "license": "MIT",
@@ -1595,104 +1595,116 @@
         ],
         "commands": [
             {
-                "command": "logicAppsMigrationAssistant.start",
+                "command": "logicAppsMigrationAgent.start",
                 "title": "Start Migration",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.openSidebar",
+                "command": "logicAppsMigrationAgent.openSidebar",
                 "title": "Open Migration Sidebar",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.selectSourceFolder",
+                "command": "logicAppsMigrationAgent.selectSourceFolder",
                 "title": "Select Source Folder",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.viewMigrationPlan",
+                "command": "logicAppsMigrationAgent.viewMigrationPlan",
                 "title": "View Migration Plan",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.resetMigration",
+                "command": "logicAppsMigrationAgent.resetMigration",
                 "title": "Reset Migration",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.showLogs",
+                "command": "logicAppsMigrationAgent.showLogs",
                 "title": "Show Extension Logs",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.checkPrerequisites",
+                "command": "logicAppsMigrationAgent.checkPrerequisites",
                 "title": "Check Prerequisites",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.runDiscovery",
+                "command": "logicAppsMigrationAgent.runDiscovery",
                 "title": "Run Discovery",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.rescanArtifacts",
+                "command": "logicAppsMigrationAgent.rescanArtifacts",
                 "title": "Rescan Artifacts",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.viewFlowVisualization",
+                "command": "logicAppsMigrationAgent.viewFlowVisualization",
                 "title": "View Details",
-                "category": "Logic Apps Migration Assistant",
+                "category": "Logic Apps Migration Agent",
                 "icon": "$(preview)"
             },
             {
-                "command": "logicAppsMigrationAssistant.viewDependencyGraph",
+                "command": "logicAppsMigrationAgent.viewDependencyGraph",
                 "title": "View Dependency Graph",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.openPlanningView",
+                "command": "logicAppsMigrationAgent.openPlanningView",
                 "title": "Open Planning View",
-                "category": "Logic Apps Migration Assistant",
+                "category": "Logic Apps Migration Agent",
                 "icon": "$(calendar)"
             },
             {
-                "command": "logicAppsMigrationAssistant.generatePlanForFlow",
+                "command": "logicAppsMigrationAgent.generatePlanForFlow",
                 "title": "Generate Plan for Flow",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.openConversionView",
+                "command": "logicAppsMigrationAgent.openConversionView",
                 "title": "Open Conversion View",
-                "category": "Logic Apps Migration Assistant",
+                "category": "Logic Apps Migration Agent",
                 "icon": "$(tools)"
             },
             {
-                "command": "logicAppsMigrationAssistant.generateConversionForFlow",
+                "command": "logicAppsMigrationAgent.generateConversionForFlow",
                 "title": "Generate Conversion for Flow",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.executeConversionTask",
+                "command": "logicAppsMigrationAgent.executeConversionTask",
                 "title": "Execute Conversion Task",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.executeAllConversionTasks",
+                "command": "logicAppsMigrationAgent.executeAllConversionTasks",
                 "title": "Execute All Conversion Tasks",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
             },
             {
-                "command": "logicAppsMigrationAssistant.executeBlackBoxTest",
+                "command": "logicAppsMigrationAgent.executeBlackBoxTest",
                 "title": "Execute Black Box Test",
-                "category": "Logic Apps Migration Assistant"
+                "category": "Logic Apps Migration Agent"
+            },
+            {
+                "command": "logicAppsMigrationAgent.exportAnalysisReport",
+                "title": "Export Analysis Report",
+                "category": "Logic Apps Migration Agent",
+                "icon": "$(file-text)"
+            },
+            {
+                "command": "logicAppsMigrationAgent.exportPlanReport",
+                "title": "Export Planning Report",
+                "category": "Logic Apps Migration Agent",
+                "icon": "$(file-text)"
             }
         ],
         "viewsContainers": {
             "activitybar": [
                 {
                     "id": "logicAppsMigration",
-                    "title": "Logic Apps Migration Assistant",
+                    "title": "Logic Apps Migration Agent",
                     "icon": "resources/icons/migration-icon.svg"
                 }
             ]
@@ -1700,23 +1712,23 @@
         "views": {
             "logicAppsMigration": [
                 {
-                    "id": "logicAppsMigrationAssistant.home",
+                    "id": "logicAppsMigrationAgent.home",
                     "name": "Home"
                 },
                 {
-                    "id": "logicAppsMigrationAssistant.discovery",
+                    "id": "logicAppsMigrationAgent.discovery",
                     "name": "Discovery Results"
                 },
                 {
-                    "id": "logicAppsMigrationAssistant.actions",
+                    "id": "logicAppsMigrationAgent.actions",
                     "name": "Actions"
                 }
             ]
         },
         "viewsWelcome": [
             {
-                "view": "logicAppsMigrationAssistant.discovery",
-                "contents": "No artifacts discovered yet.\n\n[Select Source Folder](command:logicAppsMigrationAssistant.selectSourceFolder)"
+                "view": "logicAppsMigrationAgent.discovery",
+                "contents": "No artifacts discovered yet.\n\n[Select Source Folder](command:logicAppsMigrationAgent.selectSourceFolder)"
             }
         ],
         "menus": {
@@ -1724,75 +1736,83 @@
             "view/item/context": [],
             "commandPalette": [
                 {
-                    "command": "logicAppsMigrationAssistant.start",
+                    "command": "logicAppsMigrationAgent.start",
                     "when": "false"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.openSidebar",
+                    "command": "logicAppsMigrationAgent.openSidebar",
                     "when": "false"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.selectSourceFolder",
+                    "command": "logicAppsMigrationAgent.selectSourceFolder",
                     "when": "true"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.viewMigrationPlan",
+                    "command": "logicAppsMigrationAgent.viewMigrationPlan",
                     "when": "false"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.resetMigration",
+                    "command": "logicAppsMigrationAgent.resetMigration",
                     "when": "true"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.showLogs",
+                    "command": "logicAppsMigrationAgent.showLogs",
                     "when": "true"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.runDiscovery",
+                    "command": "logicAppsMigrationAgent.runDiscovery",
                     "when": "false"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.rescanArtifacts",
+                    "command": "logicAppsMigrationAgent.rescanArtifacts",
                     "when": "false"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.viewFlowVisualization",
+                    "command": "logicAppsMigrationAgent.viewFlowVisualization",
                     "when": "false"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.viewDependencyGraph",
+                    "command": "logicAppsMigrationAgent.viewDependencyGraph",
                     "when": "false"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.openPlanningView",
+                    "command": "logicAppsMigrationAgent.openPlanningView",
                     "when": "false"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.generatePlanForFlow",
+                    "command": "logicAppsMigrationAgent.generatePlanForFlow",
                     "when": "false"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.openConversionView",
+                    "command": "logicAppsMigrationAgent.openConversionView",
                     "when": "false"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.generateConversionForFlow",
+                    "command": "logicAppsMigrationAgent.generateConversionForFlow",
                     "when": "false"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.executeConversionTask",
+                    "command": "logicAppsMigrationAgent.executeConversionTask",
                     "when": "false"
                 },
                 {
-                    "command": "logicAppsMigrationAssistant.executeAllConversionTasks",
+                    "command": "logicAppsMigrationAgent.executeAllConversionTasks",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAgent.exportAnalysisReport",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAgent.exportPlanReport",
                     "when": "false"
                 }
             ]
         },
         "configuration": {
-            "title": "Logic Apps Migration Assistant",
+            "title": "Logic Apps Migration Agent",
             "properties": {
-                "logicAppsMigrationAssistant.deploymentModel": {
+                "logicAppsMigrationAgent.deploymentModel": {
                     "type": "string",
                     "enum": [
                         "workflow-service-plan",
@@ -1807,17 +1827,17 @@
                     "default": "workflow-service-plan",
                     "markdownDescription": "Target platform deployment model for Logic Apps Standard"
                 },
-                "logicAppsMigrationAssistant.azure.subscriptionId": {
+                "logicAppsMigrationAgent.azure.subscriptionId": {
                     "type": "string",
                     "default": "",
                     "description": "Azure subscription ID for deployment"
                 },
-                "logicAppsMigrationAssistant.azure.resourceGroup": {
+                "logicAppsMigrationAgent.azure.resourceGroup": {
                     "type": "string",
                     "default": "integration-migration-tool-test-rg",
                     "description": "Azure resource group for provisioning and testing resources"
                 },
-                "logicAppsMigrationAssistant.azure.location": {
+                "logicAppsMigrationAgent.azure.location": {
                     "type": "string",
                     "default": "eastus",
                     "description": "Azure region for provisioning resources"
@@ -1868,6 +1888,7 @@
         "@azure/identity": "^4.0.1",
         "@vscode/extension-telemetry": "^1.0.0",
         "@xmldom/xmldom": "^0.8.11",
+        "docx": "^9.6.1",
         "fast-xml-parser": "^5.3.4",
         "immer": "^11.0.0",
         "mermaid": "^11.13.0",

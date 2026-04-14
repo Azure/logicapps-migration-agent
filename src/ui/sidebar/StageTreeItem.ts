@@ -195,7 +195,7 @@ export class StageTreeItem extends MigrationTreeItem {
         }
 
         return {
-            command: 'logicAppsMigrationAssistant.viewFlowVisualization',
+            command: 'logicAppsMigrationAgent.viewFlowVisualization',
             title: 'Open Main Flow View',
         };
     }
@@ -280,7 +280,7 @@ export class ExitCriteriaTreeItem extends MigrationTreeItem {
             command:
                 props.isUserConfirmable && !props.isCompleted
                     ? {
-                          command: 'logicAppsMigrationAssistant.toggleExitCriteria',
+                          command: 'logicAppsMigrationAgent.toggleExitCriteria',
                           title: 'Toggle Exit Criteria',
                           arguments: [props.parentStage, props.criterionId],
                       }

@@ -143,7 +143,7 @@ export class ProjectAutoDetection implements vscode.Disposable {
         );
 
         await vscode.commands.executeCommand(
-            'logicAppsMigrationAssistant.selectSourceFolder',
+            'logicAppsMigrationAgent.selectSourceFolder',
             vscode.Uri.file(folderPath)
         );
     }

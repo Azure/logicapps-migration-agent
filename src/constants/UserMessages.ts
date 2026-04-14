@@ -71,7 +71,7 @@ export class UserPrompts {
 
     static extensionUpdated(version: string): string {
         return format(
-            'Logic Apps Migration Assistant updated to v{0}. A window reload is recommended to register new tools.',
+            'Logic Apps Migration Agent updated to v{0}. A window reload is recommended to register new tools.',
             version
         );
     }
@@ -248,7 +248,7 @@ export class UserPrompts {
     // ========================================================================
 
     static missingRequiredExtensions(count: number): string {
-        return format('Logic Apps Migration Assistant: {0} required extension(s) missing.', count);
+        return format('Logic Apps Migration Agent: {0} required extension(s) missing.', count);
     }
 
     static readonly COPILOT_RECOMMENDED =
@@ -388,7 +388,7 @@ export class UserPrompts {
     // Welcome Panel
     // ========================================================================
 
-    static readonly WELCOME_PANEL_TITLE = 'Welcome to Logic Apps Migration Assistant';
+    static readonly WELCOME_PANEL_TITLE = 'Welcome to Logic Apps Migration Agent';
     static readonly SELECT_SOURCE_FOLDER_LABEL = 'Select Source Folder';
     static readonly SELECT_INTEGRATION_SOURCE_TITLE = 'Select Integration Source Folder';
 

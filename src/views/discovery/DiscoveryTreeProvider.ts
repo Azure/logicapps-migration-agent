@@ -751,7 +751,7 @@ export function registerDiscoveryTreeProvider(
 ): DiscoveryTreeProvider {
     const provider = DiscoveryTreeProvider.getInstance();
 
-    const treeView = vscode.window.createTreeView('logicAppsMigrationAssistant.discovery', {
+    const treeView = vscode.window.createTreeView('logicAppsMigrationAgent.discovery', {
         treeDataProvider: provider,
         showCollapseAll: true,
     });

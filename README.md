@@ -1,4 +1,4 @@
-# Logic Apps Migration Assistant
+# Logic Apps Migration Agent
 
 > **VS Code Extension for migrating BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard**
 
@@ -10,13 +10,13 @@
 
 See the extension in action before you install it.
 
-[![Watch the Logic Apps Migration Assistant demo](docs/media/logic-apps-migration-assistant-demo-poster.png)](docs/media/logic-apps-migration-assistant-demo.mp4)
+[![Watch the Logic Apps Migration Agent demo](docs/media/logic-apps-migration-assistant-demo-poster.png)](docs/media/logic-apps-migration-assistant-demo.mp4)
 
 Click the preview image above to open the demo video: [logic-apps-migration-assistant-demo.mp4](docs/media/logic-apps-migration-assistant-demo.mp4)
 
 ## Overview
 
-The **Logic Apps Migration Assistant** is a VS Code extension that automates the migration of enterprise integration solutions to Azure Logic Apps Standard. It uses AI-powered analysis via GitHub Copilot to guide you through a structured migration workflow — all running locally within VS Code.
+The **Logic Apps Migration Agent** is a VS Code extension that automates the migration of enterprise integration solutions to Azure Logic Apps Standard. It uses AI-powered analysis via GitHub Copilot to guide you through a structured migration workflow — all running locally within VS Code.
 
 ### Supported Source Platforms
 
@@ -64,8 +64,8 @@ Discovery → Planning → Conversion → Validation → Deployment
 
 1. Install the extension from VS Code Marketplace
 2. Open your BizTalk or MuleSoft project folder in VS Code
-3. Click the **Logic Apps Migration Assistant** icon in the Activity Bar
-4. Select your source folder when prompted (or use the command palette: `Logic Apps Migration Assistant: Select Source Folder`)
+3. Click the **Logic Apps Migration Agent** icon in the Activity Bar
+4. Select your source folder when prompted (or use the command palette: `Logic Apps Migration Agent: Select Source Folder`)
 5. Follow the guided 5-stage workflow
 
 ## Requirements
@@ -82,22 +82,22 @@ Discovery → Planning → Conversion → Validation → Deployment
 
 ## Extension Settings
 
-Configure via `Settings > Extensions > Logic Apps Migration Assistant`:
+Configure via `Settings > Extensions > Logic Apps Migration Agent`:
 
 | Setting                                            | Description                                       | Default                              |
 | -------------------------------------------------- | ------------------------------------------------- | ------------------------------------ |
-| `logicAppsMigrationAssistant.deploymentModel`      | Target deployment model for Logic Apps Standard   | `workflow-service-plan`              |
-| `logicAppsMigrationAssistant.azure.subscriptionId` | Azure subscription ID for deployment              | (empty)                              |
-| `logicAppsMigrationAssistant.azure.resourceGroup`  | Azure resource group for provisioning and testing | `integration-migration-tool-test-rg` |
-| `logicAppsMigrationAssistant.azure.location`       | Azure region for provisioning resources           | `eastus`                             |
+| `logicAppsMigrationAgent.deploymentModel`      | Target deployment model for Logic Apps Standard   | `workflow-service-plan`              |
+| `logicAppsMigrationAgent.azure.subscriptionId` | Azure subscription ID for deployment              | (empty)                              |
+| `logicAppsMigrationAgent.azure.resourceGroup`  | Azure resource group for provisioning and testing | `integration-migration-tool-test-rg` |
+| `logicAppsMigrationAgent.azure.location`       | Azure region for provisioning resources           | `eastus`                             |
 
 ## Command Palette
 
-| Command                                                | Description                                          |
-| ------------------------------------------------------ | ---------------------------------------------------- |
-| `Logic Apps Migration Assistant: Select Source Folder` | Start migration by selecting a source project folder |
-| `Logic Apps Migration Assistant: Reset Migration`      | Reset all migration state and start over             |
-| `Logic Apps Migration Assistant: Show Extension Logs`  | Open the extension output channel for debugging      |
+| Command                                            | Description                                          |
+| -------------------------------------------------- | ---------------------------------------------------- |
+| `Logic Apps Migration Agent: Select Source Folder` | Start migration by selecting a source project folder |
+| `Logic Apps Migration Agent: Reset Migration`      | Reset all migration state and start over             |
+| `Logic Apps Migration Agent: Show Extension Logs`  | Open the extension output channel for debugging      |
 
 ## Architecture
 

@@ -68,5 +68,9 @@ export type {
     AdfResource,
 } from './MsiExtractorService';
 
+// Report Export
+export { ReportExporterService } from './ReportExporterService';
+export { MermaidImageRenderer } from './MermaidImageRenderer';
+
 // Tool services
 export * from './tools';

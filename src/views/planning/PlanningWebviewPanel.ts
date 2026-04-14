@@ -29,7 +29,7 @@ import { UserPrompts } from '../../constants/UserMessages';
  */
 export class PlanningWebviewPanel implements vscode.Disposable {
     public static currentPanel: PlanningWebviewPanel | undefined;
-    public static readonly viewType = 'logicAppsMigrationAssistant.planningView';
+    public static readonly viewType = 'logicAppsMigrationAgent.planningView';
 
     private readonly panel: vscode.WebviewPanel;
     private readonly logger = LoggingService.getInstance();
@@ -163,7 +163,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                     this.logger.info(`Planning started for flow: ${flowId}`);
                     // Trigger plan generation via command
                     vscode.commands
-                        .executeCommand('logicAppsMigrationAssistant.generatePlanForFlow', flowId)
+                        .executeCommand('logicAppsMigrationAgent.generatePlanForFlow', flowId)
                         .then(
                             () =>
                                 this.logger.info(`Planning command completed for flow: ${flowId}`),
@@ -206,7 +206,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                             this.update();
                             vscode.commands
                                 .executeCommand(
-                                    'logicAppsMigrationAssistant.generatePlanForFlow',
+                                    'logicAppsMigrationAgent.generatePlanForFlow',
                                     flowId
                                 )
                                 .then(
@@ -240,9 +240,9 @@ export class PlanningWebviewPanel implements vscode.Disposable {
 
             case 'goToDiscovery': {
                 void vscode.commands.executeCommand(
-                    'logicAppsMigrationAssistant.viewFlowVisualization'
+                    'logicAppsMigrationAgent.viewFlowVisualization'
                 );
-                void vscode.commands.executeCommand('logicAppsMigrationAssistant.discovery.focus');
+                void vscode.commands.executeCommand('logicAppsMigrationAgent.discovery.focus');
                 break;
             }
 
@@ -258,22 +258,29 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                             query: prompt,
                         })
                         .then(undefined, () => {
-                            void vscode.commands.executeCommand(
-                                'workbench.action.chat.newChat',
-                                {
-                                    query: prompt,
-                                }
-                            );
+                            void vscode.commands.executeCommand('workbench.action.chat.newChat', {
+                                query: prompt,
+                            });
                         });
+                }
+                break;
+            }
+
+            case 'exportPlanReport': {
+                const flowId = message.data as string;
+                if (flowId) {
+                    this.logger.info(
+                        `[PlanningWebview] Export report requested for flow: ${flowId}`
+                    );
+                    void vscode.commands.executeCommand(
+                        'logicAppsMigrationAgent.exportPlanReport',
+                        flowId
+                    );
                 }
                 break;
             }
         }
     }
-
-    /**
-     * Get HTML content for webview.
-     */
     private getHtmlContent(
         flows: PlanningFlow[],
         selectedFlowId: string | undefined,
@@ -1585,6 +1592,11 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             vscode.postMessage({ command: 'replan', data: flowId });
         }
 
+        function exportPlanReport(flowId) {
+            window._dbgLog('info', 'exportPlanReport: ' + flowId);
+            vscode.postMessage({ command: 'exportPlanReport', data: flowId });
+        }
+
         function refresh() {
             window._dbgLog('info', 'refresh');
             vscode.postMessage({ command: 'refresh' });
@@ -2158,6 +2170,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                                 </div>
                             </div>
                             <button class="btn btn-sm btn-outline" onclick="replanFlow('${this.escapeHtml(result.flowId)}')" title="Clear and regenerate the plan">↻ Regenerate Plan</button>
+                            <button class="btn btn-sm btn-outline" onclick="exportPlanReport('${this.escapeHtml(result.flowId)}')" title="Export planning report as DOCX">📄 Export Report</button>
                         </div>
                     </div>
                 </div>
@@ -2229,6 +2242,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                             </div>
                         </div>
                         <button class="btn btn-sm btn-outline" onclick="replanFlow('${this.escapeHtml(result.flowId)}')" title="Clear and regenerate the plan">↻ Regenerate Plan</button>
+                        <button class="btn btn-sm btn-outline" onclick="exportPlanReport('${this.escapeHtml(result.flowId)}')" title="Export planning report as DOCX">📄 Export Report</button>
                     </div>
                 </div>
                 <div class="plan-tabs" style="margin-top: 12px;">

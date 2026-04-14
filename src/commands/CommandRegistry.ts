@@ -23,6 +23,7 @@ import { PlanningWebviewPanel } from '../views/planning';
 import { ConversionWebviewPanel } from '../views/conversion';
 import { UserPrompts } from '../constants/UserMessages';
 import { ChatPrompts } from '../constants/ChatPrompts';
+import type { GeneratedFlowResult } from '../services/LLMFlowGenerator';
 
 /**
  * Command handler function type
@@ -65,97 +66,108 @@ export class CommandRegistry implements vscode.Disposable {
     public registerAll(context: vscode.ExtensionContext): void {
         const commands: CommandDefinition[] = [
             {
-                id: 'logicAppsMigrationAssistant.start',
+                id: 'logicAppsMigrationAgent.start',
                 handler: this.handleStartMigration.bind(this),
                 title: 'Start Migration',
             },
             {
-                id: 'logicAppsMigrationAssistant.openSidebar',
+                id: 'logicAppsMigrationAgent.openSidebar',
                 handler: this.handleOpenSidebar.bind(this),
                 title: 'Open Sidebar',
             },
             {
-                id: 'logicAppsMigrationAssistant.selectSourceFolder',
+                id: 'logicAppsMigrationAgent.selectSourceFolder',
                 handler: this.handleSelectSourceFolder.bind(this),
                 title: 'Select Source Folder',
             },
             {
-                id: 'logicAppsMigrationAssistant.viewMigrationPlan',
+                id: 'logicAppsMigrationAgent.viewMigrationPlan',
                 handler: this.handleViewMigrationPlan.bind(this),
                 title: 'View Migration Plan',
             },
             {
-                id: 'logicAppsMigrationAssistant.resetMigration',
+                id: 'logicAppsMigrationAgent.resetMigration',
                 handler: this.handleResetMigration.bind(this),
                 title: 'Reset Migration',
             },
             {
-                id: 'logicAppsMigrationAssistant.showLogs',
+                id: 'logicAppsMigrationAgent.showLogs',
                 handler: this.handleShowLogs.bind(this),
                 title: 'Show Logs',
             },
             {
-                id: 'logicAppsMigrationAssistant.checkPrerequisites',
+                id: 'logicAppsMigrationAgent.checkPrerequisites',
                 handler: this.handleCheckPrerequisites.bind(this),
                 title: 'Check Prerequisites',
             },
             // Discovery Stage Commands (Phase 6)
             {
-                id: 'logicAppsMigrationAssistant.runDiscovery',
+                id: 'logicAppsMigrationAgent.runDiscovery',
                 handler: this.handleRunDiscovery.bind(this),
                 title: 'Run Discovery',
             },
             {
-                id: 'logicAppsMigrationAssistant.rescanArtifacts',
+                id: 'logicAppsMigrationAgent.rescanArtifacts',
                 handler: this.handleRescanArtifacts.bind(this),
                 title: 'Rescan Artifacts',
             },
             {
-                id: 'logicAppsMigrationAssistant.viewFlowVisualization',
+                id: 'logicAppsMigrationAgent.viewFlowVisualization',
                 handler: this.handleViewFlowVisualization.bind(this),
                 title: 'View Flow Visualization',
             },
             {
-                id: 'logicAppsMigrationAssistant.viewDependencyGraph',
+                id: 'logicAppsMigrationAgent.viewDependencyGraph',
                 handler: this.handleViewDependencyGraph.bind(this),
                 title: 'View Dependency Graph',
             },
             // Planning Stage Commands
             {
-                id: 'logicAppsMigrationAssistant.openPlanningView',
+                id: 'logicAppsMigrationAgent.openPlanningView',
                 handler: this.handleOpenPlanningView.bind(this),
                 title: 'Open Planning View',
             },
             {
-                id: 'logicAppsMigrationAssistant.generatePlanForFlow',
+                id: 'logicAppsMigrationAgent.generatePlanForFlow',
                 handler: this.handleGeneratePlanForFlow.bind(this),
                 title: 'Generate Plan for Flow',
             },
             // Conversion Stage Commands
             {
-                id: 'logicAppsMigrationAssistant.openConversionView',
+                id: 'logicAppsMigrationAgent.openConversionView',
                 handler: this.handleOpenConversionView.bind(this),
                 title: 'Open Conversion View',
             },
             {
-                id: 'logicAppsMigrationAssistant.generateConversionForFlow',
+                id: 'logicAppsMigrationAgent.generateConversionForFlow',
                 handler: this.handleGenerateConversionForFlow.bind(this),
                 title: 'Generate Conversion for Flow',
             },
             {
-                id: 'logicAppsMigrationAssistant.executeConversionTask',
+                id: 'logicAppsMigrationAgent.executeConversionTask',
                 handler: this.handleExecuteConversionTask.bind(this),
                 title: 'Execute Conversion Task',
             },
             {
-                id: 'logicAppsMigrationAssistant.executeAllConversionTasks',
+                id: 'logicAppsMigrationAgent.executeAllConversionTasks',
                 handler: this.handleExecuteAllConversionTasks.bind(this),
                 title: 'Execute All Conversion Tasks',
             },
             {
-                id: 'logicAppsMigrationAssistant.executeBlackBoxTest',
+                id: 'logicAppsMigrationAgent.executeBlackBoxTest',
                 handler: this.handleExecuteBlackBoxTest.bind(this),
                 title: 'Execute Black Box Test',
+            },
+            // Export Report Commands
+            {
+                id: 'logicAppsMigrationAgent.exportAnalysisReport',
+                handler: this.handleExportAnalysisReport.bind(this),
+                title: 'Export Analysis Report',
+            },
+            {
+                id: 'logicAppsMigrationAgent.exportPlanReport',
+                handler: this.handleExportPlanReport.bind(this),
+                title: 'Export Planning Report',
             },
         ];
 
@@ -249,11 +261,11 @@ export class CommandRegistry implements vscode.Disposable {
 
                     if (result === UserPrompts.BUTTON_VIEW_RESULTS) {
                         await vscode.commands.executeCommand(
-                            'logicAppsMigrationAssistant.viewDependencyGraph'
+                            'logicAppsMigrationAgent.viewDependencyGraph'
                         );
                     } else if (result === UserPrompts.BUTTON_CHANGE_SOURCE_FOLDER) {
                         await vscode.commands.executeCommand(
-                            'logicAppsMigrationAssistant.selectSourceFolder'
+                            'logicAppsMigrationAgent.selectSourceFolder'
                         );
                     }
                 } else {
@@ -266,11 +278,11 @@ export class CommandRegistry implements vscode.Disposable {
 
                     if (result === UserPrompts.BUTTON_RUN_DISCOVERY) {
                         await vscode.commands.executeCommand(
-                            'logicAppsMigrationAssistant.runDiscovery'
+                            'logicAppsMigrationAgent.runDiscovery'
                         );
                     } else if (result === UserPrompts.BUTTON_CHANGE_SOURCE_FOLDER) {
                         await vscode.commands.executeCommand(
-                            'logicAppsMigrationAssistant.selectSourceFolder'
+                            'logicAppsMigrationAgent.selectSourceFolder'
                         );
                     }
                 }
@@ -279,14 +291,14 @@ export class CommandRegistry implements vscode.Disposable {
         }
 
         // No migration in progress — go directly to folder selection
-        await vscode.commands.executeCommand('logicAppsMigrationAssistant.selectSourceFolder');
+        await vscode.commands.executeCommand('logicAppsMigrationAgent.selectSourceFolder');
     }
 
     /**
      * Handle opening the sidebar
      */
     private async handleOpenSidebar(): Promise<void> {
-        await vscode.commands.executeCommand('logicAppsMigrationAssistant.discovery.focus');
+        await vscode.commands.executeCommand('logicAppsMigrationAgent.discovery.focus');
     }
 
     /**
@@ -524,7 +536,7 @@ export class CommandRegistry implements vscode.Disposable {
      * Handle viewing migration plan
      */
     private async handleViewMigrationPlan(): Promise<void> {
-        await vscode.commands.executeCommand('logicAppsMigrationAssistant.openPlanningView');
+        await vscode.commands.executeCommand('logicAppsMigrationAgent.openPlanningView');
     }
 
     /**
@@ -1053,7 +1065,7 @@ export class CommandRegistry implements vscode.Disposable {
         vscode.window.showInformationMessage(UserPrompts.analysingConversionTasks(flowName));
 
         // Read Azure settings from VS Code configuration
-        const azureConfig = vscode.workspace.getConfiguration('logicAppsMigrationAssistant.azure');
+        const azureConfig = vscode.workspace.getConfiguration('logicAppsMigrationAgent.azure');
         const azureResourceGroup = azureConfig.get<string>(
             'resourceGroup',
             'integration-migration-tool-test-rg'
@@ -1208,7 +1220,7 @@ export class CommandRegistry implements vscode.Disposable {
 
         // Open agent chat for this specific task
         try {
-            const azCfg = vscode.workspace.getConfiguration('logicAppsMigrationAssistant.azure');
+            const azCfg = vscode.workspace.getConfiguration('logicAppsMigrationAgent.azure');
             const rg = azCfg.get<string>('resourceGroup', 'integration-migration-tool-test-rg');
             const loc = azCfg.get<string>('location', 'eastus');
 
@@ -1391,7 +1403,7 @@ export class CommandRegistry implements vscode.Disposable {
             : '';
 
         try {
-            const azCfg2 = vscode.workspace.getConfiguration('logicAppsMigrationAssistant.azure');
+            const azCfg2 = vscode.workspace.getConfiguration('logicAppsMigrationAgent.azure');
             const rg2 = azCfg2.get<string>('resourceGroup', 'integration-migration-tool-test-rg');
             const loc2 = azCfg2.get<string>('location', 'eastus');
 
@@ -1574,6 +1586,76 @@ export class CommandRegistry implements vscode.Disposable {
                     err instanceof Error ? err.message : String(err)
                 )
             );
+        }
+    }
+
+    /**
+     * Export analysis report as DOCX
+     */
+    private async handleExportAnalysisReport(
+        flowId?: string,
+        flowName?: string,
+        analysisResult?: GeneratedFlowResult
+    ): Promise<void> {
+        const logger = LoggingService.getInstance();
+
+        if (!flowId || !analysisResult) {
+            vscode.window.showWarningMessage('No analysis data available to export.');
+            return;
+        }
+
+        logger.info(`[Export] Generating analysis report for flow: ${flowId}`);
+        const { ReportExporterService } = await import('../services/ReportExporterService');
+        const exporter = ReportExporterService.getInstance();
+        const filePath = await exporter.generateAnalysisReport(
+            flowId,
+            flowName || flowId,
+            analysisResult
+        );
+
+        if (filePath) {
+            const openAction = await vscode.window.showInformationMessage(
+                `Analysis report saved successfully.`,
+                'Open File',
+                'Open Folder'
+            );
+            if (openAction === 'Open File') {
+                await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
+            } else if (openAction === 'Open Folder') {
+                const folderPath = (await import('path')).dirname(filePath);
+                await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(folderPath));
+            }
+        }
+    }
+
+    /**
+     * Export planning report as DOCX
+     */
+    private async handleExportPlanReport(flowId?: string): Promise<void> {
+        const logger = LoggingService.getInstance();
+
+        if (!flowId) {
+            vscode.window.showWarningMessage('No flow specified for report export.');
+            return;
+        }
+
+        logger.info(`[Export] Generating planning report for flow: ${flowId}`);
+        const { ReportExporterService } = await import('../services/ReportExporterService');
+        const exporter = ReportExporterService.getInstance();
+        const filePath = await exporter.generatePlanningReport(flowId);
+
+        if (filePath) {
+            const openAction = await vscode.window.showInformationMessage(
+                `Planning report saved successfully.`,
+                'Open File',
+                'Open Folder'
+            );
+            if (openAction === 'Open File') {
+                await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
+            } else if (openAction === 'Open Folder') {
+                const folderPath = (await import('path')).dirname(filePath);
+                await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(folderPath));
+            }
         }
     }
 

@@ -69,7 +69,7 @@ export class TelemetryService implements vscode.Disposable {
 
         // Listen for configuration changes
         vscode.workspace.onDidChangeConfiguration((event) => {
-            if (event.affectsConfiguration('logicAppsMigrationAssistant.enableTelemetry')) {
+            if (event.affectsConfiguration('logicAppsMigrationAgent.enableTelemetry')) {
                 this.updateEnabledState();
             }
         });

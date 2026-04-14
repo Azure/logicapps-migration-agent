@@ -379,7 +379,7 @@ export class DiscoveryService implements vscode.Disposable {
             // Auto-open the discovery webview after artifact parsing completes
             try {
                 await vscode.commands.executeCommand(
-                    'logicAppsMigrationAssistant.viewFlowVisualization',
+                    'logicAppsMigrationAgent.viewFlowVisualization',
                     'DISCOVERY'
                 );
             } catch (openErr) {

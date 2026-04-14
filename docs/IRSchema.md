@@ -1,6 +1,6 @@
 # IR Schema Reference (v3 - Extensible)
 
-> This document contains the complete Intermediate Representation (IR) schema used by the Logic Apps Migration Assistant. For an overview and quick reference, see the [README](../README.md#ir-schema).
+> This document contains the complete Intermediate Representation (IR) schema used by the Logic Apps Migration Agent. For an overview and quick reference, see the [README](../README.md#ir-schema).
 
 ## Table of Contents
 
