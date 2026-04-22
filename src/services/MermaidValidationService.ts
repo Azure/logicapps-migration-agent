@@ -1,4 +1,4 @@
-import { diagram as flowchartDiagram } from 'mermaid/dist/chunks/mermaid.core/flowDiagram-PKNHOUZH.mjs';
+import { diagram as flowchartDiagram } from 'mermaid/dist/chunks/mermaid.core/flowDiagram-DWJPFMVM.mjs';
 import { LoggingService } from './LoggingService';
 
 interface FlowchartDbLike {

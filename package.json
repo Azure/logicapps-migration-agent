@@ -5,8 +5,10 @@
     "version": "1.6.0",
     "publisher": "microsoft",
     "license": "MIT",
+    "packageManager": "pnpm@9.1.3",
     "engines": {
-        "vscode": "^1.85.0"
+        "vscode": "^1.85.0",
+        "pnpm": ">=9"
     },
     "categories": [
         "Azure",
@@ -1846,7 +1848,7 @@
         }
     },
     "scripts": {
-        "vscode:prepublish": "node scripts/build-reference-workflow-catalog.js && npm run build",
+        "vscode:prepublish": "node scripts/build-reference-workflow-catalog.js && pnpm run build",
         "build": "node esbuild.js --production",
         "watch": "node esbuild.js --watch",
         "compile": "tsc -p ./",
@@ -1854,7 +1856,7 @@
         "lint:fix": "eslint src --fix",
         "format": "prettier --write \"src/**/*.ts\"",
         "format:check": "prettier --check \"src/**/*.ts\"",
-        "test": "npm run compile && npm run test:unit && npm run test:integration",
+        "test": "pnpm run compile && pnpm run test:unit && pnpm run test:integration",
         "test:unit": "node ./out/test/runTest.js unit",
         "test:integration": "node ./out/test/runTest.js integration",
         "package": "vsce package",
@@ -1872,6 +1874,7 @@
         "@vscode/test-electron": "^2.3.8",
         "@vscode/vsce": "^3.0.0",
         "esbuild": "^0.27.0",
+        "@eslint/js": "^9.0.0",
         "eslint": "^9.0.0",
         "glob": "^13.0.0",
         "husky": "^9.0.0",
@@ -1887,6 +1890,7 @@
         "@azure/arm-resources": "^7.0.0",
         "@azure/identity": "^4.0.1",
         "@vscode/extension-telemetry": "^1.0.0",
+        "@microsoft/applicationinsights-common": "^3.4.1",
         "@xmldom/xmldom": "^0.8.11",
         "docx": "^9.6.1",
         "fast-xml-parser": "^5.3.4",

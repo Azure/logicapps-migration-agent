@@ -5,7 +5,11 @@ steps:
           versionSpec: '20.x'
       condition: succeeded()
 
-    - script: npm install
+    - script: npm install -g pnpm
+      displayName: 'Install pnpm'
+      condition: succeeded()
+
+    - script: pnpm install --frozen-lockfile
       displayName: 'Install dependencies'
       workingDirectory: $(working_directory)
       condition: succeeded()

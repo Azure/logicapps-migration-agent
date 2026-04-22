@@ -1,4 +1,4 @@
-declare module 'mermaid/dist/chunks/mermaid.core/flowDiagram-PKNHOUZH.mjs' {
+declare module 'mermaid/dist/chunks/mermaid.core/flowDiagram-DWJPFMVM.mjs' {
     export const diagram: {
         parser: {
             yy?: unknown;
