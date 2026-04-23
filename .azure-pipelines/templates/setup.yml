@@ -5,11 +5,58 @@ steps:
           versionSpec: '20.x'
       condition: succeeded()
 
-    - script: npm install -g pnpm
+    - pwsh: |
+          $packageManager = (Get-Content -Raw -Path "$(Build.SourcesDirectory)\package.json" | ConvertFrom-Json).packageManager
+          if (-not $packageManager -or -not $packageManager.StartsWith('pnpm@')) {
+              throw "package.json must define packageManager with a pnpm version."
+          }
+
+          $pnpmVersion = $packageManager.Substring(5).Split('+')[0]
+          Write-Output "##vso[task.setvariable variable=pnpmVersion]$pnpmVersion"
+      displayName: 'Resolve pnpm version'
+      condition: succeeded()
+
+    - pwsh: |
+          $registry = '$(CI_NPM_REGISTRY_URL)'
+          if (-not $registry -or $registry -match '^\$\([^)]+\)$') {
+              $registry = 'https://msazure.pkgs.visualstudio.com/One/_packaging/microsoft-logic-apps/npm/registry/'
+          }
+          if (-not $registry.EndsWith('/')) {
+              $registry += '/'
+          }
+
+          $ciNpmrc = '$(Agent.TempDirectory)\ci.npmrc'
+          $repoNpmrc = Join-Path '$(Build.SourcesDirectory)' '.npmrc'
+          $lines = @(
+              "registry=$registry"
+              'always-auth=true'
+          )
+
+          if (Test-Path $repoNpmrc) {
+              $lines += Get-Content $repoNpmrc
+          }
+
+          Set-Content -Path $ciNpmrc -Value $lines -Encoding utf8
+          Write-Host "Created CI .npmrc at $ciNpmrc"
+          Get-Content $ciNpmrc
+      displayName: 'Configure npm registry'
+      condition: succeeded()
+
+    - task: npmAuthenticate@0
+      displayName: 'Authenticate npm'
+      inputs:
+          workingFile: '$(Agent.TempDirectory)\ci.npmrc'
+      condition: succeeded()
+
+    - script: npm install -g pnpm@$(pnpmVersion)
       displayName: 'Install pnpm'
+      env:
+          NPM_CONFIG_USERCONFIG: $(Agent.TempDirectory)\ci.npmrc
       condition: succeeded()
 
     - script: pnpm install --frozen-lockfile
       displayName: 'Install dependencies'
       workingDirectory: $(working_directory)
+      env:
+          NPM_CONFIG_USERCONFIG: $(Agent.TempDirectory)\ci.npmrc
       condition: succeeded()
