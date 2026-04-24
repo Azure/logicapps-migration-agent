@@ -7,13 +7,16 @@ steps:
 
     - pwsh: |
           $packageManager = (Get-Content -Raw -Path "$(Build.SourcesDirectory)\package.json" | ConvertFrom-Json).packageManager
-          if (-not $packageManager -or -not $packageManager.StartsWith('pnpm@')) {
-              throw "package.json must define packageManager with a pnpm version."
+          if ($packageManager -and $packageManager.StartsWith('pnpm@')) {
+              $pnpmVersion = $packageManager.Substring(5).Split('+')[0]
+              Write-Output "##vso[task.setvariable variable=dependencyInstaller]pnpm"
+              Write-Output "##vso[task.setvariable variable=pnpmVersion]$pnpmVersion"
+              Write-Host "Using pnpm $pnpmVersion from package.json"
+          } else {
+              Write-Output "##vso[task.setvariable variable=dependencyInstaller]npm"
+              Write-Host "package.json does not declare pnpm; falling back to npm install for this release tag."
           }
-
-          $pnpmVersion = $packageManager.Substring(5).Split('+')[0]
-          Write-Output "##vso[task.setvariable variable=pnpmVersion]$pnpmVersion"
-      displayName: 'Resolve pnpm version'
+      displayName: 'Resolve dependency installer'
       condition: succeeded()
 
     - pwsh: |
@@ -50,13 +53,20 @@ steps:
 
     - script: npm install -g pnpm@$(pnpmVersion)
       displayName: 'Install pnpm'
+      condition: and(succeeded(), eq(variables['dependencyInstaller'], 'pnpm'))
       env:
           NPM_CONFIG_USERCONFIG: $(Agent.TempDirectory)\ci.npmrc
-      condition: succeeded()
 
     - script: pnpm install --frozen-lockfile
       displayName: 'Install dependencies'
       workingDirectory: $(working_directory)
+      condition: and(succeeded(), eq(variables['dependencyInstaller'], 'pnpm'))
       env:
           NPM_CONFIG_USERCONFIG: $(Agent.TempDirectory)\ci.npmrc
-      condition: succeeded()
+
+    - script: npm install --no-audit --no-fund
+      displayName: 'Install dependencies'
+      workingDirectory: $(working_directory)
+      condition: and(succeeded(), eq(variables['dependencyInstaller'], 'npm'))
+      env:
+          NPM_CONFIG_USERCONFIG: $(Agent.TempDirectory)\ci.npmrc
