@@ -8,7 +8,7 @@ steps:
       workingDirectory: $(working_directory)
       condition: succeeded()
 
-    - script: npx @vscode/vsce package
+    - script: npx @vscode/vsce package --no-dependencies
       displayName: 'Package VSIX'
       workingDirectory: $(working_directory)
       condition: succeeded()
