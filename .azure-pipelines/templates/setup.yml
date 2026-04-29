@@ -22,7 +22,7 @@ steps:
     - pwsh: |
           $registry = '$(CI_NPM_REGISTRY_URL)'
           if (-not $registry -or $registry -match '^\$\([^)]+\)$') {
-              $registry = 'https://msazure.pkgs.visualstudio.com/One/_packaging/microsoft-logic-apps/npm/registry/'
+              $registry = 'https://registry.npmjs.org/'
           }
           if (-not $registry.EndsWith('/')) {
               $registry += '/'
@@ -32,7 +32,6 @@ steps:
           $repoNpmrc = Join-Path '$(Build.SourcesDirectory)' '.npmrc'
           $lines = @(
               "registry=$registry"
-              'always-auth=true'
           )
 
           if (Test-Path $repoNpmrc) {
