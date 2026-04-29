@@ -50,12 +50,11 @@ steps:
           workingFile: '$(Agent.TempDirectory)\ci.npmrc'
       condition: succeeded()
 
-    - task: Npm@1
+    - script: npm install -g pnpm@$(pnpmVersion)
       displayName: 'Install pnpm'
-      inputs:
-          command: custom
-          customCommand: 'install -g pnpm@$(pnpmVersion)'
       condition: and(succeeded(), eq(variables['dependencyInstaller'], 'pnpm'))
+      env:
+          NPM_CONFIG_USERCONFIG: $(Agent.TempDirectory)\ci.npmrc
 
     - script: pnpm install --frozen-lockfile
       displayName: 'Install dependencies'
