@@ -3,7 +3,7 @@ parameters:
       type: string
 
 steps:
-    - script: npm version ${{ parameters.publishVersion }} --no-git-tag-version
+    - script: npm version ${{ parameters.publishVersion }} --no-git-tag-version --allow-same-version
       displayName: 'Update version in package.json'
       workingDirectory: $(working_directory)
       condition: succeeded()
