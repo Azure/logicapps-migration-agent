@@ -44,4 +44,4 @@ steps:
           Write-Output "The file '$filePath' exists."
           exit 0
       displayName: 'Verify extension.signature.p7s'
-      condition: eq(variables['signprojExists'], True)
+      condition: and(succeeded(), eq(variables['signprojExists'], True))
