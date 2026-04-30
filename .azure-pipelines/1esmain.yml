@@ -60,6 +60,9 @@ extends:
               jobs:
                   - job: Build
                     templateContext:
+                        mb:
+                            signing:
+                                enabled: false
                         outputs:
                             - output: pipelineArtifact
                               targetPath: $(build.artifactstagingdirectory)/build/Root
