@@ -1,3 +1,8 @@
+parameters:
+    - name: enableSigning
+      type: boolean
+      default: true
+
 steps:
     # Check if the SignExtension.signproj file exists
     - powershell: |
@@ -10,23 +15,24 @@ steps:
               Write-Output "SignExtension.signproj file not found. Skipping signing."
           }
       displayName: 'Check for SignExtension.signproj'
+      condition: and(succeeded(), eq(${{ parameters.enableSigning }}, true))
 
     # Get extension info from package.json
     - pwsh: |
           Write-Output "##vso[task.setvariable variable=name;isOutput=true]$((Get-Content -Raw -Path package.json | ConvertFrom-Json).name)"
           Write-Output "##vso[task.setvariable variable=version;isOutput=true]$((Get-Content -Raw -Path package.json | ConvertFrom-Json).version)"
-      condition: eq(variables['signprojExists'], True)
+      condition: and(succeeded(), eq(variables['signprojExists'], True))
       name: package
       displayName: 'Get extension info from package.json'
 
     # Generate VSIX manifest for signing
     - script: npx @vscode/vsce generate-manifest -i $(package.name)-$(package.version).vsix -o $(Build.SourcesDirectory)/extension.manifest
-      condition: eq(variables['signprojExists'], True)
+      condition: and(succeeded(), eq(variables['signprojExists'], True))
       displayName: 'Generate extension manifest'
 
     # Sign the extension
     - task: DotNetCoreCLI@2
-      condition: eq(variables['signprojExists'], True)
+      condition: and(succeeded(), eq(variables['signprojExists'], True))
       displayName: 'Sign with MSBuild'
       inputs:
           command: 'build'

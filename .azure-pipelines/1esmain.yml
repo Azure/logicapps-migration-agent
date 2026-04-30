@@ -84,6 +84,8 @@ extends:
                               publishVersion: ${{ parameters.publishVersion }}
 
                         - template: .azure-pipelines/templates/sign.yml@self
+                          parameters:
+                              enableSigning: ${{ parameters.enableSigning }}
 
                         - template: .azure-pipelines/templates/stage-artifacts.yml@self
                           parameters:
