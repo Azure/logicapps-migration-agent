@@ -1,10 +1,10 @@
 steps:
-    - script: pnpm run lint
+    - script: npm run lint
       displayName: 'Lint'
       workingDirectory: $(working_directory)
       condition: succeeded()
 
-    - script: pnpm run build
+    - script: npm run build
       displayName: 'Build'
       workingDirectory: $(working_directory)
       condition: succeeded()

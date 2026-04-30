@@ -1848,7 +1848,7 @@
         }
     },
     "scripts": {
-        "vscode:prepublish": "node scripts/build-reference-workflow-catalog.js && pnpm run build",
+        "vscode:prepublish": "node scripts/build-reference-workflow-catalog.js && npm run build",
         "build": "node esbuild.js --production",
         "watch": "node esbuild.js --watch",
         "compile": "tsc -p ./",
