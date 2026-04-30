@@ -60,13 +60,6 @@ extends:
               jobs:
                   - job: Build
                     templateContext:
-                        mb:
-                            signing:
-                                enabled: ${{ parameters.enableSigning }}
-                                signType: real
-                                signWithProd: true
-                                zipSources: false
-                                azureSubscription: 'MicroBuild Signing Task (DevDiv)'
                         outputs:
                             - output: pipelineArtifact
                               targetPath: $(build.artifactstagingdirectory)/build/Root
