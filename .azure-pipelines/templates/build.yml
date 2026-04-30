@@ -1,10 +1,16 @@
 steps:
-    - script: npm run lint
+    - task: Npm@1
       displayName: 'Lint'
-      workingDirectory: $(working_directory)
+      inputs:
+          command: custom
+          customCommand: 'run lint'
+          workingDir: $(working_directory)
       condition: succeeded()
 
-    - script: npm run build
+    - task: Npm@1
       displayName: 'Build'
-      workingDirectory: $(working_directory)
+      inputs:
+          command: custom
+          customCommand: 'run build'
+          workingDir: $(working_directory)
       condition: succeeded()
