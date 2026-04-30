@@ -62,7 +62,7 @@ extends:
                     templateContext:
                         mb:
                             signing:
-                                enabled: false
+                                enabled: ${{ parameters.enableSigning }}
                         outputs:
                             - output: pipelineArtifact
                               targetPath: $(build.artifactstagingdirectory)/build/Root
