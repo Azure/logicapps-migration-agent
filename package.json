@@ -1891,7 +1891,7 @@
         "@azure/identity": "^4.0.1",
         "@vscode/extension-telemetry": "^1.0.0",
         "@microsoft/applicationinsights-common": "^3.4.1",
-        "@xmldom/xmldom": "^0.8.11",
+        "@xmldom/xmldom": "^0.8.13",
         "docx": "^9.6.1",
         "fast-xml-parser": "^5.3.4",
         "immer": "^11.0.0",
