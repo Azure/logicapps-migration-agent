@@ -5,30 +5,20 @@ steps:
           versionSpec: '20.x'
       condition: succeeded()
 
-    - pwsh: |
-          # Remove pnpm-specific .npmrc so npm ci does not choke on unknown keys
+    - powershell: |
+          # Remove pnpm .npmrc to avoid unknown config keys with npm
           $npmrc = Join-Path '$(Build.SourcesDirectory)' '.npmrc'
           if (Test-Path $npmrc) {
               Rename-Item $npmrc '.npmrc.pnpm' -Force
-              Write-Host "Renamed .npmrc to .npmrc.pnpm (contains pnpm-specific settings)"
+              Write-Host "Renamed .npmrc to .npmrc.pnpm (pnpm-specific)"
           }
-
-          # Strip the packageManager field so npm 10+ does not refuse to run
-          $pkg = Join-Path '$(Build.SourcesDirectory)' 'package.json'
-          $json = Get-Content $pkg -Raw | ConvertFrom-Json
-          if ($json.PSObject.Properties['packageManager']) {
-              $json.PSObject.Properties.Remove('packageManager')
-              $json | ConvertTo-Json -Depth 100 | Set-Content $pkg -Encoding utf8NoBOM
-              Write-Host "Removed packageManager field from package.json"
-          }
-      displayName: 'Prepare for npm ci (remove pnpm-specific config)'
+      displayName: 'Remove pnpm .npmrc'
       condition: succeeded()
 
     - task: Npm@1
       displayName: 'Install dependencies'
       inputs:
-          command: ci
+          command: install
           workingDir: $(working_directory)
           customRegistry: useFeed
           customFeed: DevDiv/CodeToCloud
-      condition: succeeded()

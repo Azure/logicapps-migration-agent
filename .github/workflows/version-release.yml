@@ -205,7 +205,7 @@ jobs:
               run: pnpm run lint
 
             - name: 'Build VSIX'
-              run: npx @vscode/vsce package
+              run: npx @vscode/vsce package --no-dependencies
               # vsce:prepublish runs automatically (builds catalog + production bundle)
 
             - name: 'Archive VSIX'
