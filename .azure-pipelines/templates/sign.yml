@@ -30,6 +30,27 @@ steps:
       condition: and(succeeded(), eq(variables['signprojExists'], True))
       displayName: 'Generate extension manifest'
 
+    # Write NuGet.Config dynamically (committed file is lost after tag checkout)
+    - powershell: |
+          $nugetConfig = @'
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="DevDiv_PublicPackages" value="https://pkgs.dev.azure.com/devdiv/DevDiv/_packaging/DevDiv_PublicPackages/nuget/v3/index.json" />
+            </packageSources>
+          </configuration>
+          '@
+          Set-Content -Path "$(Build.SourcesDirectory)/NuGet.Config" -Value $nugetConfig
+          Write-Host "Created NuGet.Config pointing to DevDiv_PublicPackages feed"
+      condition: and(succeeded(), eq(variables['signprojExists'], True))
+      displayName: 'Create NuGet.Config for ADO feed'
+
+    # Authenticate to ADO NuGet feed for Microsoft.Build.NoTargets SDK
+    - task: NuGetAuthenticate@1
+      condition: and(succeeded(), eq(variables['signprojExists'], True))
+      displayName: 'Authenticate NuGet feeds'
+
     # Sign the extension
     - task: DotNetCoreCLI@2
       condition: and(succeeded(), eq(variables['signprojExists'], True))
