@@ -29,4 +29,6 @@ steps:
       inputs:
           command: ci
           workingDir: $(working_directory)
+          customRegistry: useFeed
+          customFeed: DevDiv/CodeToCloud
       condition: succeeded()
