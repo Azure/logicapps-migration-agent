@@ -8,7 +8,11 @@ steps:
       workingDirectory: $(working_directory)
       condition: succeeded()
 
-    - script: npx @vscode/vsce package --no-dependencies
+    - task: Npm@1
       displayName: 'Package VSIX'
-      workingDirectory: $(working_directory)
-      condition: succeeded()
+      inputs:
+          command: custom
+          customCommand: 'exec @vscode/vsce package --no-dependencies'
+          workingDir: $(working_directory)
+          customRegistry: useFeed
+          customFeed: DevDiv/CodeToCloud
