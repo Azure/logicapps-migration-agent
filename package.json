@@ -1893,7 +1893,7 @@
         "@microsoft/applicationinsights-common": "^3.4.1",
         "@xmldom/xmldom": "^0.8.11",
         "docx": "^9.6.1",
-        "fast-xml-parser": "^5.3.4",
+        "fast-xml-parser": "^5.7.0",
         "immer": "^11.0.0",
         "mermaid": "^11.13.0",
         "xstate": "^5.5.0"
