@@ -347,7 +347,7 @@ If you prefer not to contribute directly to this repo, you can create a separate
 import * as vscode from 'vscode';
 
 export async function activate(context: vscode.ExtensionContext) {
-    const assistant = vscode.extensions.getExtension('microsoft.logicapps-migration-agent');
+    const assistant = vscode.extensions.getExtension('ms-azuretools.logicapps-migration-agent');
 
     if (assistant) {
         const api = await assistant.activate();
