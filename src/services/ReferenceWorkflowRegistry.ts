@@ -104,7 +104,7 @@ export class ReferenceWorkflowRegistry {
     static getInstance(extensionUri?: vscode.Uri): ReferenceWorkflowRegistry {
         if (!_instance) {
             if (!extensionUri) {
-                const ext = vscode.extensions.getExtension('microsoft.logicapps-migration-assistant');
+                const ext = vscode.extensions.getExtension('ms-azuretools.logicapps-migration-agent');
                 extensionUri = ext?.extensionUri;
             }
             if (!extensionUri) {

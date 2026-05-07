@@ -33,7 +33,7 @@ import {
 /**
  * Current IR schema identifier.
  */
-export const IR_SCHEMA_ID = 'logicapps-migration-assistant/ir/v3';
+export const IR_SCHEMA_ID = 'logicapps-migration-agent/ir/v3';
 
 /**
  * Current IR schema version.
@@ -145,7 +145,7 @@ export interface IRDocument {
 
     /**
      * IR schema identifier.
-     * Always "logicapps-migration-assistant/ir/v3" for v3 documents.
+     * Always "logicapps-migration-agent/ir/v3" for v3 documents.
      */
     readonly $schema: string;
 

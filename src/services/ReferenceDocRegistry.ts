@@ -141,7 +141,7 @@ export class ReferenceDocRegistry {
         if (!_instance) {
             if (!extensionUri) {
                 // Try to resolve from the extension host
-                const ext = vscode.extensions.getExtension('microsoft.logicapps-migration-assistant');
+                const ext = vscode.extensions.getExtension('ms-azuretools.logicapps-migration-agent');
                 extensionUri = ext?.extensionUri;
             }
             if (!extensionUri) {
