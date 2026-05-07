@@ -14,7 +14,7 @@ parameters:
 resources:
     pipelines:
         - pipeline: build
-          source: \Azure Tools\VSCode\Extensions\vscode-logicappsmigrationassistant
+          source: \Azure Tools\VSCode\Extensions\vscode-logicappsmigrationagent
     repositories:
         - repository: azExtTemplates
           type: github
