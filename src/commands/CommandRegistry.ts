@@ -819,7 +819,7 @@ export class CommandRegistry implements vscode.Disposable {
                 SourceFlowVisualizer.currentPanel.reveal();
             } else {
                 const extensionUri =
-                    vscode.extensions.getExtension('logicapps-migration-assistant')?.extensionUri ??
+                    vscode.extensions.getExtension('logicapps-migration-agent')?.extensionUri ??
                     vscode.Uri.file(__dirname);
                 SourceFlowVisualizer.showLoading(extensionUri, 'Detecting logical groups...');
             }
@@ -843,7 +843,7 @@ export class CommandRegistry implements vscode.Disposable {
 
         // NEW FLOW: Open discovery webview, which handles flow group detection & per-flow analysis
         const extensionUri =
-            vscode.extensions.getExtension('logicapps-migration-assistant')?.extensionUri ??
+            vscode.extensions.getExtension('logicapps-migration-agent')?.extensionUri ??
             vscode.Uri.file(__dirname);
 
         const stateManager = StateManager.getInstance();

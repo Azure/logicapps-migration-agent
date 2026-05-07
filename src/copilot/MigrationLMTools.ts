@@ -1557,7 +1557,7 @@ class StoreFlowGroupsTool implements vscode.LanguageModelTool<StoreFlowGroupsInp
 
             // Show flow group selector in the webview
             const extensionUri =
-                vscode.extensions.getExtension('logicapps-migration-assistant')?.extensionUri ??
+                vscode.extensions.getExtension('logicapps-migration-agent')?.extensionUri ??
                 vscode.Uri.file(__dirname);
 
             SourceFlowVisualizer.showFlowGroupSelector(extensionUri);
@@ -2196,7 +2196,7 @@ class DiscoveryFinalizeTool implements vscode.LanguageModelTool<DiscoveryFinaliz
 
             // Open the webview with the assembled result
             const extensionUri =
-                vscode.extensions.getExtension('logicapps-migration-assistant')?.extensionUri ??
+                vscode.extensions.getExtension('logicapps-migration-agent')?.extensionUri ??
                 vscode.Uri.file(__dirname);
 
             const group = discoveryCacheService.getFlowGroup(flowId);
@@ -3997,7 +3997,7 @@ class PlanningFinalizeTool implements vscode.LanguageModelTool<PlanningFinalizeI
                 await planningService.selectFlow(flowId);
                 const { PlanningWebviewPanel } = await import('../views/planning');
                 const extensionUri2 =
-                    vscode.extensions.getExtension('logicapps-migration-assistant')?.extensionUri ??
+                    vscode.extensions.getExtension('logicapps-migration-agent')?.extensionUri ??
                     vscode.Uri.file(__dirname);
                 PlanningWebviewPanel.createOrShow(extensionUri2);
             } catch (vizErr) {
@@ -4320,7 +4320,7 @@ class ConversionStoreTaskPlanTool implements vscode.LanguageModelTool<Conversion
                 const { ConversionWebviewPanel } =
                     await import('../views/conversion/ConversionWebviewPanel');
                 const extensionUri3 =
-                    vscode.extensions.getExtension('logicapps-migration-assistant')?.extensionUri ??
+                    vscode.extensions.getExtension('logicapps-migration-agent')?.extensionUri ??
                     vscode.Uri.file(__dirname);
                 ConversionWebviewPanel.createOrShow(extensionUri3);
             } catch (vizErr) {

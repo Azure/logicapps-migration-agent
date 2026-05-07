@@ -204,7 +204,7 @@ export async function activate(
                     const { SourceFlowVisualizer } =
                         await import('./views/discovery/SourceFlowVisualizer');
                     const extensionUri =
-                        vscode.extensions.getExtension('logicapps-migration-assistant')
+                        vscode.extensions.getExtension('logicapps-migration-agent')
                             ?.extensionUri ?? vscode.Uri.file(__dirname);
                     SourceFlowVisualizer.showFlowGroupSelector(extensionUri);
                     LoggingService.getInstance().info(

@@ -93,7 +93,7 @@ interface ParserContribution {
  * @example
  * ```typescript
  * // In partner extension's activate function:
- * const migrationAgent = vscode.extensions.getExtension('microsoft.logicapps-migration-assistant');
+ * const migrationAgent = vscode.extensions.getExtension('microsoft.logicapps-migration-agent');
  * const api = await migrationAgent.activate();
  * api.registerParser(new MyParser(), { priority: 20 });
  * ```

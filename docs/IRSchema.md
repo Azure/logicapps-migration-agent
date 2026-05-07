@@ -125,7 +125,7 @@ The IR normalizes concepts across all supported platforms:
 
 ```json
 {
-    "$schema": "logicapps-migration-assistant/ir/v3",
+    "$schema": "logicapps-migration-agent/ir/v3",
     "$version": "3.0.0",
 
     "metadata": {
