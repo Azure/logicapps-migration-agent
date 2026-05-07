@@ -2,7 +2,7 @@
     "name": "logicapps-migration-agent",
     "displayName": "Logic Apps Migration Agent",
     "description": "Migrate BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard with AI-powered agent",
-    "version": "1.6.6",
+    "version": "1.6.7",
     "publisher": "microsoft",
     "license": "MIT",
     "packageManager": "pnpm@9.1.3",
