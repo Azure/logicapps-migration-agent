@@ -1895,7 +1895,7 @@
         "docx": "^9.6.1",
         "fast-xml-parser": "^5.3.4",
         "immer": "^11.0.0",
-        "mermaid": "^11.13.0",
+        "mermaid": "^11.15.0",
         "xstate": "^5.5.0"
     },
     "overrides": {
