@@ -49,6 +49,12 @@ const PLATFORM_FILE_PATTERNS: Record<
         { patterns: ['*.dwl'], confidence: 'high' },
         { patterns: ['*.raml', '*.yaml'], confidence: 'low' },
     ],
+    tibco: [
+        { patterns: ['tibco.xml', 'TIBCO.xml'], confidence: 'high' },
+        { patterns: ['*.process', '*.bwp'], confidence: 'high' },
+        { patterns: ['*.sharedhttp', '*.sharedjdbc'], confidence: 'medium' },
+        { patterns: ['*.xsd', '*.wsdl', '*.xsl', '*.xslt'], confidence: 'low' },
+    ],
     generic: [{ patterns: ['*.xml', '*.json'], confidence: 'low' }],
 };
 

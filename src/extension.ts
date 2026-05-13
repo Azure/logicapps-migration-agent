@@ -57,6 +57,8 @@ const disposables: vscode.Disposable[] = [];
  * - workspaceContains:**\/*.btm (BizTalk maps)
  * - workspaceContains:**\/pom.xml (MuleSoft projects)
  * - workspaceContains:**\/mule-*.xml (MuleSoft flows)
+ * - workspaceContains:**\/tibco.xml (TIBCO BW projects)
+ * - workspaceContains:**\/*.process (TIBCO BW process files)
  *
  * @returns Extension API for parser registration by partner extensions
  */

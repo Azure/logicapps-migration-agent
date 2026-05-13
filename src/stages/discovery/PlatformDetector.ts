@@ -54,6 +54,7 @@ export class PlatformDetector implements vscode.Disposable {
     private registerBuiltInDetectors(): void {
         this.detectors.set('biztalk', new BizTalkDetector());
         this.detectors.set('mulesoft', new MuleSoftDetector());
+        this.detectors.set('tibco', new TIBCODetector());
     }
 
     /**
@@ -171,7 +172,7 @@ export class PlatformDetector implements vscode.Disposable {
         }
 
         // Add all platforms
-        const allPlatforms: SourcePlatformType[] = ['biztalk', 'mulesoft'];
+        const allPlatforms: SourcePlatformType[] = ['biztalk', 'mulesoft', 'tibco'];
 
         for (const platform of allPlatforms) {
             if (
@@ -226,6 +227,7 @@ export class PlatformDetector implements vscode.Disposable {
         const names: Record<SourcePlatformType, string> = {
             biztalk: 'BizTalk Server',
             mulesoft: 'MuleSoft Anypoint',
+            tibco: 'TIBCO BusinessWorks',
             generic: 'Generic/Other',
         };
         return names[platform] || platform;
@@ -238,6 +240,7 @@ export class PlatformDetector implements vscode.Disposable {
         const mapping: Record<string, SourcePlatformType> = {
             'BizTalk Server': 'biztalk',
             'MuleSoft Anypoint': 'mulesoft',
+            'TIBCO BusinessWorks': 'tibco',
             'Generic/Other': 'generic',
         };
         return mapping[displayName] || 'generic';
@@ -582,6 +585,81 @@ class MuleSoftDetector extends BasePlatformDetector {
 
         return {
             platform: 'mulesoft',
+            version,
+            confidence: Math.min(confidence, 100),
+            indicators,
+            alternativePlatforms: [],
+        };
+    }
+}
+
+/**
+ * TIBCO BusinessWorks platform detector.
+ */
+class TIBCODetector extends BasePlatformDetector {
+    readonly platform: SourcePlatformType = 'tibco';
+
+    async detect(folderPath: string): Promise<PlatformDetectionResult | null> {
+        const indicators: PlatformIndicator[] = [];
+        let confidence = 0;
+        let version: string | undefined;
+
+        // Common BW project descriptor
+        const tibcoProjectFiles = await this.findFiles(folderPath, ['tibco.xml', 'TIBCO.xml']);
+        if (tibcoProjectFiles.length > 0) {
+            confidence += 45;
+            indicators.push({
+                platform: 'tibco',
+                indicatorType: 'config-file',
+                match: path.basename(tibcoProjectFiles[0]),
+                confidence: 'high',
+            });
+
+            const content = await this.readFileContent(tibcoProjectFiles[0]);
+            if (content) {
+                if (/bw6|businessworks\s*6/i.test(content)) {
+                    version = '6.x';
+                } else if (/bw5|businessworks\s*5/i.test(content)) {
+                    version = '5.x';
+                }
+            }
+        }
+
+        // Process definitions
+        const processFiles = await this.findFiles(folderPath, ['*.process', '*.bwp']);
+        if (processFiles.length > 0) {
+            confidence += 40;
+            indicators.push({
+                platform: 'tibco',
+                indicatorType: 'file-extension',
+                match: `${processFiles.length} process file(s)`,
+                confidence: 'high',
+            });
+        }
+
+        // Shared resources and module descriptors used by BW projects
+        const sharedResourceFiles = await this.findFiles(folderPath, [
+            '*.sharedhttp',
+            '*.sharedjdbc',
+            'defaultVars.substvar',
+            '*.archive',
+        ]);
+        if (sharedResourceFiles.length > 0) {
+            confidence += 15;
+            indicators.push({
+                platform: 'tibco',
+                indicatorType: 'config-file',
+                match: `${sharedResourceFiles.length} shared resource/module file(s)`,
+                confidence: 'medium',
+            });
+        }
+
+        if (indicators.length === 0) {
+            return null;
+        }
+
+        return {
+            platform: 'tibco',
             version,
             confidence: Math.min(confidence, 100),
             indicators,
