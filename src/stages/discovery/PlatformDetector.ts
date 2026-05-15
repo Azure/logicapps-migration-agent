@@ -621,8 +621,23 @@ class TIBCODetector extends BasePlatformDetector {
                     version = '6.x';
                 } else if (/bw5|businessworks\s*5/i.test(content)) {
                     version = '5.x';
+                } else if (/schemas\.tibco\.com\/tra\/model\/core\/PackagingModel/i.test(content)) {
+                    version = '6.x';
                 }
             }
+        }
+
+        // BW6 module descriptor (META-INF/module.bwm)
+        const moduleBwmFiles = await this.findFiles(folderPath, ['module.bwm']);
+        if (moduleBwmFiles.length > 0) {
+            confidence += 40;
+            version = version || '6.x';
+            indicators.push({
+                platform: 'tibco',
+                indicatorType: 'config-file',
+                match: 'module.bwm (BW6 module descriptor)',
+                confidence: 'high',
+            });
         }
 
         // Process definitions
@@ -642,7 +657,10 @@ class TIBCODetector extends BasePlatformDetector {
             '*.sharedhttp',
             '*.sharedjdbc',
             'defaultVars.substvar',
+            '*.substvar',
             '*.archive',
+            '*.httpClientResource',
+            '*.httpConnResource',
         ]);
         if (sharedResourceFiles.length > 0) {
             confidence += 15;

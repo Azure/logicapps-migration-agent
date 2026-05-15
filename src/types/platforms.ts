@@ -52,7 +52,7 @@ export const SUPPORTED_PLATFORMS: PlatformInfo[] = [
         label: 'TIBCO BusinessWorks',
         description: 'TIBCO BW5/BW6 projects and process definitions',
         icon: '$(symbol-event)',
-        filePatterns: ['tibco.xml', '.process', '.bwp'],
+        filePatterns: ['tibco.xml', 'TIBCO.xml', 'module.bwm', '.process', '.bwp'],
     },
 ];
 

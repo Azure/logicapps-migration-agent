@@ -39,7 +39,14 @@ export class TIBCOProjectParser extends AbstractParser implements IProjectParser
         }
 
         if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
-            return fs.existsSync(path.join(filePath, 'tibco.xml'));
+            // BW5 style: tibco.xml at root
+            if (fs.existsSync(path.join(filePath, 'tibco.xml'))) {
+                return true;
+            }
+            // BW6 style: TIBCO.xml or module.bwm inside META-INF/
+            if (this.findDescriptorPath(filePath) !== null) {
+                return true;
+            }
         }
 
         return false;
@@ -47,9 +54,9 @@ export class TIBCOProjectParser extends AbstractParser implements IProjectParser
 
     async detectVersion(inputPath: string): Promise<string | null> {
         const projectDir = this.resolveProjectDir(inputPath);
-        const descriptorPath = path.join(projectDir, 'tibco.xml');
+        const descriptorPath = this.findDescriptorPath(projectDir);
 
-        if (!fs.existsSync(descriptorPath)) {
+        if (!descriptorPath) {
             return null;
         }
 
@@ -58,11 +65,21 @@ export class TIBCOProjectParser extends AbstractParser implements IProjectParser
             return null;
         }
 
+        // BW6 module descriptor
+        if (path.basename(descriptorPath).toLowerCase() === 'module.bwm') {
+            return '6.x';
+        }
+
         if (/businessworks\s*6|\bbw6\b/i.test(content)) {
             return '6.x';
         }
         if (/businessworks\s*5|\bbw5\b/i.test(content)) {
             return '5.x';
+        }
+
+        // BW6 packaging namespace in TIBCO.xml
+        if (/schemas\.tibco\.com\/tra\/model\/core\/PackagingModel/i.test(content)) {
+            return '6.x';
         }
 
         return null;
@@ -75,7 +92,31 @@ export class TIBCOProjectParser extends AbstractParser implements IProjectParser
         await this.scanDirectory(projectDir, ['.process', '.bwp'], 'flow', files);
         await this.scanDirectory(projectDir, ['.xsd', '.wsdl'], 'schema', files);
         await this.scanDirectory(projectDir, ['.xsl', '.xslt'], 'map', files);
-        await this.scanDirectory(projectDir, ['.sharedhttp', '.sharedjdbc'], 'config', files);
+        await this.scanDirectory(
+            projectDir,
+            ['.sharedhttp', '.sharedjdbc', '.substvar', '.httpClientResource', '.httpConnResource', '.sslClientResource', '.keystoreProviderResource'],
+            'config',
+            files
+        );
+
+        // Also scan sibling module folder for BW6 application projects
+        const parentDir = path.dirname(projectDir);
+        const baseName = path.basename(projectDir);
+        if (baseName.endsWith('.application')) {
+            const moduleName = baseName.replace(/\.application$/, '');
+            const moduleDir = path.join(parentDir, moduleName);
+            if (fs.existsSync(moduleDir) && fs.statSync(moduleDir).isDirectory()) {
+                await this.scanDirectory(moduleDir, ['.process', '.bwp'], 'flow', files);
+                await this.scanDirectory(moduleDir, ['.xsd', '.wsdl'], 'schema', files);
+                await this.scanDirectory(moduleDir, ['.xsl', '.xslt'], 'map', files);
+                await this.scanDirectory(
+                    moduleDir,
+                    ['.sharedhttp', '.sharedjdbc', '.substvar', '.httpClientResource', '.httpConnResource', '.sslClientResource', '.keystoreProviderResource'],
+                    'config',
+                    files
+                );
+            }
+        }
 
         return files;
     }
@@ -95,20 +136,21 @@ export class TIBCOProjectParser extends AbstractParser implements IProjectParser
         errors: ParseErrorAccumulator
     ): Promise<IRDocument | null> {
         const projectDir = this.resolveProjectDir(inputPath);
-        const descriptorPath = path.join(projectDir, 'tibco.xml');
+        const descriptorPath = this.findDescriptorPath(projectDir);
 
         this.reportProgress(options.onProgress, 1, 3, 'Reading TIBCO project descriptor');
 
-        const descriptorContent = fs.existsSync(descriptorPath)
-            ? await this.readFile(descriptorPath, errors)
-            : null;
-
-        if (!descriptorContent) {
+        if (!descriptorPath) {
             errors.addError(
                 ParseErrorCodes.PROJECT_NOT_FOUND,
-                'tibco.xml project descriptor was not found',
+                'No TIBCO project descriptor found (tibco.xml or META-INF/TIBCO.xml or META-INF/module.bwm)',
                 { filePath: projectDir }
             );
+            return null;
+        }
+
+        const descriptorContent = await this.readFile(descriptorPath, errors);
+        if (!descriptorContent) {
             return null;
         }
 
@@ -167,6 +209,38 @@ export class TIBCOProjectParser extends AbstractParser implements IProjectParser
 
     protected override getFileType(_extension: string): SourceFileType {
         return 'project';
+    }
+
+    /**
+     * Find the TIBCO project descriptor in a folder.
+     * Supports BW5 (tibco.xml at root) and BW6 (META-INF/TIBCO.xml or META-INF/module.bwm).
+     */
+    private findDescriptorPath(projectDir: string): string | null {
+        // BW5 style: tibco.xml at root
+        const rootDescriptor = path.join(projectDir, 'tibco.xml');
+        if (fs.existsSync(rootDescriptor)) {
+            return rootDescriptor;
+        }
+
+        // BW6 style: TIBCO.xml in META-INF
+        const metaInfDir = path.join(projectDir, 'META-INF');
+        if (fs.existsSync(metaInfDir)) {
+            // Check for TIBCO.xml (case-insensitive on Windows, explicit variants for cross-platform)
+            for (const name of ['TIBCO.xml', 'tibco.xml', 'Tibco.xml']) {
+                const candidate = path.join(metaInfDir, name);
+                if (fs.existsSync(candidate)) {
+                    return candidate;
+                }
+            }
+
+            // BW6 module descriptor
+            const moduleBwm = path.join(metaInfDir, 'module.bwm');
+            if (fs.existsSync(moduleBwm)) {
+                return moduleBwm;
+            }
+        }
+
+        return null;
     }
 
     private resolveProjectDir(inputPath: string): string {

@@ -51,8 +51,10 @@ const PLATFORM_FILE_PATTERNS: Record<
     ],
     tibco: [
         { patterns: ['tibco.xml', 'TIBCO.xml'], confidence: 'high' },
+        { patterns: ['module.bwm'], confidence: 'high' },
         { patterns: ['*.process', '*.bwp'], confidence: 'high' },
         { patterns: ['*.sharedhttp', '*.sharedjdbc'], confidence: 'medium' },
+        { patterns: ['*.substvar'], confidence: 'medium' },
         { patterns: ['*.xsd', '*.wsdl', '*.xsl', '*.xslt'], confidence: 'low' },
     ],
     generic: [{ patterns: ['*.xml', '*.json'], confidence: 'low' }],
