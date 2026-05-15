@@ -115,7 +115,7 @@ Many triggers return **metadata** (file path, message ID, blob URI) rather than 
 
 ## 6. 1:1 Flow to Workflow Rule
 
-- Every flow (including sub-flows with significant logic) MUST be a separate workflow.
+- Every flow (including sub-processes with significant logic) MUST be a separate workflow.
 - Use the `Workflow` action type to invoke child workflows from parent workflows.
 - Do NOT convert flows to local functions.
 
@@ -205,5 +205,7 @@ Before storing workflow definitions, cross-check EVERY action against this table
 | JSON parsing                | `Parse JSON` action                                  | `json()` expression for structured access              |
 | Array trigger debatching    | `splitOn` on trigger                                 | `For_each` loop wrapping all actions                   |
 | File trigger cleanup        | Do nothing (no delete)                               | Delete/archive trigger input file                      |
-| Sub-flow (via flow-ref)     | Separate workflow + `Workflow` action                | Merge into parent or local function                    |
+| sub-process (via process-call)     | Separate workflow + `Workflow` action                | Merge into parent or local function                    |
 | Custom source code          | .NET local function                                  | Expressions or inline approximation                    |
+
+

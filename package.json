@@ -17,6 +17,7 @@
     "keywords": [
         "biztalk",
         "mulesoft",
+        "tibco",
         "azure",
         "logic-apps",
         "migration",
@@ -40,7 +41,9 @@
         "workspaceContains:**/*.odx",
         "workspaceContains:**/*.btm",
         "workspaceContains:**/pom.xml",
-        "workspaceContains:**/mule-*.xml"
+        "workspaceContains:**/mule-*.xml",
+        "workspaceContains:**/tibco.xml",
+        "workspaceContains:**/*.process"
     ],
     "main": "./dist/extension.js",
     "contributes": {

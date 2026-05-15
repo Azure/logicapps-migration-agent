@@ -4,6 +4,7 @@
  * Provides parsing capabilities for various integration platforms:
  * - BizTalk Server (fully implemented)
  * - MuleSoft (fully implemented)
+ * - TIBCO BusinessWorks (basic implementation)
  *
  * @module parsers
  */
@@ -50,6 +51,9 @@ export {
 // MuleSoft Parsers (fully implemented)
 export { MuleSoftFlowParser, MuleSoftDataWeaveParser, MuleSoftProjectParser } from './mulesoft';
 
+// TIBCO Parsers (basic implementation)
+export { TIBCOProjectParser, TIBCOProcessParser } from './tibco';
+
 // Stub Parsers (work in progress)
 export { MuleSoftAPISpecParser, GenericXMLParser } from './stubs';
 
@@ -67,6 +71,7 @@ import {
     BizTalkAsmxParser,
 } from './biztalk';
 import { MuleSoftFlowParser, MuleSoftDataWeaveParser, MuleSoftProjectParser } from './mulesoft';
+import { TIBCOProjectParser, TIBCOProcessParser } from './tibco';
 import { MuleSoftAPISpecParser, GenericXMLParser } from './stubs';
 
 /**
@@ -89,6 +94,10 @@ export function initializeParsers(): void {
     defaultParserRegistry.register(new MuleSoftProjectParser());
     defaultParserRegistry.register(new MuleSoftFlowParser());
     defaultParserRegistry.register(new MuleSoftDataWeaveParser());
+
+    // TIBCO parsers (basic implementation)
+    defaultParserRegistry.register(new TIBCOProjectParser());
+    defaultParserRegistry.register(new TIBCOProcessParser());
 
     // MuleSoft API spec parser (stub — RAML/OAS parsing planned)
     defaultParserRegistry.register(new MuleSoftAPISpecParser());

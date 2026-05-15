@@ -16,7 +16,7 @@
  * Each platform has specialized parsers that convert platform-specific
  * artifacts into the normalized IR format.
  */
-export type SourcePlatformType = 'biztalk' | 'mulesoft' | 'generic'; // For generic XML/JSON inputs
+export type SourcePlatformType = 'biztalk' | 'mulesoft' | 'tibco' | 'generic'; // For generic XML/JSON inputs
 
 /**
  * Target platforms for conversion output.
