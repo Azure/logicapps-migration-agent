@@ -25,8 +25,8 @@ BEFORE writing ANY `workflow.json`:
 
 Each `workflow.json` must contain a `definition` key with:
 
-- `$schema`
-- `contentVersion`
+- `$schema` — MUST be exactly `"https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#"`
+- `contentVersion` — use `"1.0.0.0"`
 - `triggers` — at least one trigger
 - `actions` — with `runAfter` (object mapping predecessor action names to status arrays) and `type` for each action
 

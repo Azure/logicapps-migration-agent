@@ -10,7 +10,7 @@
 /**
  * Supported source platform identifiers.
  */
-export type SourcePlatform = 'biztalk' | 'mulesoft';
+export type SourcePlatform = 'biztalk' | 'mulesoft' | 'tibco';
 
 /**
  * Platform display metadata.
@@ -46,6 +46,13 @@ export const SUPPORTED_PLATFORMS: PlatformInfo[] = [
         description: 'MuleSoft Mule 3/4',
         icon: '$(cloud)',
         filePatterns: ['pom.xml', 'mule-*.xml', '.dwl'],
+    },
+    {
+        id: 'tibco',
+        label: 'TIBCO BusinessWorks',
+        description: 'TIBCO BW5/BW6 projects and process definitions',
+        icon: '$(symbol-event)',
+        filePatterns: ['tibco.xml', 'TIBCO.xml', 'module.bwm', '.process', '.bwp'],
     },
 ];
 

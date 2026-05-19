@@ -243,7 +243,7 @@ export class AgentFileProvisioner {
     // Skills
     // -------------------------------------------------------------------------
 
-    private static readonly SKILLS_VERSION = '10.23.0';
+    private static readonly SKILLS_VERSION = '10.24.0';
     private static readonly SKILLS_VERSION_TAG = `<!-- skills v${AgentFileProvisioner.SKILLS_VERSION} -->`;
 
     /**
@@ -274,7 +274,11 @@ export class AgentFileProvisioner {
         // Determine source platform for platform-specific skills
         const sourcePlatform = StateManager.getInstance().getState().sourcePlatform || 'biztalk';
         // Map platform to skill subfolder name (default to biztalk for unknown platforms)
-        const platformFolder = sourcePlatform === 'mulesoft' ? 'mulesoft' : 'biztalk';
+        const normalizedPlatform = sourcePlatform.toLowerCase();
+        const platformFolder =
+            normalizedPlatform === 'mulesoft' || normalizedPlatform === 'tibco'
+                ? normalizedPlatform
+                : 'biztalk';
 
         // Skills go to .github/skills/, which is a sibling of .github/agents/
         const githubDir = path.dirname(agentDir); // .github/

@@ -93,6 +93,10 @@ export class ParserFactory {
                 platform: 'mulesoft',
                 patterns: ['pom.xml', 'mule-*.xml', '*.dwl'],
             },
+            {
+                platform: 'tibco',
+                patterns: ['tibco.xml', '*.process', '*.bwp'],
+            },
         ];
 
         for (const indicator of indicators) {

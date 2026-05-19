@@ -155,6 +155,7 @@ export class ProjectAutoDetection implements vscode.Disposable {
         const names: Record<string, string> = {
             biztalk: 'BizTalk Server',
             mulesoft: 'MuleSoft Anypoint',
+            tibco: 'TIBCO BusinessWorks',
             generic: 'Generic Integration',
         };
 

@@ -21,6 +21,7 @@ import { InventoryService } from '../../stages/discovery/InventoryService';
 import { GeneratedFlowResult, FlowGroupsResult } from '../../services/LLMFlowGenerator';
 import { UserPrompts } from '../../constants/UserMessages';
 import { ChatPrompts } from '../../constants/ChatPrompts';
+import { ConfigurationService } from '../../services/ConfigurationService';
 
 // =============================================================================
 // Source Flow Visualizer
@@ -238,6 +239,8 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 return; // Shouldn't happen, but guard
             }
 
+            const sourcePlatform = ConfigurationService.getInstance().getSourcePlatform();
+            const migrationBannerHtml = SourceFlowVisualizer.getMigrationBannerHtml(sourcePlatform);
             const isAnyFlowBusy = SourceFlowVisualizer.isAnyFlowBusy;
 
             const flowCards = flowGroups.groups
@@ -577,6 +580,31 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             font-size: 12px;
         }
         .stat-count { font-weight: bold; font-size: 14px; color: var(--vscode-textLink-foreground); }
+        .migration-banner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            padding: 12px 20px;
+            margin-bottom: 16px;
+            background: var(--vscode-editor-inactiveSelectionBackground);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 8px;
+        }
+        .migration-platform {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .migration-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--vscode-foreground);
+        }
+        .migration-arrow {
+            display: flex;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
@@ -584,6 +612,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         <h1>Discovered Logical Groups</h1>
         <button class="btn btn-outline" onclick="refreshPage()" style="height:fit-content;">↻ Refresh</button>
     </div>
+    ${migrationBannerHtml}
     <p class="subtitle">Select a flow to analyse its architecture, components, and migration gaps.</p>
     <div class="stats-bar">
         <div class="stat-pill"><span class="stat-count">${flowGroups.groups.length}</span> Total Flows</div>
@@ -1866,6 +1895,78 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         );
     }
 
+    /**
+     * Returns inline SVG logos and a migration banner showing Source → Logic Apps.
+     */
+    private static getMigrationBannerHtml(platform: string): string {
+        const biztalkLogo = `<svg viewBox="0 0 50 50" width="36" height="36" xmlns="http://www.w3.org/2000/svg"><path fill="#B8D432" d="M29.6,23.8c0-2.5-2-4.5-4.5-4.5s-4.5,2-4.5,4.5c0,2.5,2,4.5,4.5,4.5S29.6,26.3,29.6,23.8z"/><path fill="#59B4D9" d="M43.1,15.9c0.3-1,0.4-2,0.4-3.1c0-6.7-5.3-12.2-11.8-12.2c-4.9,0-9.1,3.1-10.9,7.5c-1.5-1.9-3.8-3-6.4-3c-4.6,0-8.3,3.9-8.3,8.6c0,0.8,0.1,1.6,0.3,2.4C2.7,17.5,0,20.8,0,25.2C0,30.8,4.4,35,9.9,35h2.9h11.3v-4.1c-1.8-0.3-3.4-1.2-4.4-2.6l-3.8,2l1.3,3l-5.8-1.5l2-6l1.5,2.8l3.7-2.2c-0.3-0.8-0.5-1.8-0.5-2.8c0-0.9,0.2-1.8,0.5-2.6l0,0l-3.9-2.3l-1.5,2.7l-1.9-6l5.9-1l-1.4,2.5l3.9,2.3c1.1-1.4,2.7-2.4,4.6-2.7v-4.4h-2.8l3.8-4.6l4,4.6h-3v4.4c1.9,0.3,3.5,1.3,4.6,2.7l3.9-2.3l-1.5-2.6l5.9,1.2l-1.9,5.9l-1.5-2.6l-3.9,2.3c0.3,0.8,0.5,1.7,0.5,2.6c0,0.9-0.2,1.8-0.5,2.6l3.9,2.3l1.7-2.9l1.8,6.2L33,33.3l1.6-2.9l-3.9-2.3c-1.1,1.5-2.8,2.5-4.6,2.7V35h12.2h1.9c5.5,0,9.8-4.2,9.8-9.8C50,20.7,47.1,17.2,43.1,15.9z"/><rect x="23.5" y="35" fill="#3999C6" width="3" height="7"/><circle fill="#0072C6" cx="25" cy="45" r="4"/></svg>`;
+        const logicAppsLogo = `<svg viewBox="0 0 18 18" width="36" height="36" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="la-g1" x1="5.05" y1="10.55" x2="5.05" y2="13.48" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#76bc2d"/><stop offset="1" stop-color="#5e9624"/></linearGradient><linearGradient id="la-g2" x1="12.84" y1="10.57" x2="12.84" y2="13.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#76bc2d"/><stop offset="1" stop-color="#5e9624"/></linearGradient></defs><path d="M3.19,15.6a2.49,2.49,0,0,1-1.53-.38,1.7,1.7,0,0,1-.45-1.36V10.33c0-.58-.23-.89-.71-.89V8.56c.48,0,.71-.31.71-.92V4.17a1.79,1.79,0,0,1,.45-1.39A2.29,2.29,0,0,1,3.19,2.4v.89c-.51,0-.79.27-.79.85v3.4c0,.78-.23,1.26-.74,1.46a1.42,1.42,0,0,1,.74,1.46v3.37a1.25,1.25,0,0,0,.17.68.74.74,0,0,0,.58.2l0,.89Z" fill="#949494"/><path d="M14.81,2.4a2.49,2.49,0,0,1,1.53.38,1.7,1.7,0,0,1,.45,1.36V7.67c0,.58.23.89.71.89v.88c-.48,0-.71.31-.71.92v3.43a1.8,1.8,0,0,1-.45,1.4,2.28,2.28,0,0,1-1.53.41v-.89c.51,0,.79-.27.79-.85v-3.4c0-.78.23-1.26.74-1.46a1.42,1.42,0,0,1-.74-1.46V4.17a1.25,1.25,0,0,0-.17-.68.74.74,0,0,0-.58-.2Z" fill="#949494"/><path d="M9.41,8.35V7.08h-.9V8.35a.18.18,0,0,1-.18.18H5a.36.36,0,0,0-.36.36v1.65h.9V9.63a.18.18,0,0,1,.17-.18h6.54a.18.18,0,0,1,.18.18v.93h.89V8.89a.36.36,0,0,0-.35-.36H9.59A.18.18,0,0,1,9.41,8.35Z" fill="#005ba1"/><path d="M10.61,3.21H7.25a.38.38,0,0,0-.38.37V6.94a.37.37,0,0,0,.38.37h3.36A.37.37,0,0,0,11,6.94V3.58A.38.38,0,0,0,10.61,3.21Zm-.32,3.17a.25.25,0,0,1-.25.24H7.81a.25.25,0,0,1-.25-.24V4.15a.25.25,0,0,1,.25-.25H10a.25.25,0,0,1,.25.25Z" fill="#0078d4"/><rect x="3.58" y="10.55" width="2.94" height="2.94" rx="0.27" fill="url(#la-g1)"/><rect x="11.38" y="10.57" width="2.94" height="2.94" rx="0.27" fill="url(#la-g2)"/></svg>`;
+
+        let sourceLogo: string;
+        let sourceLabel: string;
+        switch (platform) {
+            case 'tibco':
+                sourceLogo = '';
+                sourceLabel = 'TIBCO BW';
+                break;
+            case 'mulesoft':
+                sourceLogo = '';
+                sourceLabel = 'MuleSoft';
+                break;
+            default:
+                sourceLogo = biztalkLogo;
+                sourceLabel = 'BizTalk';
+                break;
+        }
+
+        return `
+        <div class="migration-banner">
+            <div class="migration-platform">
+                ${sourceLogo}
+                <span class="migration-label">${sourceLabel}</span>
+            </div>
+            <div class="migration-arrow">
+                <svg width="40" height="20" viewBox="0 0 40 20"><path d="M0 10h32M26 4l8 6-8 6" fill="none" stroke="var(--vscode-textLink-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="migration-platform">
+                ${logicAppsLogo}
+                <span class="migration-label">Logic Apps</span>
+            </div>
+        </div>`;
+    }
+
+    /**
+     * Returns the CSS styles for the migration banner.
+     */
+    private static getMigrationBannerCss(): string {
+        return `
+        .migration-banner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            background: var(--vscode-editor-inactiveSelectionBackground);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 8px;
+        }
+        .migration-platform {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .migration-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--vscode-foreground);
+        }
+        .migration-arrow {
+            display: flex;
+            align-items: center;
+        }`;
+    }
+
     private getMermaidHtml(result: GeneratedFlowResult, title: string, isCached = false): string {
         const mermaidCode = result.mermaid.replace(/`/g, '\\`');
         const componentDetailsJson = JSON.stringify(result.componentDetails || []);
@@ -1876,8 +1977,45 @@ export class SourceFlowVisualizer implements vscode.Disposable {
 
         // Flow group dropdown removed — navigation via "← Flow Groups" button instead
 
-        // Component type explanations for education
-        const componentExplanations: Record<string, string> = {
+        // Detect the source platform for platform-aware UI content
+        const sourcePlatform = ConfigurationService.getInstance().getSourcePlatform();
+
+        // Component type explanations for education (platform-aware)
+        const componentExplanations: Record<string, string> = sourcePlatform === 'tibco' ? {
+            'Process':
+                'A TIBCO BusinessWorks process that defines the execution flow using activities, transitions, and groups.',
+            'Starter':
+                'Entry point activity that triggers process execution (e.g., HTTP Receiver, JMS Queue Receiver, Timer).',
+            'Activity':
+                'A unit of work within a process (e.g., JDBC Query, Write File, Send HTTP Request, Transform XML).',
+            'Connection':
+                'Shared resource defining connectivity to external systems (e.g., JDBC Connection, JMS Connection, HTTP Connection).',
+            'Sub-Process':
+                'A reusable process invoked from other processes, enabling modular design.',
+            'Transition':
+                'Control flow between activities defining execution order and conditional routing.',
+            'Group':
+                'A container for activities that can apply iteration, transaction, or error handling scope.',
+            'Schema':
+                'XSD definition that describes the structure of messages (elements, attributes, data types).',
+            'XSLT':
+                'XSLT-based transformation that converts messages from one schema format to another.',
+        } : sourcePlatform === 'mulesoft' ? {
+            'Flow':
+                'A MuleSoft flow defining message processing from source to one or more processors.',
+            'Source':
+                'Entry point that triggers flow execution (e.g., HTTP Listener, Scheduler, JMS Subscriber).',
+            'Processor':
+                'A component that processes, transforms, or routes messages within a flow.',
+            'Connector':
+                'Configuration for connecting to external systems (e.g., Database, HTTP, Salesforce).',
+            'Transform':
+                'DataWeave transformation for converting message payloads between formats.',
+            'Sub-Flow':
+                'A reusable set of processors that can be referenced from other flows.',
+            'Error Handler':
+                'Defines how errors are caught and handled within a flow.',
+        } : {
             'Receive Location':
                 'Entry point where messages enter BizTalk. Configured with an adapter (FILE, HTTP, etc.) to poll or listen for incoming data.',
             'Receive Port':
@@ -2237,6 +2375,32 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         }
         
         /* Message Flow Timeline */
+        .migration-banner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            background: var(--vscode-editor-inactiveSelectionBackground);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 8px;
+        }
+        .migration-platform {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .migration-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--vscode-foreground);
+        }
+        .migration-arrow {
+            display: flex;
+            align-items: center;
+        }
+
         .flow-timeline {
             position: relative;
             padding-left: 40px;
@@ -3231,7 +3395,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         <button class="tab" onclick="showTab('dependencies')">Missing Dependencies ${depTabBadge}</button>
         <button class="tab" onclick="showTab('gaps')">Gap Analysis ${gapBadge}</button>
         <button class="tab" onclick="showTab('patterns')">Patterns ${patternBadge}</button>
-        <button class="tab" onclick="showTab('learn')">Learn BizTalk</button>
+        <button class="tab" onclick="showTab('learn')">Learn ${sourcePlatform === 'tibco' ? 'TIBCO' : sourcePlatform === 'mulesoft' ? 'MuleSoft' : 'BizTalk'}</button>
     </div>
     
     <!-- Diagram Tab -->
@@ -3289,7 +3453,8 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     <!-- Message Flow Tab -->
     <div id="tab-flow" class="tab-content">
         <h2 style="margin-bottom: 24px;">Step-by-Step Message Flow</h2>
-        <p style="margin-bottom: 24px; opacity: 0.8;">Follow the journey of a message through the BizTalk integration:</p>
+        ${SourceFlowVisualizer.getMigrationBannerHtml(sourcePlatform)}
+        <p style="margin-bottom: 24px; opacity: 0.8;">Follow the journey of a message through the ${sourcePlatform === 'tibco' ? 'TIBCO' : sourcePlatform === 'mulesoft' ? 'MuleSoft' : 'BizTalk'} integration:</p>
         <div class="flow-timeline" id="flowTimeline">
             <!-- Populated by JavaScript -->
         </div>
@@ -3325,7 +3490,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     <!-- Patterns Tab -->
     <div id="tab-patterns" class="tab-content">
         <h2 style="margin-bottom: 8px;">Migration Patterns</h2>
-        <p style="margin-bottom: 24px; opacity: 0.8;">BizTalk integration patterns detected in this flow and how they translate to Azure Logic Apps Standard.</p>
+        <p style="margin-bottom: 24px; opacity: 0.8;">${sourcePlatform === 'tibco' ? 'TIBCO' : sourcePlatform === 'mulesoft' ? 'MuleSoft' : 'BizTalk'} integration patterns detected in this flow and how they translate to Azure Logic Apps Standard.</p>
         <div id="patternsContainer">
             <!-- Populated by JavaScript -->
         </div>
@@ -3333,6 +3498,104 @@ export class SourceFlowVisualizer implements vscode.Disposable {
 
     <!-- Learn Tab -->
     <div id="tab-learn" class="tab-content">
+        ${sourcePlatform === 'tibco' ? `
+        <h2 style="margin-bottom: 24px;">Understanding TIBCO BusinessWorks Architecture</h2>
+        
+        <div class="education-section">
+            <h3>Process Flow Layers</h3>
+            
+            <div class="concept-card">
+                <div class="concept-title">
+                    <span class="concept-icon" style="background: #4CAF50;"></span>
+                    Process Starters (Inbound)
+                </div>
+                <div class="concept-desc">
+                    Messages enter TIBCO BusinessWorks through <strong>Process Starters</strong> such as HTTP Receiver, 
+                    JMS Queue Receiver, File Poller, or Timer. These define the trigger that initiates a process execution.
+                </div>
+            </div>
+            
+            <div class="concept-card">
+                <div class="concept-title">
+                    <span class="concept-icon" style="background: #607D8B;"></span>
+                    Process Definitions (Orchestration)
+                </div>
+                <div class="concept-desc">
+                    The core of TIBCO BW — visual process definitions (.process files) that coordinate activities in a flow.
+                    Processes define <strong>activities</strong>, <strong>transitions</strong>, and <strong>groups</strong> 
+                    (loops, critical sections, error handlers) to implement business logic.
+                </div>
+            </div>
+            
+            <div class="concept-card">
+                <div class="concept-title">
+                    <span class="concept-icon" style="background: #9C27B0;"></span>
+                    Activities (Operations)
+                </div>
+                <div class="concept-desc">
+                    Individual units of work within a process: JDBC queries, SOAP/REST calls, file I/O, JMS publish/subscribe, 
+                    XML transformations (XSLT/XQuery), and Java code execution. Activities are connected via transitions.
+                </div>
+            </div>
+            
+            <div class="concept-card">
+                <div class="concept-title">
+                    <span class="concept-icon" style="background: #FF9800;"></span>
+                    Shared Resources &amp; Connections
+                </div>
+                <div class="concept-desc">
+                    Reusable connection definitions for databases (JDBC), messaging (JMS, EMS), HTTP, FTP, and more.
+                    Defined at the project level and referenced by activities. Includes <strong>Global Variables</strong> 
+                    for environment-specific configuration.
+                </div>
+            </div>
+            
+            <div class="concept-card">
+                <div class="concept-title">
+                    <span class="concept-icon" style="background: #2196F3;"></span>
+                    Substrates &amp; Deployment
+                </div>
+                <div class="concept-desc">
+                    Projects are packaged as EAR archives and deployed to TIBCO BW engines (AppNodes in BW6, or domains in BW5).
+                    Configuration uses <strong>AppSpace</strong> and <strong>AppNode</strong> concepts for scaling and management.
+                </div>
+            </div>
+        </div>
+        
+        <div class="education-section">
+            <h3>Migration to Azure Logic Apps</h3>
+            
+            <div class="concept-card">
+                <div class="concept-desc">
+                    When migrating to Azure Logic Apps, each TIBCO BW component maps to an Azure equivalent:
+                    <ul style="margin-top: 12px;">
+                        <li><strong>Process Starters</strong> → Logic Apps Triggers (HTTP, Service Bus, Blob, Timer, etc.)</li>
+                        <li><strong>Process Definitions</strong> → Logic Apps Standard Workflows</li>
+                        <li><strong>XSLT/XQuery Transforms</strong> → Transform action with Integration Account Maps</li>
+                        <li><strong>Schemas (XSD)</strong> → Integration Account Schemas</li>
+                        <li><strong>JDBC Activities</strong> → SQL Connector or custom .NET code</li>
+                        <li><strong>JMS/EMS Activities</strong> → Service Bus Connector or MQ Connector</li>
+                        <li><strong>REST/SOAP Calls</strong> → HTTP Action or custom Connectors</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="education-section">
+            <h3>Official Documentation</h3>
+            
+            <div class="concept-card">
+                <div class="concept-desc">
+                    For comprehensive TIBCO BusinessWorks documentation, refer to the official resources:
+                    <ul style="margin-top: 12px;">
+                        <li><a href="https://docs.tibco.com/products/tibco-activematrix-businessworks" style="color: var(--vscode-textLink-foreground);">TIBCO ActiveMatrix BusinessWorks Documentation</a></li>
+                        <li><a href="https://docs.tibco.com/products/tibco-businessworks-enterprise-edition" style="color: var(--vscode-textLink-foreground);">TIBCO BusinessWorks Enterprise Edition (BW6)</a></li>
+                        <li><a href="https://docs.tibco.com/products/tibco-enterprise-message-service" style="color: var(--vscode-textLink-foreground);">TIBCO Enterprise Message Service (EMS)</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        ` : `
         <h2 style="margin-bottom: 24px;">Understanding BizTalk Architecture</h2>
         
         <div class="education-section">
@@ -3416,6 +3679,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 </div>
             </div>
         </div>
+        `}
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -3427,6 +3691,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         const dependencyAnalysis = ${dependencyAnalysisJson};
         const gapAnalysis = ${gapAnalysisJson};
         const migrationPatterns = ${migrationPatternsJson};
+        const sourcePlatformName = '${sourcePlatform === 'tibco' ? 'TIBCO' : sourcePlatform === 'mulesoft' ? 'MuleSoft' : 'BizTalk'}';
         
         // ── Zoom State (per flow group) ──
         const ZOOM_STEP = 0.1;
@@ -4209,30 +4474,38 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             // Merge explicit patterns with inferred patterns from component types
             let patterns = migrationPatterns && migrationPatterns.length > 0 ? [...migrationPatterns] : [];
             
-            // Auto-detect common BizTalk patterns from componentDetails if none provided
+            // Auto-detect common patterns from componentDetails if none provided
             if (patterns.length === 0 && componentDetails && componentDetails.length > 0) {
                 const types = new Set(componentDetails.map(c => c.type.toLowerCase()));
                 const compNames = componentDetails.map(c => c.name);
                 
-                if (types.has('orchestration')) {
-                    const orchComps = componentDetails.filter(c => c.type.toLowerCase() === 'orchestration').map(c => c.name);
+                if (types.has('orchestration') || types.has('process')) {
+                    const orchComps = componentDetails.filter(c => c.type.toLowerCase() === 'orchestration' || c.type.toLowerCase() === 'process').map(c => c.name);
                     patterns.push({
                         pattern: 'Orchestration Workflow',
-                        description: 'BizTalk orchestrations coordinate complex business processes with state management, correlation, and exception handling.',
+                        description: sourcePlatformName === 'TIBCO' 
+                            ? 'TIBCO BusinessWorks processes coordinate complex business logic with activities, transitions, and error handling.'
+                            : 'BizTalk orchestrations coordinate complex business processes with state management, correlation, and exception handling.',
                         complexity: 'high',
-                        biztalkApproach: 'XLANG/s orchestration with visual designer, dehydration/rehydration for long-running processes, correlation sets for message routing.',
+                        biztalkApproach: sourcePlatformName === 'TIBCO'
+                            ? 'TIBCO BW process definitions with activities, transitions, groups, and inline error handling (catch blocks).'
+                            : 'XLANG/s orchestration with visual designer, dehydration/rehydration for long-running processes, correlation sets for message routing.',
                         logicAppsApproach: 'Logic Apps Standard stateful workflows with triggers, actions, and built-in retry/error handling. Use Run After configuration for exception handling.',
                         components: orchComps
                     });
                 }
                 
-                if (types.has('map')) {
-                    const mapComps = componentDetails.filter(c => c.type.toLowerCase() === 'map').map(c => c.name);
+                if (types.has('map') || types.has('xslt') || types.has('transformation')) {
+                    const mapComps = componentDetails.filter(c => ['map', 'xslt', 'transformation'].includes(c.type.toLowerCase())).map(c => c.name);
                     patterns.push({
                         pattern: 'Message Transformation',
-                        description: 'BizTalk maps use XSLT-based transformations with functoids for complex data mapping between schemas.',
+                        description: sourcePlatformName === 'TIBCO'
+                            ? 'TIBCO uses XSLT transformations and mapping activities to convert messages between formats.'
+                            : 'BizTalk maps use XSLT-based transformations with functoids for complex data mapping between schemas.',
                         complexity: 'medium',
-                        biztalkApproach: 'BizTalk Mapper with XSLT, custom functoids, inline scripts, and multi-input maps.',
+                        biztalkApproach: sourcePlatformName === 'TIBCO'
+                            ? 'TIBCO Mapper activities with XSLT, XPath expressions, and inline transformation logic.'
+                            : 'BizTalk Mapper with XSLT, custom functoids, inline scripts, and multi-input maps.',
                         logicAppsApproach: 'Logic Apps Data Mapper (XSLT-based), Liquid templates for JSON, or Azure Functions for complex transformations.',
                         components: mapComps
                     });
@@ -4250,14 +4523,18 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                     });
                 }
                 
-                if (types.has('receive port') || types.has('receiveport') || types.has('receive location') || types.has('receivelocation')) {
+                if (types.has('receive port') || types.has('receiveport') || types.has('receive location') || types.has('receivelocation') || types.has('connection') || types.has('jms connection') || types.has('http connection')) {
                     patterns.push({
                         pattern: 'Adapter-Based Connectivity',
-                        description: 'BizTalk uses adapters (FILE, HTTP, SQL, FTP, WCF, etc.) for inbound and outbound connectivity with transport-level configuration.',
+                        description: sourcePlatformName === 'TIBCO'
+                            ? 'TIBCO uses shared connections and transport resources (HTTP, JMS, File, FTP, etc.) for inbound and outbound connectivity.'
+                            : 'BizTalk uses adapters (FILE, HTTP, SQL, FTP, WCF, etc.) for inbound and outbound connectivity with transport-level configuration.',
                         complexity: 'low',
-                        biztalkApproach: 'Built-in and custom adapters with receive locations and send ports configured for specific transports and protocols.',
+                        biztalkApproach: sourcePlatformName === 'TIBCO'
+                            ? 'TIBCO shared connections and resources configured at the project or engine level for transport connectivity.'
+                            : 'Built-in and custom adapters with receive locations and send ports configured for specific transports and protocols.',
                         logicAppsApproach: 'Logic Apps Standard built-in connectors (HTTP, Service Bus, SQL, FTP, etc.) and managed connectors. Most common adapters have direct equivalents.',
-                        components: compNames.filter(n => componentDetails.find(c => c.name === n && (c.type.toLowerCase().includes('port') || c.type.toLowerCase().includes('location'))))
+                        components: compNames.filter(n => componentDetails.find(c => c.name === n && (c.type.toLowerCase().includes('port') || c.type.toLowerCase().includes('location') || c.type.toLowerCase().includes('connection'))))
                     });
                 }
             }
@@ -4287,7 +4564,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                         <div class="pattern-description">\${p.description}</div>
                         <div class="pattern-approaches">
                             <div class="pattern-approach-box biztalk">
-                                <strong>BizTalk Approach</strong>
+                                <strong>\${sourcePlatformName} Approach</strong>
                                 \${p.biztalkApproach}
                             </div>
                             <div class="pattern-approach-box logicapps">

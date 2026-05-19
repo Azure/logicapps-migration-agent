@@ -2,7 +2,7 @@
     "name": "logicapps-migration-agent",
     "displayName": "Logic Apps Migration Agent",
     "description": "Migrate BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard with AI-powered agent",
-    "version": "1.7.1",
+    "version": "1.8.0",
     "publisher": "microsoft",
     "license": "MIT",
     "packageManager": "pnpm@9.1.3",
@@ -17,6 +17,7 @@
     "keywords": [
         "biztalk",
         "mulesoft",
+        "tibco",
         "azure",
         "logic-apps",
         "migration",
@@ -40,7 +41,9 @@
         "workspaceContains:**/*.odx",
         "workspaceContains:**/*.btm",
         "workspaceContains:**/pom.xml",
-        "workspaceContains:**/mule-*.xml"
+        "workspaceContains:**/mule-*.xml",
+        "workspaceContains:**/tibco.xml",
+        "workspaceContains:**/*.process"
     ],
     "main": "./dist/extension.js",
     "contributes": {
