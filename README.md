@@ -152,7 +152,7 @@ The Flow Visualizer provides an interactive webview for exploring your integrati
 | **Missing Dependencies** | Dependencies that couldn't be resolved during discovery                        |
 | **Gap Analysis**         | Features that have no direct Logic Apps equivalent, with suggested resolutions |
 | **Patterns**             | Detected integration patterns (pub/sub, request-reply, batch, etc.)            |
-| **Learn BizTalk**        | Educational content about the source BizTalk artifacts                         |
+| **Learn SAP PI**        | Educational content about the source SAP PI artifacts                         |
 
 ### Diagram Features
 
