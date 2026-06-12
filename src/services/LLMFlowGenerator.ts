@@ -315,7 +315,7 @@ export interface GeneratedFlowResult {
         options: string[];
         recommendation: string;
     }[];
-    /** Migration patterns: BizTalk patterns hard to migrate to Logic Apps */
+    /** Migration patterns: SAP PI patterns hard to migrate to Logic Apps */
     migrationPatterns?: {
         pattern: string;
         description: string;
