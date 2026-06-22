@@ -67,7 +67,7 @@ export class PlatformDetector implements vscode.Disposable {
         folderPath: string,
         _quickScan?: QuickScanResult
     ): Promise<PlatformDetectionResult> {
-        this.logger.info('Starting platform detection', { folderPath });
+        this.logger.debug('Starting platform detection', { folderPath });
 
         const allResults: { platform: SourcePlatformType; result: PlatformDetectionResult }[] = [];
 
@@ -115,7 +115,7 @@ export class PlatformDetector implements vscode.Disposable {
                 indicators: r.result.indicators,
             }));
 
-        this.logger.info('Platform detection complete', {
+        this.logger.debug('Platform detection complete', {
             primary: primary.platform,
             primaryConfidence: primary.result.confidence,
             alternativeCount: alternatives.length,

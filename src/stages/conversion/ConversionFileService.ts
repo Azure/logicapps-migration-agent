@@ -54,7 +54,7 @@ export class ConversionFileService {
             return;
         }
         this.writeJson(path.join(dir, TASK_PLAN_FILENAME), plan);
-        this.logger.info(`[ConversionFiles] Stored task-plan.json for flow "${flowId}"`);
+        this.logger.debug(`[ConversionFiles] Stored task-plan.json for flow "${flowId}"`);
     }
 
     /**
@@ -95,7 +95,7 @@ export class ConversionFileService {
         // Update task status in task-plan.json so it persists across restarts
         this.updateTaskStatus(flowId, taskId, status);
 
-        this.logger.info(
+        this.logger.debug(
             `[ConversionFiles] Stored ${filename} for flow "${flowId}" (status: ${status})`
         );
     }
@@ -144,7 +144,7 @@ export class ConversionFileService {
             return;
         }
         fs.rmSync(dir, { recursive: true, force: true });
-        this.logger.info(`[ConversionFiles] Removed conversion directory for flow "${flowId}"`);
+        this.logger.debug(`[ConversionFiles] Removed conversion directory for flow "${flowId}"`);
     }
 
     /**
@@ -156,7 +156,7 @@ export class ConversionFileService {
             return;
         }
         fs.rmSync(rootDir, { recursive: true, force: true });
-        this.logger.info('[ConversionFiles] Removed all conversion files');
+        this.logger.debug('[ConversionFiles] Removed all conversion files');
     }
 
     // =========================================================================
@@ -166,7 +166,7 @@ export class ConversionFileService {
     private getConversionRootDir(): string | undefined {
         const wsFolder = vscode.workspace.workspaceFolders?.[0];
         if (!wsFolder) {
-            this.logger.warn('[ConversionFiles] No workspace folder');
+            this.logger.debug('[ConversionFiles] No workspace folder');
             return undefined;
         }
         return path.join(wsFolder.uri.fsPath, CONVERSION_DIR);

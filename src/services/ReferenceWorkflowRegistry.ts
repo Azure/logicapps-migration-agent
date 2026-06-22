@@ -104,7 +104,7 @@ export class ReferenceWorkflowRegistry {
     static getInstance(extensionUri?: vscode.Uri): ReferenceWorkflowRegistry {
         if (!_instance) {
             if (!extensionUri) {
-                const ext = vscode.extensions.getExtension('ms-azuretools.logicapps-migration-agent');
+                const ext = vscode.extensions.getExtension('microsoft.logicapps-migration-agent');
                 extensionUri = ext?.extensionUri;
             }
             if (!extensionUri) {
@@ -235,11 +235,11 @@ export class ReferenceWorkflowRegistry {
             const json: CatalogJson = JSON.parse(Buffer.from(bytes).toString('utf-8'));
             this.catalog = json.entries;
             const elapsed = Date.now() - startTime;
-            logger.info(
+            logger.debug(
                 `[RefWorkflowRegistry] Loaded catalog in ${elapsed}ms: ${json.totalEntries} entries`
             );
         } catch (err) {
-            logger.error(
+            logger.warn(
                 '[RefWorkflowRegistry] Failed to load catalog.json',
                 err instanceof Error ? err : new Error(String(err))
             );

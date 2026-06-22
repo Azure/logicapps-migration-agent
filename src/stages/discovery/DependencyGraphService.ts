@@ -46,7 +46,7 @@ export class DependencyGraphBuilder {
      * Build dependency graph from inventory.
      */
     public async build(inventory: ArtifactInventory): Promise<DependencyGraph> {
-        this.logger.info('Building dependency graph', { itemCount: inventory.items.length });
+        this.logger.debug('Building dependency graph', { itemCount: inventory.items.length });
 
         const nodes = new Map<string, DependencyNode>();
         const edges: DependencyEdge[] = [];
@@ -90,7 +90,7 @@ export class DependencyGraphBuilder {
             }
         }
 
-        this.logger.info('Dependency extraction summary', {
+        this.logger.debug('Dependency extraction summary', {
             totalItems: inventory.items.length,
             itemsWithIrDoc,
             nameMapSize: nameToIds.size,
@@ -135,7 +135,7 @@ export class DependencyGraphBuilder {
         // Identify shared resources
         const sharedResources = this.identifySharedResources(nodes, edges);
 
-        this.logger.info('Dependency graph built', {
+        this.logger.debug('Dependency graph built', {
             nodes: nodes.size,
             edges: edges.length,
             roots: rootNodeIds.length,
@@ -1290,7 +1290,7 @@ export class DependencyGraphService implements vscode.Disposable {
 
             this.logger.debug('Dependency graph saved to storage');
         } catch (error) {
-            this.logger.error('Failed to save dependency graph', error as Error);
+            this.logger.warn('Failed to save dependency graph', error as Error);
         }
     }
 

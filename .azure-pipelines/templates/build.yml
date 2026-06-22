@@ -1,4 +1,20 @@
 steps:
+    - powershell: |
+          $aiKey = $env:AI_KEY
+          if ([string]::IsNullOrWhiteSpace($aiKey) -or $aiKey -eq '$(AI_KEY)') {
+              Write-Host "##vso[task.logissue type=error]AI_KEY is not set. Configure the 'AI_KEY' pipeline variable before building."
+              exit 1
+          }
+          $pkg = Join-Path '$(working_directory)' 'package.json'
+          (Get-Content $pkg -Raw).Replace('setInGitHubBuild', $aiKey) | Set-Content $pkg -NoNewline
+          $src = Join-Path '$(working_directory)' 'src/services/TelemetryService.ts'
+          (Get-Content $src -Raw).Replace('setInGitHubBuild', $aiKey) | Set-Content $src -NoNewline
+          Write-Host 'Injected Application Insights key into package.json and TelemetryService.ts'
+      displayName: 'Inject Application Insights key'
+      env:
+          AI_KEY: $(AI_KEY)
+      condition: succeeded()
+
     - task: Npm@1
       displayName: 'Lint'
       inputs:

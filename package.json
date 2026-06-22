@@ -3,6 +3,7 @@
     "displayName": "Logic Apps Migration Agent",
     "description": "Migrate BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard with AI-powered agent",
     "version": "1.8.0",
+    "aiKey": "setInGitHubBuild",
     "publisher": "microsoft",
     "license": "MIT",
     "packageManager": "pnpm@9.1.3",
@@ -1846,6 +1847,17 @@
                     "type": "string",
                     "default": "eastus",
                     "description": "Azure region for provisioning resources"
+                },
+                "logicAppsMigrationAgent.logLevel": {
+                    "type": "string",
+                    "enum": [
+                        "debug",
+                        "info",
+                        "warn",
+                        "error"
+                    ],
+                    "default": "info",
+                    "description": "Minimum severity for logs written to the output channel and forwarded to telemetry."
                 }
             }
         }

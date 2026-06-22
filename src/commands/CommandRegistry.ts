@@ -175,7 +175,7 @@ export class CommandRegistry implements vscode.Disposable {
             this.registerCommand(context, command);
         }
 
-        LoggingService.getInstance().info(`Registered ${commands.length} commands`);
+        LoggingService.getInstance().debug(`Registered ${commands.length} commands`);
     }
 
     /**
@@ -418,7 +418,7 @@ export class CommandRegistry implements vscode.Disposable {
                 );
             }
 
-            LoggingService.getInstance().info(`Source folder selected: ${selectedPath}`);
+            LoggingService.getInstance().debug(`Source folder selected: ${selectedPath}`);
 
             const discoveryService = DiscoveryService.getInstance();
 
@@ -441,7 +441,7 @@ export class CommandRegistry implements vscode.Disposable {
                     // Reset state and discovery
                     await stateManager.resetState();
                     await discoveryService.reset();
-                    LoggingService.getInstance().info('Migration reset for new source folder');
+                    LoggingService.getInstance().debug('Migration reset for new source folder');
                 } else if (existingPath === selectedPath) {
                     // Same folder already discovered — skip redundant re-scan.
                     // This happens on VS Code restart when auto-detection re-triggers
@@ -450,7 +450,7 @@ export class CommandRegistry implements vscode.Disposable {
                     // any cached flow groups or other data that references the old IDs.
                     const existingInventory = discoveryService.getCurrentInventory();
                     if (existingInventory && existingInventory.items.length > 0) {
-                        LoggingService.getInstance().info(
+                        LoggingService.getInstance().debug(
                             'Skipping redundant discovery — same folder already discovered',
                             {
                                 path: selectedPath,
@@ -466,7 +466,7 @@ export class CommandRegistry implements vscode.Disposable {
                                 await this.handleViewFlowVisualization();
                             }
                         } catch (err) {
-                            LoggingService.getInstance().warn(
+                            LoggingService.getInstance().debug(
                                 `Failed to auto-start flow group detection: ${err instanceof Error ? err.message : String(err)}`
                             );
                         }
@@ -618,7 +618,7 @@ export class CommandRegistry implements vscode.Disposable {
                     );
                     if (fs.existsSync(migrationDir)) {
                         fs.rmSync(migrationDir, { recursive: true, force: true });
-                        logger.info(`[Reset] Deleted .vscode/migration folder: ${migrationDir}`);
+                        logger.debug(`[Reset] Deleted .vscode/migration folder: ${migrationDir}`);
                     }
                 }
             } catch (fsErr) {
@@ -638,7 +638,8 @@ export class CommandRegistry implements vscode.Disposable {
             // Reset state manager (clears projectPath, inventory, stage, etc.)
             await StateManager.getInstance().resetState();
 
-            logger.info('Migration reset by user');
+            logger.debug('Migration reset by user');
+            TelemetryService.getInstance().logStep('migration.reset', { scope: 'full' });
             await vscode.window.showInformationMessage(UserPrompts.MIGRATION_HAS_BEEN_RESET);
         }
     }
@@ -653,13 +654,13 @@ export class CommandRegistry implements vscode.Disposable {
 
                 if (listOutput.toLowerCase().includes('func.exe')) {
                     cp.execSync('taskkill /F /IM func.exe /T', { stdio: 'ignore' });
-                    logger.info('[Reset] Killed running func.exe process(es).');
+                    logger.debug('[Reset] Killed running func.exe process(es).');
                 }
                 return;
             }
 
             cp.execSync('pkill -f "(^|[\\/])func(\\.exe)?(\\s|$)"', { stdio: 'ignore' });
-            logger.info('[Reset] Killed running func process(es).');
+            logger.debug('[Reset] Killed running func process(es).');
         } catch {
             // Non-critical: ignore when no process exists or command is unavailable.
         }
@@ -671,7 +672,7 @@ export class CommandRegistry implements vscode.Disposable {
             const outDir = path.join(workspaceRoot, 'out');
             if (fs.existsSync(outDir)) {
                 fs.rmSync(outDir, { recursive: true, force: true });
-                logger.info(`[Reset] Deleted output folder: ${outDir}`);
+                logger.debug(`[Reset] Deleted output folder: ${outDir}`);
             }
         } catch (error) {
             logger.warn(`[Reset] Failed to delete out folder: ${String(error)}`);
@@ -753,7 +754,7 @@ export class CommandRegistry implements vscode.Disposable {
                                 await this.handleViewFlowVisualization();
                             }
                         } catch (autoDetectError) {
-                            LoggingService.getInstance().warn(
+                            LoggingService.getInstance().debug(
                                 `[Discovery] Failed to auto-start logical group detection: ${autoDetectError instanceof Error ? autoDetectError.message : String(autoDetectError)}`
                             );
                         }
@@ -790,7 +791,7 @@ export class CommandRegistry implements vscode.Disposable {
                         await this.handleViewFlowVisualization();
                     }
                 } catch (autoDetectError) {
-                    LoggingService.getInstance().warn(
+                    LoggingService.getInstance().debug(
                         `[Discovery] Failed to auto-start logical group detection after rescan: ${autoDetectError instanceof Error ? autoDetectError.message : String(autoDetectError)}`
                     );
                 }
@@ -939,7 +940,10 @@ export class CommandRegistry implements vscode.Disposable {
      * Opens the @migration-planner agent chat to analyse the flow and produce
      * a target Logic Apps Standard architecture diagram.
      */
-    private async handleGeneratePlanForFlow(flowId?: string): Promise<void> {
+    private async handleGeneratePlanForFlow(
+        flowId?: string,
+        trigger: 'initial' | 'replan' = 'initial'
+    ): Promise<void> {
         const logger = LoggingService.getInstance();
 
         if (!flowId) {
@@ -947,7 +951,7 @@ export class CommandRegistry implements vscode.Disposable {
             return;
         }
 
-        logger.info(`[Planning] handleGeneratePlanForFlow called for: ${flowId}`);
+        logger.debug(`[Planning] handleGeneratePlanForFlow called for: ${flowId}`);
 
         // Do NOT call planningService.selectFlow here — it fires state-change events
         // that would update any existing PlanningWebviewPanel. The webview opens only
@@ -963,13 +967,20 @@ export class CommandRegistry implements vscode.Disposable {
                 ? `The flow contains these artifact IDs: ${artifactIds.join(', ')}.`
                 : '';
 
+        TelemetryService.getInstance().startTimer(`planning:${flowId}`);
+        TelemetryService.getInstance().logStep('planning.started', {
+            flowId,
+            flowName,
+            trigger,
+        });
+
         // Ensure the @migration-planner agent file is provisioned
         try {
             const stateManager = StateManager.getInstance();
             const projectPath = stateManager.getState().projectPath;
             if (projectPath) {
                 await AgentFileProvisioner.getInstance().provision(projectPath);
-                logger.info('[Planning] Agent files provisioned successfully');
+                logger.debug('[Planning] Agent files provisioned successfully');
             }
         } catch (err) {
             logger.warn(
@@ -990,7 +1001,7 @@ export class CommandRegistry implements vscode.Disposable {
                     artifactList,
                 }),
             });
-            logger.info('[Planning] Agent chat opened successfully');
+            logger.debug('[Planning] Agent chat opened successfully');
         } catch (err) {
             logger.error(
                 `[Planning] Failed to open agent chat: ${err instanceof Error ? err.message : String(err)}`
@@ -1036,7 +1047,7 @@ export class CommandRegistry implements vscode.Disposable {
             return;
         }
 
-        logger.info(`[Conversion] handleGenerateConversionForFlow called for: ${flowId}`);
+        logger.debug(`[Conversion] handleGenerateConversionForFlow called for: ${flowId}`);
 
         // Do NOT call conversionService.selectFlow here — it fires state-change events
         // that would update any existing ConversionWebviewPanel. The webview opens only
@@ -1047,13 +1058,18 @@ export class CommandRegistry implements vscode.Disposable {
         const flow = conversionService.getFlows().find((f) => f.id === flowId);
         const flowName = flow?.name || flowId;
 
+        TelemetryService.getInstance().logStep('conversion.tasklist.started', {
+            flowId,
+            flowName,
+        });
+
         // Ensure the @migration-converter agent file is provisioned
         try {
             const stateManager = StateManager.getInstance();
             const projectPath = stateManager.getState().projectPath;
             if (projectPath) {
                 await AgentFileProvisioner.getInstance().provision(projectPath);
-                logger.info('[Conversion] Agent files provisioned successfully');
+                logger.debug('[Conversion] Agent files provisioned successfully');
             }
         } catch (err) {
             logger.warn(
@@ -1096,7 +1112,7 @@ export class CommandRegistry implements vscode.Disposable {
                     outputLogicAppRoot,
                 }),
             });
-            logger.info('[Conversion] Agent chat opened successfully');
+            logger.debug('[Conversion] Agent chat opened successfully');
         } catch (err) {
             logger.error(
                 `[Conversion] Failed to open agent chat: ${err instanceof Error ? err.message : String(err)}`
@@ -1126,7 +1142,7 @@ export class CommandRegistry implements vscode.Disposable {
             return;
         }
 
-        logger.info(`[Conversion] handleExecuteConversionTask: flow=${flowId} task=${taskId}`);
+        logger.debug(`[Conversion] handleExecuteConversionTask: flow=${flowId} task=${taskId}`);
 
         const conversionService = ConversionService.getInstance();
         const taskPlan = conversionService.getTaskPlan(flowId);
@@ -1141,6 +1157,15 @@ export class CommandRegistry implements vscode.Disposable {
             vscode.window.showWarningMessage(UserPrompts.taskNotFound(taskId));
             return;
         }
+
+        TelemetryService.getInstance().startTimer(`task:${flowId}:${taskId}`);
+        TelemetryService.getInstance().logStep('conversion.task.started', {
+            flowId,
+            flowName: taskPlan.flowName ?? flowId,
+            taskId,
+            taskName: task.name,
+            taskType: task.type,
+        });
 
         const isExplicitSingleUiInvocation =
             context === true || (typeof context === 'object' && context?.origin === 'single-ui');
@@ -1245,7 +1270,7 @@ export class CommandRegistry implements vscode.Disposable {
                     location: loc,
                 }),
             });
-            logger.info(`[Conversion] Agent chat opened for task: ${taskId}`);
+            logger.debug(`[Conversion] Agent chat opened for task: ${taskId}`);
         } catch (err) {
             // Revert status on failure
             await conversionService.updateTask(flowId, taskId, { status: 'pending' });
@@ -1273,7 +1298,7 @@ export class CommandRegistry implements vscode.Disposable {
             return;
         }
 
-        logger.info(`[Conversion] handleExecuteAllConversionTasks: flow=${flowId}`);
+        logger.debug(`[Conversion] handleExecuteAllConversionTasks: flow=${flowId}`);
 
         // Mark flow as executing on the flow group page
         SourceFlowVisualizer.executingGroupIds.add(flowId);
@@ -1286,6 +1311,12 @@ export class CommandRegistry implements vscode.Disposable {
             vscode.window.showWarningMessage(UserPrompts.NO_TASK_PLAN_FOUND);
             return;
         }
+
+        TelemetryService.getInstance().logStep('conversion.batch.started', {
+            flowId,
+            flowName: taskPlan.flowName ?? flowId,
+            totalTasks: taskPlan.tasks.length,
+        });
 
         // Keep UI in Execute All mode across task boundaries
         await conversionService.setExecuteAllActive(flowId, true);
@@ -1328,7 +1359,7 @@ export class CommandRegistry implements vscode.Disposable {
         // which updates the webview. The user can click "Convert All" again
         // to continue with the next task, or the agent prompt instructs it to
         // continue with remaining tasks.
-        logger.info(
+        logger.debug(
             `[Conversion] Convert All — starting task "${nextTask.id}" (${nextTask.name}) for flow ${flowId}`
         );
 
@@ -1430,7 +1461,7 @@ export class CommandRegistry implements vscode.Disposable {
                     location: loc2,
                 }),
             });
-            logger.info('[Conversion] Convert All agent chat opened successfully');
+            logger.debug('[Conversion] Convert All agent chat opened successfully');
         } catch (err) {
             await conversionService.updateTask(flowId, nextTask.id, { status: 'pending' });
             await conversionService.setExecuteAllActive(flowId, false);
@@ -1460,7 +1491,7 @@ export class CommandRegistry implements vscode.Disposable {
             return;
         }
 
-        logger.info(`[Conversion] handleExecuteBlackBoxTest: flow=${flowId} task=${taskId}`);
+        logger.debug(`[Conversion] handleExecuteBlackBoxTest: flow=${flowId} task=${taskId}`);
 
         const conversionService = ConversionService.getInstance();
         const taskPlan = conversionService.getTaskPlan(flowId);
@@ -1498,12 +1529,12 @@ export class CommandRegistry implements vscode.Disposable {
         });
 
         if (!folderUris || folderUris.length === 0) {
-            logger.info('[Conversion] Black box test cancelled — no folder selected');
+            logger.debug('[Conversion] Black box test cancelled — no folder selected');
             return;
         }
 
         const testDataFolder = folderUris[0].fsPath;
-        logger.info(`[Conversion] Black box test data folder: ${testDataFolder}`);
+        logger.debug(`[Conversion] Black box test data folder: ${testDataFolder}`);
 
         // Validate that TEST-INSTRUCTIONS.md exists in the selected folder
         const fs = await import('fs');
@@ -1575,7 +1606,7 @@ export class CommandRegistry implements vscode.Disposable {
                     testDataFolder,
                 }),
             });
-            logger.info(`[Conversion] Black box test agent chat opened for task: ${taskId}`);
+            logger.debug(`[Conversion] Black box test agent chat opened for task: ${taskId}`);
         } catch (err) {
             await conversionService.updateTask(flowId, taskId, { status: 'pending' });
             logger.error(
@@ -1604,7 +1635,7 @@ export class CommandRegistry implements vscode.Disposable {
             return;
         }
 
-        logger.info(`[Export] Generating analysis report for flow: ${flowId}`);
+        logger.debug(`[Export] Generating analysis report for flow: ${flowId}`);
         const { ReportExporterService } = await import('../services/ReportExporterService');
         const exporter = ReportExporterService.getInstance();
         const filePath = await exporter.generateAnalysisReport(
@@ -1612,6 +1643,13 @@ export class CommandRegistry implements vscode.Disposable {
             flowName || flowId,
             analysisResult
         );
+
+        TelemetryService.getInstance().logStep('report.exported', {
+            type: 'analysis',
+            flowId,
+            flowName: flowName ?? flowId,
+            success: !!filePath,
+        });
 
         if (filePath) {
             const openAction = await vscode.window.showInformationMessage(
@@ -1639,10 +1677,16 @@ export class CommandRegistry implements vscode.Disposable {
             return;
         }
 
-        logger.info(`[Export] Generating planning report for flow: ${flowId}`);
+        logger.debug(`[Export] Generating planning report for flow: ${flowId}`);
         const { ReportExporterService } = await import('../services/ReportExporterService');
         const exporter = ReportExporterService.getInstance();
         const filePath = await exporter.generatePlanningReport(flowId);
+
+        TelemetryService.getInstance().logStep('report.exported', {
+            type: 'planning',
+            flowId,
+            success: !!filePath,
+        });
 
         if (filePath) {
             const openAction = await vscode.window.showInformationMessage(

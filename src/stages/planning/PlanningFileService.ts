@@ -206,7 +206,7 @@ export class PlanningFileService {
     private ensureFlowDir(flowId: string): string | undefined {
         const dir = this.getFlowDir(flowId);
         if (!dir) {
-            this.logger.warn('[PlanningFiles] No workspace folder — cannot persist');
+            this.logger.debug('[PlanningFiles] No workspace folder — cannot persist');
             return undefined;
         }
         if (!fs.existsSync(dir)) {
@@ -227,7 +227,7 @@ export class PlanningFileService {
         }
         const filePath = path.join(dir, PLANNING_FILES.ARCHITECTURE);
         fs.writeFileSync(filePath, mermaid, 'utf-8');
-        this.logger.info(`[PlanningFiles] Stored architecture.mmd for "${flowId}"`);
+        this.logger.debug(`[PlanningFiles] Stored architecture.mmd for "${flowId}"`);
         return filePath;
     }
 
@@ -245,7 +245,7 @@ export class PlanningFileService {
         const fileName = `${PLANNING_FILES.WORKFLOW_PREFIX}${safeName}.json`;
         const filePath = path.join(dir, fileName);
         fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-        this.logger.info(`[PlanningFiles] Stored ${fileName} for "${flowId}"`);
+        this.logger.debug(`[PlanningFiles] Stored ${fileName} for "${flowId}"`);
         return filePath;
     }
 
@@ -260,7 +260,7 @@ export class PlanningFileService {
         }
         const filePath = path.join(dir, PLANNING_FILES.AZURE_COMPONENTS);
         fs.writeFileSync(filePath, JSON.stringify(components, null, 2), 'utf-8');
-        this.logger.info(`[PlanningFiles] Stored azure-components.json for "${flowId}"`);
+        this.logger.debug(`[PlanningFiles] Stored azure-components.json for "${flowId}"`);
         return filePath;
     }
 
@@ -272,7 +272,7 @@ export class PlanningFileService {
         }
         const filePath = path.join(dir, PLANNING_FILES.ACTION_MAPPINGS);
         fs.writeFileSync(filePath, JSON.stringify(mappings, null, 2), 'utf-8');
-        this.logger.info(`[PlanningFiles] Stored action-mappings.json for "${flowId}"`);
+        this.logger.debug(`[PlanningFiles] Stored action-mappings.json for "${flowId}"`);
         return filePath;
     }
 
@@ -284,7 +284,7 @@ export class PlanningFileService {
         }
         const filePath = path.join(dir, PLANNING_FILES.GAPS);
         fs.writeFileSync(filePath, JSON.stringify(gaps, null, 2), 'utf-8');
-        this.logger.info(`[PlanningFiles] Stored gaps.json for "${flowId}"`);
+        this.logger.debug(`[PlanningFiles] Stored gaps.json for "${flowId}"`);
         return filePath;
     }
 
@@ -296,7 +296,7 @@ export class PlanningFileService {
         }
         const filePath = path.join(dir, PLANNING_FILES.PATTERNS);
         fs.writeFileSync(filePath, JSON.stringify(patterns, null, 2), 'utf-8');
-        this.logger.info(`[PlanningFiles] Stored patterns.json for "${flowId}"`);
+        this.logger.debug(`[PlanningFiles] Stored patterns.json for "${flowId}"`);
         return filePath;
     }
 
@@ -311,7 +311,7 @@ export class PlanningFileService {
         }
         const filePath = path.join(dir, PLANNING_FILES.ARTIFACT_DISPOSITIONS);
         fs.writeFileSync(filePath, JSON.stringify(dispositions, null, 2), 'utf-8');
-        this.logger.info(`[PlanningFiles] Stored artifact-dispositions.json for "${flowId}"`);
+        this.logger.debug(`[PlanningFiles] Stored artifact-dispositions.json for "${flowId}"`);
         return filePath;
     }
 
@@ -323,7 +323,7 @@ export class PlanningFileService {
         }
         const filePath = path.join(dir, PLANNING_FILES.META);
         fs.writeFileSync(filePath, JSON.stringify(meta, null, 2), 'utf-8');
-        this.logger.info(`[PlanningFiles] Stored plan-meta.json for "${flowId}"`);
+        this.logger.debug(`[PlanningFiles] Stored plan-meta.json for "${flowId}"`);
         return filePath;
     }
 
@@ -563,7 +563,7 @@ export class PlanningFileService {
         }
         try {
             fs.rmSync(dir, { recursive: true, force: true });
-            this.logger.info(`[PlanningFiles] Removed planning folder for "${flowId}"`);
+            this.logger.debug(`[PlanningFiles] Removed planning folder for "${flowId}"`);
         } catch (error) {
             this.logger.warn(`[PlanningFiles] Failed to remove planning folder for "${flowId}"`, {
                 error: error instanceof Error ? error.message : String(error),
@@ -579,7 +579,7 @@ export class PlanningFileService {
         }
         try {
             fs.rmSync(baseDir, { recursive: true, force: true });
-            this.logger.info('[PlanningFiles] Removed entire planning directory');
+            this.logger.debug('[PlanningFiles] Removed entire planning directory');
         } catch (error) {
             this.logger.warn('[PlanningFiles] Failed to remove planning directory', {
                 error: error instanceof Error ? error.message : String(error),

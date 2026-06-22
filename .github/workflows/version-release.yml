@@ -17,6 +17,9 @@ on:
 permissions:
     contents: write
 
+env:
+    AI_KEY: ${{ vars.AI_KEY }}
+
 jobs:
     validation:
         runs-on: ubuntu-latest
@@ -203,6 +206,21 @@ jobs:
 
             - name: 'Lint'
               run: pnpm run lint
+
+            - name: 'Verify AI_KEY is set'
+              run: |
+                  if [ -z "${{ env.AI_KEY }}" ]; then
+                    echo "::error::AI_KEY is not set. Configure the 'AI_KEY' repository variable (Settings → Secrets and variables → Actions → Variables) before releasing."
+                    exit 1
+                  fi
+
+            - name: 'Set VSIX aiKey in package.json'
+              run: |
+                  jq --arg key "${{ env.AI_KEY }}" '.aiKey = $key' package.json > package.tmp.json
+                  mv package.tmp.json package.json
+
+            - name: 'Replace placeholder with telemetry key'
+              run: sed -i "s/setInGitHubBuild/${{ env.AI_KEY }}/g" src/services/TelemetryService.ts
 
             - name: 'Build VSIX'
               run: npx @vscode/vsce package --no-dependencies

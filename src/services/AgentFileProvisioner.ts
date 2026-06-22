@@ -90,7 +90,7 @@ export class AgentFileProvisioner {
                 await this.provisionSkills(agentDir);
                 return false;
             }
-            this.logger.info('[AgentFileProvisioner] Updating agent file to new version');
+            this.logger.debug('[AgentFileProvisioner] Updating agent file to new version');
         }
 
         // Ensure directory exists
@@ -100,7 +100,7 @@ export class AgentFileProvisioner {
         const content = this.buildAgentContent();
         await fs.promises.writeFile(agentFile, content, 'utf-8');
 
-        this.logger.info(`[AgentFileProvisioner] Provisioned ${AGENT_FILENAME} → ${agentFile}`);
+        this.logger.debug(`[AgentFileProvisioner] Provisioned ${AGENT_FILENAME} → ${agentFile}`);
 
         // Also provision the migration-planner and migration-converter agents
         await this.provisionPlannerAgent(agentDir);
@@ -125,13 +125,13 @@ export class AgentFileProvisioner {
                 );
                 return;
             }
-            this.logger.info('[AgentFileProvisioner] Updating planner agent file to new version');
+            this.logger.debug('[AgentFileProvisioner] Updating planner agent file to new version');
         }
 
         await fs.promises.mkdir(agentDir, { recursive: true });
         const content = this.buildPlannerAgentContent();
         await fs.promises.writeFile(plannerFile, content, 'utf-8');
-        this.logger.info(
+        this.logger.debug(
             `[AgentFileProvisioner] Provisioned ${PLANNER_AGENT_FILENAME} → ${plannerFile}`
         );
     }
@@ -149,19 +149,19 @@ export class AgentFileProvisioner {
         const agentFile = path.join(rootDir, AGENT_DIR, AGENT_FILENAME);
         if (fs.existsSync(agentFile)) {
             await fs.promises.unlink(agentFile);
-            this.logger.info(`[AgentFileProvisioner] Removed ${agentFile}`);
+            this.logger.debug(`[AgentFileProvisioner] Removed ${agentFile}`);
         }
 
         const plannerFile = path.join(rootDir, AGENT_DIR, PLANNER_AGENT_FILENAME);
         if (fs.existsSync(plannerFile)) {
             await fs.promises.unlink(plannerFile);
-            this.logger.info(`[AgentFileProvisioner] Removed ${plannerFile}`);
+            this.logger.debug(`[AgentFileProvisioner] Removed ${plannerFile}`);
         }
 
         const converterFile = path.join(rootDir, AGENT_DIR, CONVERTER_AGENT_FILENAME);
         if (fs.existsSync(converterFile)) {
             await fs.promises.unlink(converterFile);
-            this.logger.info(`[AgentFileProvisioner] Removed ${converterFile}`);
+            this.logger.debug(`[AgentFileProvisioner] Removed ${converterFile}`);
         }
     }
 
@@ -228,13 +228,13 @@ export class AgentFileProvisioner {
                 );
                 return;
             }
-            this.logger.info('[AgentFileProvisioner] Updating converter agent file to new version');
+            this.logger.debug('[AgentFileProvisioner] Updating converter agent file to new version');
         }
 
         await fs.promises.mkdir(agentDir, { recursive: true });
         const content = this.buildConverterAgentContent();
         await fs.promises.writeFile(converterFile, content, 'utf-8');
-        this.logger.info(
+        this.logger.debug(
             `[AgentFileProvisioner] Provisioned ${CONVERTER_AGENT_FILENAME} → ${converterFile}`
         );
     }
@@ -367,7 +367,7 @@ export class AgentFileProvisioner {
                 }
             }
             await fs.promises.writeFile(skillFile, skill.content, 'utf-8');
-            this.logger.info(`[AgentFileProvisioner] Provisioned skill: ${skill.folder}/SKILL.md`);
+            this.logger.debug(`[AgentFileProvisioner] Provisioned skill: ${skill.folder}/SKILL.md`);
         }
     }
 

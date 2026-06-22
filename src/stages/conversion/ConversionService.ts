@@ -85,7 +85,7 @@ export class ConversionService implements vscode.Disposable {
      */
     public async initialize(): Promise<void> {
         await this.loadStateFromStorage();
-        this.logger.info('Conversion service initialized');
+        this.logger.debug('Conversion service initialized');
     }
 
     // =========================================================================
@@ -102,7 +102,7 @@ export class ConversionService implements vscode.Disposable {
         const planningFlows = planningService.getFlows();
 
         if (planningFlows.length === 0) {
-            this.logger.warn('No planning flows available for conversion');
+            this.logger.debug('No planning flows available for conversion');
             return [];
         }
 
@@ -148,7 +148,7 @@ export class ConversionService implements vscode.Disposable {
         void this.saveStateToStorage();
         this._onStateChange.fire({ type: 'flows-loaded' });
 
-        this.logger.info(`Built ${flows.length} convertible flows from planning`);
+        this.logger.debug(`Built ${flows.length} convertible flows from planning`);
         return flows;
     }
 
@@ -216,13 +216,13 @@ export class ConversionService implements vscode.Disposable {
     ): Promise<void> {
         const plan = this.state?.taskPlans[flowId];
         if (!plan) {
-            this.logger.warn(`No task plan for flow ${flowId}`);
+            this.logger.debug(`No task plan for flow ${flowId}`);
             return;
         }
 
         const task = plan.tasks.find((t) => t.id === taskId);
         if (!task) {
-            this.logger.warn(`Task ${taskId} not found in flow ${flowId}`);
+            this.logger.debug(`Task ${taskId} not found in flow ${flowId}`);
             return;
         }
 
@@ -340,7 +340,7 @@ export class ConversionService implements vscode.Disposable {
             flow = this.state.flows.find((f) => f.id === flowId);
         }
         if (!flow) {
-            this.logger.warn(
+            this.logger.debug(
                 `[ConversionService] setExecuteAllActive: flow "${flowId}" not found in state`
             );
             return;
@@ -370,7 +370,7 @@ export class ConversionService implements vscode.Disposable {
         this.state = undefined;
         const storage = StorageService.getInstance();
         await storage.setWorkspace(StorageKeys.CONVERSION_STATE, undefined);
-        this.logger.info('Conversion state reset');
+        this.logger.debug('Conversion state reset');
     }
 
     // =========================================================================
@@ -387,7 +387,7 @@ export class ConversionService implements vscode.Disposable {
             await storage.setWorkspace(StorageKeys.CONVERSION_STATE, this.state);
             this.logger.debug('Conversion state saved to storage');
         } catch (error) {
-            this.logger.error('Failed to save conversion state', error as Error);
+            this.logger.warn('Failed to save conversion state', error as Error);
         }
     }
 
@@ -411,7 +411,7 @@ export class ConversionService implements vscode.Disposable {
                         if (!taskPlan) {
                             // No task plan — if stuck at 'thinking', reset to 'not-started'
                             if (flow.status === 'thinking') {
-                                this.logger.info(
+                                this.logger.debug(
                                     `[ConversionService] loadState: correcting flow "${flow.id}" from "thinking" to "not-started" (no task plan)`
                                 );
                                 flow.status = 'not-started';
@@ -424,7 +424,7 @@ export class ConversionService implements vscode.Disposable {
                         );
                         const hasRunning = taskPlan.tasks.some((t) => t.status === 'in-progress');
                         if (allDone && flow.status !== 'completed') {
-                            this.logger.info(
+                            this.logger.debug(
                                 `[ConversionService] loadState: correcting flow "${flow.id}" from "${flow.status}" to "completed"`
                             );
                             flow.status = 'completed';
@@ -434,12 +434,12 @@ export class ConversionService implements vscode.Disposable {
                             hasRunning &&
                             (flow.status === 'thinking' || flow.status === 'tasks-ready')
                         ) {
-                            this.logger.info(
+                            this.logger.debug(
                                 `[ConversionService] loadState: correcting flow "${flow.id}" from "${flow.status}" to "in-progress"`
                             );
                             flow.status = 'in-progress';
                         } else if (flow.status === 'thinking' || flow.status === 'in-progress') {
-                            this.logger.info(
+                            this.logger.debug(
                                 `[ConversionService] loadState: correcting flow "${flow.id}" from "${flow.status}" to "tasks-ready" (no running tasks)`
                             );
                             flow.status = 'tasks-ready';
@@ -461,7 +461,7 @@ export class ConversionService implements vscode.Disposable {
                 this.logger.debug('Conversion state restored from storage');
             }
         } catch (error) {
-            this.logger.error('Failed to load conversion state', error as Error);
+            this.logger.warn('Failed to load conversion state', error as Error);
         }
     }
 

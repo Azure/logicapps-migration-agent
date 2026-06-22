@@ -141,7 +141,7 @@ export class ReferenceDocRegistry {
         if (!_instance) {
             if (!extensionUri) {
                 // Try to resolve from the extension host
-                const ext = vscode.extensions.getExtension('ms-azuretools.logicapps-migration-agent');
+                const ext = vscode.extensions.getExtension('microsoft.logicapps-migration-agent');
                 extensionUri = ext?.extensionUri;
             }
             if (!extensionUri) {
@@ -367,7 +367,7 @@ export class ReferenceDocRegistry {
     private async buildIndex(): Promise<void> {
         const logger = LoggingService.getInstance();
         const startTime = Date.now();
-        logger.info('[RefDocIndex] Building inverted search index...');
+        logger.debug('[RefDocIndex] Building inverted search index...');
 
         const catalog = await this.getCatalog();
         const index = new Map<string, Map<string, number>>();
@@ -423,7 +423,7 @@ export class ReferenceDocRegistry {
         this.totalDocs = catalog.length;
 
         const elapsed = Date.now() - startTime;
-        logger.info(
+        logger.debug(
             `[RefDocIndex] Index built in ${elapsed}ms: ${catalog.length} docs, ${totalTokens} tokens, ${index.size} unique terms, ${content.size} cached contents`
         );
     }

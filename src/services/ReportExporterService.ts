@@ -494,7 +494,7 @@ export class ReportExporterService {
         }
 
         fs.writeFileSync(saveUri.fsPath, buffer);
-        this.logger.info(`[ReportExporter] Report saved: ${saveUri.fsPath}`);
+        this.logger.debug(`[ReportExporter] Report saved: ${saveUri.fsPath}`);
         return saveUri.fsPath;
     }
 

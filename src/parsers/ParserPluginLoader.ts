@@ -116,7 +116,10 @@ export class ParserPluginLoader implements vscode.Disposable {
         // Listen for extension changes to discover new parser contributions
         this.extensionChangeListener = vscode.extensions.onDidChange(() => {
             this.discoverContributedParsers().catch((err) => {
-                LoggingService.getInstance().error('Failed to discover parser contributions', err);
+                LoggingService.getInstance().warn(
+                    'Failed to discover parser contributions',
+                    err instanceof Error ? err : undefined
+                );
             });
         });
     }
@@ -143,7 +146,7 @@ export class ParserPluginLoader implements vscode.Disposable {
         await this.discoverContributedParsers();
         this.initialized = true;
 
-        LoggingService.getInstance().info('Parser plugin loader initialized', {
+        LoggingService.getInstance().debug('Parser plugin loader initialized', {
             externalParsers: this.externalParsers.size,
         });
     }
@@ -228,7 +231,7 @@ export class ParserPluginLoader implements vscode.Disposable {
                 registeredAt: new Date(),
             });
 
-            LoggingService.getInstance().info('External parser registered', {
+            LoggingService.getInstance().debug('External parser registered', {
                 parserId: id,
                 platform: parser.capabilities.platform,
                 extensionId: callingExtension,
@@ -240,7 +243,7 @@ export class ParserPluginLoader implements vscode.Disposable {
             };
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            LoggingService.getInstance().error(
+            LoggingService.getInstance().warn(
                 'Failed to register external parser',
                 error instanceof Error ? error : undefined
             );
@@ -267,7 +270,7 @@ export class ParserPluginLoader implements vscode.Disposable {
             this.registry.unregister(parserId);
             this.externalParsers.delete(parserId);
 
-            LoggingService.getInstance().info('External parser unregistered', {
+            LoggingService.getInstance().debug('External parser unregistered', {
                 parserId,
             });
 
@@ -373,12 +376,12 @@ export class ParserPluginLoader implements vscode.Disposable {
                 priority: contribution.priority ?? 10,
             });
 
-            LoggingService.getInstance().info('Loaded contributed parser', {
+            LoggingService.getInstance().debug('Loaded contributed parser', {
                 extensionId: extension.id,
                 parserId,
             });
         } catch (error) {
-            LoggingService.getInstance().error(
+            LoggingService.getInstance().warn(
                 `Failed to load parser from ${extension.id}`,
                 error instanceof Error ? error : undefined
             );
