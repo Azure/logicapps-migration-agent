@@ -1847,17 +1847,6 @@
                     "type": "string",
                     "default": "eastus",
                     "description": "Azure region for provisioning resources"
-                },
-                "logicAppsMigrationAgent.logLevel": {
-                    "type": "string",
-                    "enum": [
-                        "debug",
-                        "info",
-                        "warn",
-                        "error"
-                    ],
-                    "default": "info",
-                    "description": "Minimum severity for logs written to the output channel and forwarded to telemetry."
                 }
             }
         }

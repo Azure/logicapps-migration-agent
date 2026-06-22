@@ -18,6 +18,9 @@ export enum LogLevel {
     Error = 3,
 }
 
+/** Human-readable names for each log level, indexed by LogLevel value. */
+const LEVEL_NAMES = ['DEBUG', 'INFO', 'WARN', 'ERROR'] as const;
+
 /**
  * Log entry metadata
  */
@@ -29,7 +32,6 @@ type LogMetadata = Record<string, string | number | boolean | undefined>;
 export class LoggingService implements vscode.Disposable {
     private static instance: LoggingService | undefined;
     private outputChannel: vscode.LogOutputChannel | undefined;
-    private logLevel: LogLevel = LogLevel.Info;
     private readonly channelName = 'Logic Apps Migration Agent';
     private forwardingToTelemetry = false;
 
@@ -49,44 +51,13 @@ export class LoggingService implements vscode.Disposable {
      * Initialize the logging service
      */
     public initialize(_context: vscode.ExtensionContext): void {
+        // Create the channel as a LogOutputChannel so VS Code controls the
+        // visible log level natively (the Output panel's filter icon, or the
+        // "Developer: Set Log Level…" command). The channel's own level is the
+        // single source of truth — there is no extension-level log-level setting.
         this.outputChannel = vscode.window.createOutputChannel(this.channelName, { log: true });
 
-        // Read log level from configuration
-        this.updateLogLevel();
-
-        // Listen for configuration changes
-        vscode.workspace.onDidChangeConfiguration((event) => {
-            if (event.affectsConfiguration('logicAppsMigrationAgent.logLevel')) {
-                this.updateLogLevel();
-            }
-        });
-
         this.debug('Logging service initialized');
-    }
-
-    /**
-     * Update log level from configuration
-     */
-    private updateLogLevel(): void {
-        const config = vscode.workspace.getConfiguration('logicAppsMigrationAgent');
-        const levelString = config.get<string>('logLevel', 'info');
-
-        switch (levelString.toLowerCase()) {
-            case 'debug':
-                this.logLevel = LogLevel.Debug;
-                break;
-            case 'info':
-                this.logLevel = LogLevel.Info;
-                break;
-            case 'warn':
-                this.logLevel = LogLevel.Warn;
-                break;
-            case 'error':
-                this.logLevel = LogLevel.Error;
-                break;
-            default:
-                this.logLevel = LogLevel.Info;
-        }
     }
 
     /**
@@ -104,18 +75,14 @@ export class LoggingService implements vscode.Disposable {
      * Log a debug message
      */
     public debug(message: string, metadata?: LogMetadata): void {
-        if (this.logLevel <= LogLevel.Debug) {
-            this.log(LogLevel.Debug, message, metadata);
-        }
+        this.log(LogLevel.Debug, message, metadata);
     }
 
     /**
      * Log an info message
      */
     public info(message: string, metadata?: LogMetadata): void {
-        if (this.logLevel <= LogLevel.Info) {
-            this.log(LogLevel.Info, message, metadata);
-        }
+        this.log(LogLevel.Info, message, metadata);
     }
 
     /**
@@ -132,18 +99,14 @@ export class LoggingService implements vscode.Disposable {
         errorOrMetadata?: Error | LogMetadata,
         metadata?: LogMetadata
     ): void {
-        if (this.logLevel <= LogLevel.Warn) {
-            this.log(LogLevel.Warn, message, this.coalesceMetadata(errorOrMetadata, metadata));
-        }
+        this.log(LogLevel.Warn, message, this.coalesceMetadata(errorOrMetadata, metadata));
     }
 
     /**
      * Log an error message
      */
     public error(message: string, error?: Error, metadata?: LogMetadata): void {
-        if (this.logLevel <= LogLevel.Error) {
-            this.log(LogLevel.Error, message, this.coalesceMetadata(error, metadata));
-        }
+        this.log(LogLevel.Error, message, this.coalesceMetadata(error, metadata));
     }
 
     /**
@@ -169,11 +132,10 @@ export class LoggingService implements vscode.Disposable {
      * Internal log method
      */
     private log(level: LogLevel, message: string, metadata?: LogMetadata): void {
-        const levelNames = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
-
         if (this.outputChannel) {
             // Route through the LogOutputChannel's native level methods so VS Code
-            // renders a single, correct severity (and its own timestamp).
+            // renders a single, correct severity (and its own timestamp), and so
+            // the channel's native level filter controls visibility.
             const text = this.composeMessage(message, metadata);
             switch (level) {
                 case LogLevel.Debug:
@@ -197,7 +159,7 @@ export class LoggingService implements vscode.Disposable {
         if (level >= LogLevel.Info && !this.forwardingToTelemetry) {
             this.forwardingToTelemetry = true;
             try {
-                TelemetryService.getInstance().sendLog(levelNames[level], message, metadata);
+                TelemetryService.getInstance().sendLog(LEVEL_NAMES[level], message, metadata);
             } finally {
                 this.forwardingToTelemetry = false;
             }
