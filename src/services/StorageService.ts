@@ -114,7 +114,9 @@ export class StorageService implements vscode.Disposable {
     public async setWorkspace<T>(key: StorageKey, value: T): Promise<void> {
         const stateDir = this.getStateDir();
         if (!stateDir) {
-            LoggingService.getInstance().warn('No workspace folder — cannot persist state to disk');
+            LoggingService.getInstance().debug(
+                'No workspace folder — cannot persist state to disk'
+            );
             return;
         }
         try {
@@ -152,7 +154,7 @@ export class StorageService implements vscode.Disposable {
         if (stateDir && fs.existsSync(stateDir)) {
             try {
                 fs.rmSync(stateDir, { recursive: true, force: true });
-                LoggingService.getInstance().info('Workspace storage cleared (state dir removed)');
+                LoggingService.getInstance().debug('Workspace storage cleared (state dir removed)');
             } catch (err) {
                 LoggingService.getInstance().warn(`Failed to clear workspace storage: ${err}`);
             }
@@ -207,7 +209,7 @@ export class StorageService implements vscode.Disposable {
         for (const key of keys) {
             await this.context.globalState.update(key, undefined);
         }
-        LoggingService.getInstance().info('Global storage cleared');
+        LoggingService.getInstance().debug('Global storage cleared');
     }
 
     // ==================== Large Object Storage ====================
@@ -280,7 +282,7 @@ export class StorageService implements vscode.Disposable {
         try {
             return JSON.parse(serialized) as T;
         } catch (error) {
-            LoggingService.getInstance().error('Failed to parse chunked data', error as Error, {
+            LoggingService.getInstance().warn('Failed to parse chunked data', error as Error, {
                 key,
             });
             return defaultValue;

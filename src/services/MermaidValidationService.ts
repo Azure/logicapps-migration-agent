@@ -104,7 +104,7 @@ export class MermaidValidationService {
 
             this.validateFlowchartSyntax(normalized);
 
-            this.logger.info(
+            this.logger.debug(
                 `[MermaidValidationService] Mermaid validation succeeded (${diagramType ?? 'unknown'})`
             );
 

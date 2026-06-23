@@ -10,6 +10,7 @@
 
 import * as vscode from 'vscode';
 import { LoggingService } from '../../services/LoggingService';
+import { TelemetryService } from '../../services/TelemetryService';
 import { PlanningService } from '../../stages/planning/PlanningService';
 import { PlanningFlow, FlowMigrationPlan } from '../../stages/planning/types';
 import {
@@ -115,7 +116,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                 ? PlanningCacheService.getInstance().get(selectedFlowId)
                 : undefined;
 
-            this.logger.info(
+            this.logger.debug(
                 `[PlanningWebview] update: selectedFlowId=${selectedFlowId}, hasPlan=${!!selectedPlan}, hasCachedResult=${!!cachedPlanResult}, flowCount=${flows.length}`
             );
 
@@ -143,7 +144,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
      * Handle messages from webview.
      */
     private handleMessage(message: { command: string; data?: unknown }): void {
-        this.logger.info(
+        this.logger.debug(
             `[PlanningWebview] message received: ${message.command} data=${JSON.stringify(message.data)}`
         );
         switch (message.command) {
@@ -151,7 +152,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                 const flowId = message.data as string;
                 if (flowId) {
                     void this.planningService.selectFlow(flowId);
-                    this.logger.info(`Flow selected for planning: ${flowId}`);
+                    this.logger.debug(`Flow selected for planning: ${flowId}`);
                 }
                 break;
             }
@@ -160,13 +161,13 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                 const flowId = message.data as string;
                 if (flowId) {
                     void this.planningService.selectFlow(flowId);
-                    this.logger.info(`Planning started for flow: ${flowId}`);
+                    this.logger.debug(`Planning started for flow: ${flowId}`);
                     // Trigger plan generation via command
                     vscode.commands
                         .executeCommand('logicAppsMigrationAgent.generatePlanForFlow', flowId)
                         .then(
                             () =>
-                                this.logger.info(`Planning command completed for flow: ${flowId}`),
+                                this.logger.debug(`Planning command completed for flow: ${flowId}`),
                             (err) => {
                                 this.logger.error(
                                     `Planning command failed for flow: ${flowId} — ${err}`
@@ -183,7 +184,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             case 'replan': {
                 const flowId = message.data as string;
                 if (flowId) {
-                    this.logger.info(`Replan requested for flow: ${flowId}`);
+                    this.logger.debug(`Replan requested for flow: ${flowId}`);
                     // Remove cached plan from disk and memory
                     PlanningCacheService.getInstance()
                         .remove(flowId)
@@ -207,11 +208,12 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                             vscode.commands
                                 .executeCommand(
                                     'logicAppsMigrationAgent.generatePlanForFlow',
-                                    flowId
+                                    flowId,
+                                    'replan'
                                 )
                                 .then(
                                     () =>
-                                        this.logger.info(
+                                        this.logger.debug(
                                             `Replan command completed for flow: ${flowId}`
                                         ),
                                     (err) => {
@@ -251,6 +253,12 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                 if (userMsg && userMsg.trim().length > 0) {
                     const state = this.planningService.getState();
                     const flowId = state?.selectedFlowId || '';
+                    TelemetryService.getInstance().logStep('suggestion.requested', {
+                        stage: 'planning',
+                        flowId,
+                        message: userMsg.trim().slice(0, 1000),
+                        messageLength: userMsg.trim().length,
+                    });
                     const prompt = `@migration-planner\nRespond for below, Strictly follow your \`Incremental Updates\` instruction. Re-plan and update the results, then finalize.\n\nFlow ID: ${flowId}\n\n${userMsg}`;
                     void vscode.commands
                         .executeCommand('workbench.action.chat.open', {
@@ -269,7 +277,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             case 'exportPlanReport': {
                 const flowId = message.data as string;
                 if (flowId) {
-                    this.logger.info(
+                    this.logger.debug(
                         `[PlanningWebview] Export report requested for flow: ${flowId}`
                     );
                     void vscode.commands.executeCommand(

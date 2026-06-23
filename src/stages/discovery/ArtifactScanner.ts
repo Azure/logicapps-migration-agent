@@ -235,7 +235,7 @@ export class ArtifactScanner implements vscode.Disposable {
         options?: ScanOptions,
         progressCallback?: ScanProgressCallback
     ): Promise<ScanResult> {
-        this.logger.info('Starting artifact scan', { folderPath, platform });
+        this.logger.debug('Starting artifact scan', { folderPath, platform });
 
         const startTime = Date.now();
         this.currentScan = { cancelled: false, startTime };
@@ -264,7 +264,7 @@ export class ArtifactScanner implements vscode.Disposable {
 
             const discoveredFiles = await this.discoverFiles(folderPath, platform, mergedOptions);
 
-            this.logger.info('File discovery complete', { totalFiles: discoveredFiles.length });
+            this.logger.debug('File discovery complete', { totalFiles: discoveredFiles.length });
 
             // Phase 2: Parse files
             const totalFiles = discoveredFiles.length;
@@ -276,7 +276,7 @@ export class ArtifactScanner implements vscode.Disposable {
                     this.currentScan.cancelled ||
                     mergedOptions.cancellationToken.isCancellationRequested
                 ) {
-                    this.logger.info('Scan cancelled');
+                    this.logger.debug('Scan cancelled');
                     break;
                 }
 
@@ -377,7 +377,7 @@ export class ArtifactScanner implements vscode.Disposable {
 
             const durationMs = Date.now() - startTime;
 
-            this.logger.info('Artifact scan complete', {
+            this.logger.debug('Artifact scan complete', {
                 totalFiles: discoveredFiles.length,
                 parsed: parsedArtifacts.length,
                 errors: parseErrors.length,
@@ -445,7 +445,7 @@ export class ArtifactScanner implements vscode.Disposable {
     public cancelScan(): void {
         if (this.currentScan) {
             this.currentScan.cancelled = true;
-            this.logger.info('Scan cancellation requested');
+            this.logger.debug('Scan cancellation requested');
         }
     }
 

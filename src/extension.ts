@@ -113,7 +113,7 @@ export async function activate(
         }, 3000);
 
         // Log activation
-        LoggingService.getInstance().info('Extension activated successfully', {
+        LoggingService.getInstance().debug('Extension activated successfully', {
             extensionId: context.extension.id,
             extensionVersion: context.extension.packageJSON.version,
         });
@@ -140,7 +140,7 @@ export async function activate(
                         return;
                     }
 
-                    LoggingService.getInstance().info(
+                    LoggingService.getInstance().debug(
                         'Workspace folders changed, syncing source folder'
                     );
 
@@ -177,7 +177,7 @@ export async function activate(
                 );
 
                 if (!isAlreadyWorkspace) {
-                    LoggingService.getInstance().info(
+                    LoggingService.getInstance().debug(
                         'Source folder changed, syncing workspace folder',
                         { newPath: event.newPath }
                     );
@@ -206,10 +206,10 @@ export async function activate(
                     const { SourceFlowVisualizer } =
                         await import('./views/discovery/SourceFlowVisualizer');
                     const extensionUri =
-                        vscode.extensions.getExtension('logicapps-migration-agent')
-                            ?.extensionUri ?? vscode.Uri.file(__dirname);
+                        vscode.extensions.getExtension('logicapps-migration-agent')?.extensionUri ??
+                        vscode.Uri.file(__dirname);
                     SourceFlowVisualizer.showFlowGroupSelector(extensionUri);
-                    LoggingService.getInstance().info(
+                    LoggingService.getInstance().debug(
                         'Auto-opened flow group selector on startup (flow groups exist)'
                     );
                 }
@@ -267,7 +267,7 @@ async function initializeServices(context: vscode.ExtensionContext): Promise<voi
 
     // Initialize all parsers and register them
     initializeParsers();
-    LoggingService.getInstance().info('Parsers initialized');
+    LoggingService.getInstance().debug('Parsers initialized');
 
     // =========================================================================
     // PHASE 5: Stage Infrastructure Services
@@ -278,7 +278,7 @@ async function initializeServices(context: vscode.ExtensionContext): Promise<voi
     await toolRegistry.initialize();
     disposables.push(toolRegistry);
 
-    LoggingService.getInstance().info('Stage infrastructure services initialized');
+    LoggingService.getInstance().debug('Stage infrastructure services initialized');
 
     // =========================================================================
     // PHASE 6: Discovery Stage Services
@@ -289,7 +289,7 @@ async function initializeServices(context: vscode.ExtensionContext): Promise<voi
     await discoveryService.initialize();
     disposables.push(discoveryService);
 
-    LoggingService.getInstance().info('Discovery stage services initialized');
+    LoggingService.getInstance().debug('Discovery stage services initialized');
 
     // =========================================================================
     // PLANNING STAGE SERVICES
@@ -300,7 +300,7 @@ async function initializeServices(context: vscode.ExtensionContext): Promise<voi
     await planningService.initialize();
     disposables.push(planningService);
 
-    LoggingService.getInstance().info('Planning stage services initialized');
+    LoggingService.getInstance().debug('Planning stage services initialized');
 
     // =========================================================================
     // CONVERSION STAGE SERVICES
@@ -311,7 +311,7 @@ async function initializeServices(context: vscode.ExtensionContext): Promise<voi
     await conversionService.initialize();
     disposables.push(conversionService);
 
-    LoggingService.getInstance().info('Conversion stage services initialized');
+    LoggingService.getInstance().debug('Conversion stage services initialized');
 
     // =========================================================================
     // PROJECT AUTO-DETECTION (Phase 6)
@@ -322,7 +322,7 @@ async function initializeServices(context: vscode.ExtensionContext): Promise<voi
     await autoDetection.initialize();
     disposables.push(autoDetection);
 
-    LoggingService.getInstance().info('Project auto-detection initialized');
+    LoggingService.getInstance().debug('Project auto-detection initialized');
 }
 
 /**
@@ -372,7 +372,7 @@ function createStatusBarItem(context: vscode.ExtensionContext): vscode.StatusBar
 export function deactivate(): void {
     // Log deactivation
     try {
-        LoggingService.getInstance().info('Extension deactivating...');
+        LoggingService.getInstance().debug('Extension deactivating...');
 
         // Send telemetry
         TelemetryService.getInstance().sendEvent('extension.deactivated');
