@@ -4,7 +4,7 @@
     "description": "Migrate BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard with AI-powered agent",
     "version": "1.8.0",
     "aiKey": "setInGitHubBuild",
-    "publisher": "microsoft",
+    "publisher": "ms-azuretools",
     "license": "MIT",
     "packageManager": "pnpm@9.1.3",
     "engines": {
