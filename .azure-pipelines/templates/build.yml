@@ -1,7 +1,12 @@
 steps:
     - powershell: |
           $aiKey = $env:AI_KEY
-          if ([string]::IsNullOrWhiteSpace($aiKey) -or $aiKey -eq '$(AI_KEY)') {
+          # Build the unexpanded-macro token at runtime ('$(AI_KEY)') so Azure
+          # DevOps does NOT substitute it during pre-execution macro expansion.
+          # When the variable is undefined, $env:AI_KEY is left as that literal
+          # token; when it is set, $env:AI_KEY is the real key.
+          $unsetToken = '$' + '(AI_KEY)'
+          if ([string]::IsNullOrWhiteSpace($aiKey) -or $aiKey -eq $unsetToken) {
               Write-Host "##vso[task.logissue type=error]AI_KEY is not set. Configure the 'AI_KEY' pipeline variable before building."
               exit 1
           }
