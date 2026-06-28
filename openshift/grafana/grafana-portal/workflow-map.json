@@ -1,0 +1,23 @@
+[
+  {
+    "WorkflowName": "hl7decode",
+    "TableName": "flowb92b4ea62e4b720aa3fbd8c31235bbruns",
+    "SchemaName": "dt",
+    "Triggers": "When_an_HTTP_request_is_received",
+    "MappingMethod": "latest-activity-fallback"
+  },
+  {
+    "WorkflowName": "request-response",
+    "TableName": "flowb92b4ea62e4b720b53acf25db8882druns",
+    "SchemaName": "dt",
+    "Triggers": "When_an_HTTP_request_is_received",
+    "MappingMethod": "latest-activity-fallback"
+  },
+  {
+    "WorkflowName": "x12decode",
+    "TableName": "flowb92b4ea62e4b7208cafde815415d3fruns",
+    "SchemaName": "dt",
+    "Triggers": "When_a_HTTP_request_is_received",
+    "MappingMethod": "latest-activity-fallback"
+  }
+]

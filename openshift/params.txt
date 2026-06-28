@@ -1,0 +1,47 @@
+# params.txt template (safe for public repo)
+# Fill these values per environment before running setup scripts.
+# CLI parameters override environment variable values.
+
+############################################
+# Grafana Portal Setup (setup-grafana-portal.ps1)
+############################################
+# Optional: auto-resolved from Container App secret/pod env when available
+# SQL_SERVER=<sql-server-host-or-ip>
+# SQL_DATABASE=logicapp
+# SQL_USER=<sql-user>
+# SQL_PASSWORD=<sql-password>
+# Optional: only needed when auto-discovery from local host secrets is unavailable
+# LOGICAPPS_MASTER_KEY=<logicapps-master-key>
+# Optional: defaults to port-forward URL or container app ingress FQDN when available
+# LOGICAPPS_BASE_URL=<logic-app-base-url-if-not-portforward>
+# Optional: auto-resolved from k8se metadata/az lookup when available
+# LOGICAPPS_RESOURCE_GROUP=<resource-group-containing-container-app>
+# Optional in local OpenShift: auto-resolved from openshift-monitoring routes/current oc token when available
+# PROMETHEUS_URL=<prometheus-or-thanos-url>
+# PROMETHEUS_TOKEN=<prometheus-bearer-token>
+# Optional: defaults to current Logic Apps namespace from oc context/cluster discovery
+# LOGICAPPS_NAMESPACE=<k8s-namespace>
+# Optional: if omitted, setup discovers all apps in namespace and generates one dashboard per app
+# LOGICAPPS_APP_NAME=<logic-app-container-app-name>
+# Optional: defaults to %USERPROFILE%\.kube\config when present
+# KUBECONFIG=<path-to-kubeconfig>
+# Optional: defaults to current oc context
+# KUBE_CONTEXT=<kube-context-name>
+
+############################################
+# OpenShift + Logic Apps Setup (setup-logicapps-sno-complete.ps1)
+############################################
+# Optional in local setup: auto-resolved from current az login/session when available
+# AZURE_TENANT_ID=<tenant-id>
+# AZURE_SUBSCRIPTION_NAME=<subscription-name-or-id>
+# Optional in local setup: auto-resolved from current oc context when available
+# OPENSHIFT_API_URL=<https://api.<cluster-domain>:6443>
+# Optional in local setup: auto-resolved from current oc context/session when available
+# OPENSHIFT_USERNAME=<openshift-username>
+# OPENSHIFT_PASSWORD=<openshift-password>
+# OPENSHIFT_TOKEN=<openshift-bearer-token>
+# Optional: if omitted, setup auto-detects a local host IP reachable by the cluster
+# HOST_ACCESS_IP=<host-ip-reachable-from-openshift>
+# Optional: if omitted, setup auto-picks a local random /24 range (you can still override)
+# METALLB_IP_START=<metallb-start-ip>
+# METALLB_IP_END=<metallb-end-ip>

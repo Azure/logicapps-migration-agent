@@ -1,0 +1,24 @@
+services:
+  grafana:
+    image: grafana/grafana:latest
+    container_name: logicapps-grafana-portal
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_PANELS_DISABLE_SANITIZE_HTML: "true"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/logicapps-workflow-hub.json
+    extra_hosts:
+      - "-gateway"
+    volumes:
+      - ./provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./dashboards:/var/lib/grafana/dashboards
+      - grafana-portal-data:/var/lib/grafana
+    restart: unless-stopped
+
+volumes:
+  grafana-portal-data:

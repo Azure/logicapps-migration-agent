@@ -1,0 +1,270 @@
+{
+  "uid": "logicapps-monitor",
+  "title": "Logic Apps - Workflow Hub",
+  "tags": ["logicapps", "workflows", "monitoring"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "editable": true,
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "title": "Total Runs", "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "targets": [{ "rawSql": "SELECT COUNT(*) AS total FROM (\n  SELECT CreatedTime FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime)\n  UNION ALL SELECT CreatedTime FROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs] WHERE $__timeFilter(CreatedTime)\n  UNION ALL SELECT CreatedTime FROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs] WHERE $__timeFilter(CreatedTime)\n  UNION ALL SELECT CreatedTime FROM [dt].[flowbbf0356a73a18ba21fc14c095f059aruns] WHERE $__timeFilter(CreatedTime)\n) a", "refId": "A", "format": "table" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"value": null, "color": "blue"}] } } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name", "colorMode": "value" }
+    },
+    {
+      "id": 2, "title": "Succeeded", "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "targets": [{ "rawSql": "SELECT COUNT(*) AS succeeded FROM (\n  SELECT Status FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime) AND Status='Succeeded'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs] WHERE $__timeFilter(CreatedTime) AND Status='Succeeded'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs] WHERE $__timeFilter(CreatedTime) AND Status='Succeeded'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba21fc14c095f059aruns] WHERE $__timeFilter(CreatedTime) AND Status='Succeeded'\n) a", "refId": "A", "format": "table" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"value": null, "color": "green"}] } } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name", "colorMode": "value" }
+    },
+    {
+      "id": 3, "title": "Failed", "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "targets": [{ "rawSql": "SELECT COUNT(*) AS failed FROM (\n  SELECT Status FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime) AND Status='Failed'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs] WHERE $__timeFilter(CreatedTime) AND Status='Failed'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs] WHERE $__timeFilter(CreatedTime) AND Status='Failed'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba21fc14c095f059aruns] WHERE $__timeFilter(CreatedTime) AND Status='Failed'\n) a", "refId": "A", "format": "table" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"value": null, "color": "green"}, {"value": 1, "color": "red"}] } } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name", "colorMode": "value" }
+    },
+    {
+      "id": 4, "title": "Avg Duration", "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "targets": [{ "rawSql": "SELECT CAST(AVG(DATEDIFF(MILLISECOND,CreatedTime,EndTime))/1000.0 AS DECIMAL(10,2)) AS avg_sec FROM (\n  SELECT CreatedTime, EndTime FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime) AND EndTime IS NOT NULL AND EndTime > CreatedTime\n  UNION ALL SELECT CreatedTime, EndTime FROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs] WHERE $__timeFilter(CreatedTime) AND EndTime IS NOT NULL AND EndTime > CreatedTime\n  UNION ALL SELECT CreatedTime, EndTime FROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs] WHERE $__timeFilter(CreatedTime) AND EndTime IS NOT NULL AND EndTime > CreatedTime\n  UNION ALL SELECT CreatedTime, EndTime FROM [dt].[flowbbf0356a73a18ba21fc14c095f059aruns] WHERE $__timeFilter(CreatedTime) AND EndTime IS NOT NULL AND EndTime > CreatedTime\n) a", "refId": "A", "format": "table" }],
+      "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"value": null, "color": "purple"}] } } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name", "colorMode": "value" }
+    },
+    {
+      "id": 5, "title": "Retry Count", "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "targets": [{ "rawSql": "SELECT ISNULL(SUM(CurrentRetryCount),0) AS retries FROM [dt].[flowbbf0356a73a18bajobdefinitions] WHERE JobId LIKE 'FlowTriggerJob%'", "refId": "A", "format": "table" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"value": null, "color": "orange"}, {"value": 50, "color": "red"}] } } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name", "colorMode": "value" }
+    },
+    {
+      "id": 6, "title": "Success Rate", "type": "gauge",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "targets": [{ "rawSql": "SELECT CAST(ISNULL(SUM(CASE WHEN Status='Succeeded' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0),0) AS DECIMAL(5,1)) AS success_rate FROM (\n  SELECT Status FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime)\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs] WHERE $__timeFilter(CreatedTime)\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs] WHERE $__timeFilter(CreatedTime)\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba21fc14c095f059aruns] WHERE $__timeFilter(CreatedTime)\n) a", "refId": "A", "format": "table" }],
+      "fieldConfig": { "defaults": { "min": 0, "max": 100, "unit": "percent", "thresholds": { "steps": [{"value": null, "color": "red"}, {"value": 80, "color": "yellow"}, {"value": 95, "color": "green"}] } } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 10, "title": "Workflow Inventory", "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+      "targets": [{ "rawSql": "SELECT * FROM (\n  SELECT 'sendfile' AS [Workflow],\n    CASE WHEN SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END)>5 THEN 'Critical' WHEN SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END)>0 THEN 'Warning' ELSE 'Healthy' END AS Health,\n    COUNT(*) AS [Total Runs],\n    SUM(CASE WHEN Status='Succeeded' THEN 1 ELSE 0 END) AS Succeeded,\n    SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END) AS [Failed],\n    CAST(SUM(CASE WHEN Status='Succeeded' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0) AS DECIMAL(5,1)) AS [Success%],\n    CAST(AVG(CASE WHEN EndTime IS NOT NULL AND EndTime>CreatedTime THEN DATEDIFF(MILLISECOND,CreatedTime,EndTime) END)/1000.0 AS DECIMAL(10,2)) AS [Avg(s)],\n    CAST(MIN(CASE WHEN EndTime IS NOT NULL AND EndTime>CreatedTime THEN DATEDIFF(MILLISECOND,CreatedTime,EndTime) END)/1000.0 AS DECIMAL(10,3)) AS [Min(s)],\n    CAST(MAX(CASE WHEN EndTime IS NOT NULL AND EndTime>CreatedTime THEN DATEDIFF(MILLISECOND,CreatedTime,EndTime) END)/1000.0 AS DECIMAL(10,3)) AS [Max(s)],\n    MAX(CreatedTime) AS [Last Run]\n  FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime)\n  UNION ALL\n  SELECT 'mllpreceiove',\n    CASE WHEN SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END)>5 THEN 'Critical' WHEN SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END)>0 THEN 'Warning' ELSE 'Healthy' END,\n    COUNT(*), SUM(CASE WHEN Status='Succeeded' THEN 1 ELSE 0 END), SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END),\n    CAST(SUM(CASE WHEN Status='Succeeded' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0) AS DECIMAL(5,1)),\n    CAST(AVG(CASE WHEN EndTime IS NOT NULL AND EndTime>CreatedTime THEN DATEDIFF(MILLISECOND,CreatedTime,EndTime) END)/1000.0 AS DECIMAL(10,2)),\n    CAST(MIN(CASE WHEN EndTime IS NOT NULL AND EndTime>CreatedTime THEN DATEDIFF(MILLISECOND,CreatedTime,EndTime) END)/1000.0 AS DECIMAL(10,3)),\n    CAST(MAX(CASE WHEN EndTime IS NOT NULL AND EndTime>CreatedTime THEN DATEDIFF(MILLISECOND,CreatedTime,EndTime) END)/1000.0 AS DECIMAL(10,3)),\n    MAX(CreatedTime)\n  FROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs] WHERE $__timeFilter(CreatedTime)\n  UNION ALL\n  SELECT 'wf2',\n    CASE WHEN SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END)>5 THEN 'Critical' WHEN SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END)>0 THEN 'Warning' ELSE 'Healthy' END,\n    COUNT(*), SUM(CASE WHEN Status='Succeeded' THEN 1 ELSE 0 END), SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END),\n    CAST(SUM(CASE WHEN Status='Succeeded' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0) AS DECIMAL(5,1)),\n    CAST(AVG(CASE WHEN EndTime IS NOT NULL AND EndTime>CreatedTime THEN DATEDIFF(MILLISECOND,CreatedTime,EndTime) END)/1000.0 AS DECIMAL(10,2)),\n    CAST(MIN(CASE WHEN EndTime IS NOT NULL AND EndTime>CreatedTime THEN DATEDIFF(MILLISECOND,CreatedTime,EndTime) END)/1000.0 AS DECIMAL(10,3)),\n    CAST(MAX(CASE WHEN EndTime IS NOT NULL AND EndTime>CreatedTime THEN DATEDIFF(MILLISECOND,CreatedTime,EndTime) END)/1000.0 AS DECIMAL(10,3)),\n    MAX(CreatedTime)\n  FROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs] WHERE $__timeFilter(CreatedTime)\n  UNION ALL\n  SELECT 'hello-workflow',\n    CASE WHEN SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END)>5 THEN 'Critical' WHEN SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END)>0 THEN 'Warning' ELSE 'Healthy' END,\n    COUNT(*), SUM(CASE WHEN Status='Succeeded' THEN 1 ELSE 0 END), SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END),\n    CAST(SUM(CASE WHEN Status='Succeeded' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0) AS DECIMAL(5,1)),\n    CAST(AVG(CASE WHEN EndTime IS NOT NULL AND EndTime>CreatedTime THEN DATEDIFF(MILLISECOND,CreatedTime,EndTime) END)/1000.0 AS DECIMAL(10,2)),\n    CAST(MIN(CASE WHEN EndTime IS NOT NULL AND EndTime>CreatedTime THEN DATEDIFF(MILLISECOND,CreatedTime,EndTime) END)/1000.0 AS DECIMAL(10,3)),\n    CAST(MAX(CASE WHEN EndTime IS NOT NULL AND EndTime>CreatedTime THEN DATEDIFF(MILLISECOND,CreatedTime,EndTime) END)/1000.0 AS DECIMAL(10,3)),\n    MAX(CreatedTime)\n  FROM [dt].[flowbbf0356a73a18ba21fc14c095f059aruns] WHERE $__timeFilter(CreatedTime)\n) results WHERE [Total Runs]>0 ORDER BY [Total Runs] DESC", "refId": "A", "format": "table" }],
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": true, "reducer": ["sum"], "fields": ["Total Runs","Succeeded","Failed"] } }
+    },
+    {
+      "id": 90, "title": "🔄 Workflow Run Manager (Resubmit / Trigger)", "type": "text",
+      "gridPos": { "h": 16, "w": 8, "x": 16, "y": 12 },
+      "options": { "mode": "html", "content": "<iframe src=\"http://localhost:3001\" style=\"width:100%;height:100%;border:none;min-height:350px;\"></iframe>" }
+    },
+    {
+      "id": 15, "title": "Run Status Distribution", "type": "piechart",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+      "targets": [
+        { "rawSql": "SELECT 'Succeeded' AS metric, COUNT(*) AS value FROM (\n  SELECT Status FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime) AND Status='Succeeded'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs] WHERE $__timeFilter(CreatedTime) AND Status='Succeeded'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs] WHERE $__timeFilter(CreatedTime) AND Status='Succeeded'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba21fc14c095f059aruns] WHERE $__timeFilter(CreatedTime) AND Status='Succeeded'\n) a", "refId": "A", "format": "table" },
+        { "rawSql": "SELECT 'Failed' AS metric, COUNT(*) AS value FROM (\n  SELECT Status FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime) AND Status='Failed'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs] WHERE $__timeFilter(CreatedTime) AND Status='Failed'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs] WHERE $__timeFilter(CreatedTime) AND Status='Failed'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba21fc14c095f059aruns] WHERE $__timeFilter(CreatedTime) AND Status='Failed'\n) a", "refId": "B", "format": "table" },
+        { "rawSql": "SELECT 'Running' AS metric, COUNT(*) AS value FROM (\n  SELECT Status FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime) AND Status='Running'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs] WHERE $__timeFilter(CreatedTime) AND Status='Running'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs] WHERE $__timeFilter(CreatedTime) AND Status='Running'\n  UNION ALL SELECT Status FROM [dt].[flowbbf0356a73a18ba21fc14c095f059aruns] WHERE $__timeFilter(CreatedTime) AND Status='Running'\n) a", "refId": "C", "format": "table" }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} }
+      ],
+      "fieldConfig": { "overrides": [
+        { "matcher": { "id": "byName", "options": "Succeeded" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "Failed" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "Running" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] }
+      ] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] }, "pieType": "donut", "reduceOptions": { "values": true, "calcs": [], "fields": "/.*value.*/" }, "displayLabels": ["name", "percent"] }
+    },
+    {
+      "id": 16, "title": "P50 / P95 / P99 Latency (sec)", "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+      "targets": [{ "rawSql": "SELECT Workflow, CAST(P50/1000.0 AS DECIMAL(10,3)) AS P50, CAST(P95/1000.0 AS DECIMAL(10,3)) AS P95, CAST(P99/1000.0 AS DECIMAL(10,3)) AS P99, Runs\nFROM (\n  SELECT 'sendfile' AS Workflow,\n    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND,CreatedTime,EndTime)) OVER() AS P50,\n    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND,CreatedTime,EndTime)) OVER() AS P95,\n    PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND,CreatedTime,EndTime)) OVER() AS P99,\n    COUNT(*) OVER() AS Runs, ROW_NUMBER() OVER(ORDER BY CreatedTime) AS rn\n  FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns]\n  WHERE $__timeFilter(CreatedTime) AND EndTime IS NOT NULL AND EndTime > CreatedTime\n) t WHERE rn=1\nUNION ALL\nSELECT Workflow, CAST(P50/1000.0 AS DECIMAL(10,3)), CAST(P95/1000.0 AS DECIMAL(10,3)), CAST(P99/1000.0 AS DECIMAL(10,3)), Runs FROM (\n  SELECT 'mllpreceiove' AS Workflow,\n    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND,CreatedTime,EndTime)) OVER() AS P50,\n    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND,CreatedTime,EndTime)) OVER() AS P95,\n    PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND,CreatedTime,EndTime)) OVER() AS P99,\n    COUNT(*) OVER() AS Runs, ROW_NUMBER() OVER(ORDER BY CreatedTime) AS rn\n  FROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs]\n  WHERE $__timeFilter(CreatedTime) AND EndTime IS NOT NULL AND EndTime > CreatedTime\n) t WHERE rn=1\nUNION ALL\nSELECT Workflow, CAST(P50/1000.0 AS DECIMAL(10,3)), CAST(P95/1000.0 AS DECIMAL(10,3)), CAST(P99/1000.0 AS DECIMAL(10,3)), Runs FROM (\n  SELECT 'wf2' AS Workflow,\n    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND,CreatedTime,EndTime)) OVER() AS P50,\n    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND,CreatedTime,EndTime)) OVER() AS P95,\n    PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND,CreatedTime,EndTime)) OVER() AS P99,\n    COUNT(*) OVER() AS Runs, ROW_NUMBER() OVER(ORDER BY CreatedTime) AS rn\n  FROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs]\n  WHERE $__timeFilter(CreatedTime) AND EndTime IS NOT NULL AND EndTime > CreatedTime\n) t WHERE rn=1\nORDER BY Runs DESC", "refId": "A", "format": "table" }],
+      "options": { "showHeader": true, "cellHeight": "sm" }
+    },
+    {
+      "id": 17, "title": "Top Failed Workflows", "type": "table",
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 20 },
+      "targets": [{ "rawSql": "SELECT * FROM (\n  SELECT 'sendfile' AS Workflow, SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END) AS [Failed], CAST(SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0) AS DECIMAL(5,1)) AS [Failure%]\n  FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime)\n  UNION ALL\n  SELECT 'mllpreceiove', SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END), CAST(SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0) AS DECIMAL(5,1))\n  FROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs] WHERE $__timeFilter(CreatedTime)\n  UNION ALL\n  SELECT 'wf2', SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END), CAST(SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0) AS DECIMAL(5,1))\n  FROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs] WHERE $__timeFilter(CreatedTime)\n  UNION ALL\n  SELECT 'hello-workflow', SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END), CAST(SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END)*100.0/NULLIF(COUNT(*),0) AS DECIMAL(5,1))\n  FROM [dt].[flowbbf0356a73a18ba21fc14c095f059aruns] WHERE $__timeFilter(CreatedTime)\n) t ORDER BY [Failed] DESC", "refId": "A", "format": "table" }],
+      "options": { "showHeader": true, "cellHeight": "sm" }
+    },
+    {
+      "id": 20, "title": "Runs Over Time (All Workflows)", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "targets": [{ "rawSql": "SELECT $__timeGroup(CreatedTime,'5m') AS time,\n  SUM(CASE WHEN Status='Succeeded' THEN 1 ELSE 0 END) AS Succeeded,\n  SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END) AS Failed\nFROM (\n  SELECT CreatedTime, Status FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime)\n  UNION ALL SELECT CreatedTime, Status FROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs] WHERE $__timeFilter(CreatedTime)\n  UNION ALL SELECT CreatedTime, Status FROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs] WHERE $__timeFilter(CreatedTime)\n  UNION ALL SELECT CreatedTime, Status FROM [dt].[flowbbf0356a73a18ba21fc14c095f059aruns] WHERE $__timeFilter(CreatedTime)\n) a\nGROUP BY $__timeGroup(CreatedTime,'5m')\nORDER BY time", "refId": "A", "format": "time_series" }],
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 20, "spanNulls": true } }, "overrides": [
+        { "matcher": { "id": "byName", "options": "Succeeded" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "Failed" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+      ] }
+    },
+    {
+      "id": 25, "title": "Execution Duration Over Time (ms)", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "targets": [
+        { "rawSql": "SELECT CreatedTime AS time, DATEDIFF(MILLISECOND,CreatedTime,EndTime) AS sendfile FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime) AND EndTime IS NOT NULL AND EndTime>CreatedTime ORDER BY time", "refId": "A", "format": "time_series" },
+        { "rawSql": "SELECT CreatedTime AS time, DATEDIFF(MILLISECOND,CreatedTime,EndTime) AS mllpreceiove FROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs] WHERE $__timeFilter(CreatedTime) AND EndTime IS NOT NULL AND EndTime>CreatedTime ORDER BY time", "refId": "B", "format": "time_series" },
+        { "rawSql": "SELECT CreatedTime AS time, DATEDIFF(MILLISECOND,CreatedTime,EndTime) AS wf2 FROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs] WHERE $__timeFilter(CreatedTime) AND EndTime IS NOT NULL AND EndTime>CreatedTime ORDER BY time", "refId": "C", "format": "time_series" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "lineWidth": 1, "fillOpacity": 5, "drawStyle": "points", "pointSize": 4 } } }
+    },
+    {
+      "id": 30, "title": "sendfile - Runs Over Time", "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 36 },
+      "targets": [{ "rawSql": "SELECT $__timeGroup(CreatedTime,'5m') AS time,\n  SUM(CASE WHEN Status='Succeeded' THEN 1 ELSE 0 END) AS Succeeded,\n  SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END) AS Failed\nFROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime)\nGROUP BY $__timeGroup(CreatedTime,'5m') ORDER BY time", "refId": "A", "format": "time_series" }],
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [
+        { "matcher": { "id": "byName", "options": "Succeeded" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "Failed" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+      ] }
+    },
+    {
+      "id": 31, "title": "sendfile - Recent Runs", "type": "table",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 36 },
+      "targets": [{ "rawSql": "SELECT TOP 20 FlowRunSequenceId AS RunId, Status, TriggerName, CreatedTime, EndTime, DATEDIFF(MILLISECOND,CreatedTime,EndTime) AS Duration_ms FROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns] WHERE $__timeFilter(CreatedTime) ORDER BY CreatedTime DESC", "refId": "A", "format": "table" }],
+      "options": { "showHeader": true, "cellHeight": "sm" }
+    },
+    {
+      "id": 40, "title": "mllpreceiove - Runs Over Time", "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 43 },
+      "targets": [{ "rawSql": "SELECT $__timeGroup(CreatedTime,'5m') AS time,\n  SUM(CASE WHEN Status='Succeeded' THEN 1 ELSE 0 END) AS Succeeded,\n  SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END) AS Failed\nFROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs] WHERE $__timeFilter(CreatedTime)\nGROUP BY $__timeGroup(CreatedTime,'5m') ORDER BY time", "refId": "A", "format": "time_series" }],
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [
+        { "matcher": { "id": "byName", "options": "Succeeded" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "Failed" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+      ] }
+    },
+    {
+      "id": 41, "title": "wf2 - Runs Over Time", "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 43 },
+      "targets": [{ "rawSql": "SELECT $__timeGroup(CreatedTime,'5m') AS time,\n  SUM(CASE WHEN Status='Succeeded' THEN 1 ELSE 0 END) AS Succeeded,\n  SUM(CASE WHEN Status='Failed' THEN 1 ELSE 0 END) AS Failed\nFROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs] WHERE $__timeFilter(CreatedTime)\nGROUP BY $__timeGroup(CreatedTime,'5m') ORDER BY time", "refId": "A", "format": "time_series" }],
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [
+        { "matcher": { "id": "byName", "options": "Succeeded" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "Failed" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+      ] }
+    },
+    {
+      "id": 60, "title": "Volume Mounts", "type": "table",
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 50 },
+      "targets": [{ "rawSql": "SELECT 'conne' AS [Volume], '/mounts/conne' AS [Mount Path], '\\\\172.23.208.1\\Files' AS [SMB Server\\Share], 'ReadWrite' AS [Access], 'logicapps-container' AS [Container]\nUNION ALL\nSELECT 'artifacts', '/home/site/wwwroot', '\\\\172.23.208.1\\storage', 'ReadWrite', 'logicapps-container'", "refId": "A", "format": "table" }],
+      "options": { "showHeader": true, "cellHeight": "sm" }
+    },
+    {
+      "id": 61, "title": "Trigger Jobs Status", "type": "table",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 55 },
+      "targets": [{ "rawSql": "SELECT\n  CASE JobPartition\n    WHEN 'E2C831A799FC4589BC4F7D330588C67C' THEN 'sendfile'\n    WHEN 'D485C5348EEC4CEF83D98224E1BFF08A' THEN 'wf2'\n    WHEN '20D52BC709D44E65ACCA0A357B5A3029' THEN 'mllpreceiove'\n    WHEN '69D04229180D440292B5B785F3A967C0' THEN 'hello-workflow'\n    ELSE JobPartition END AS Workflow,\n  JobId AS [Trigger], State, LastExecutionStatus AS [Last Status],\n  LastExecutionTime AS [Last Exec], NextExecutionTime AS [Next Exec],\n  TotalSucceededCount AS Succeeded, TotalFailedCount AS Failed, CurrentRetryCount AS Retries\nFROM [dt].[flowbbf0356a73a18bajobdefinitions]\nWHERE JobId LIKE 'FlowTriggerJob%'\nORDER BY LastExecutionTime DESC", "refId": "A", "format": "table" }],
+      "options": { "showHeader": true, "cellHeight": "sm" }
+    },
+    {
+      "id": 70, "title": "Pod Instances", "type": "timeseries",
+      "datasource": "Prometheus-CRC",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 61 },
+      "targets": [{ "expr": "count(kube_pod_info{namespace=\"logicapps-aca-ns\",pod=~\"psrivas-logicapp-hybrid2.*\"})", "legendFormat": "Running Instances", "refId": "A" }],
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 20 }, "color": { "fixedColor": "blue", "mode": "fixed" }, "decimals": 0 } }
+    },
+    {
+      "id": 71, "title": "CPU Usage (cores)", "type": "timeseries",
+      "datasource": "Prometheus-CRC",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 61 },
+      "targets": [
+        { "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"logicapps-aca-ns\",pod=~\"psrivas-logicapp-hybrid2.*\",container=\"logicapps-container\"}[5m]))", "legendFormat": "CPU Used", "refId": "A" },
+        { "expr": "sum(kube_pod_container_resource_limits{namespace=\"logicapps-aca-ns\",pod=~\"psrivas-logicapp-hybrid2.*\",container=\"logicapps-container\",resource=\"cpu\"})", "legendFormat": "CPU Limit", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 15 } }, "overrides": [
+        { "matcher": { "id": "byName", "options": "CPU Used" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "CPU Limit" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }, { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10,10] } }, { "id": "custom.fillOpacity", "value": 0 }] }
+      ] }
+    },
+    {
+      "id": 72, "title": "Memory Usage (MB)", "type": "timeseries",
+      "datasource": "Prometheus-CRC",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 61 },
+      "targets": [
+        { "expr": "sum(container_memory_working_set_bytes{namespace=\"logicapps-aca-ns\",pod=~\"psrivas-logicapp-hybrid2.*\",container=\"logicapps-container\"}) / 1024 / 1024", "legendFormat": "Memory Used", "refId": "A" },
+        { "expr": "sum(kube_pod_container_resource_limits{namespace=\"logicapps-aca-ns\",pod=~\"psrivas-logicapp-hybrid2.*\",container=\"logicapps-container\",resource=\"memory\"}) / 1024 / 1024", "legendFormat": "Memory Limit", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "decmbytes", "custom": { "lineWidth": 2, "fillOpacity": 15 } }, "overrides": [
+        { "matcher": { "id": "byName", "options": "Memory Used" }, "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "Memory Limit" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }, { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10,10] } }, { "id": "custom.fillOpacity", "value": 0 }] }
+      ] }
+    },
+    {
+      "id": 73, "title": "CPU by Container", "type": "timeseries",
+      "datasource": "Prometheus-CRC",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 68 },
+      "targets": [{ "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"logicapps-aca-ns\",pod=~\"psrivas-logicapp-hybrid2.*\",container!=\"\"}[5m])) by (container)", "legendFormat": "{{container}}", "refId": "A" }],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 1, "fillOpacity": 10, "stacking": { "mode": "normal" } } } }
+    },
+    {
+      "id": 74, "title": "Memory by Container (MB)", "type": "timeseries",
+      "datasource": "Prometheus-CRC",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 68 },
+      "targets": [{ "expr": "sum(container_memory_working_set_bytes{namespace=\"logicapps-aca-ns\",pod=~\"psrivas-logicapp-hybrid2.*\",container!=\"\"}) by (container) / 1024 / 1024", "legendFormat": "{{container}}", "refId": "A" }],
+      "fieldConfig": { "defaults": { "unit": "decmbytes", "custom": { "lineWidth": 1, "fillOpacity": 10, "stacking": { "mode": "normal" } } } }
+    },
+    {
+      "id": 75, "title": "Network I/O (bytes/sec)", "type": "timeseries",
+      "datasource": "Prometheus-CRC",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 75 },
+      "targets": [
+        { "expr": "sum(rate(container_network_receive_bytes_total{namespace=\"logicapps-aca-ns\",pod=~\"psrivas-logicapp-hybrid2.*\"}[5m]))", "legendFormat": "Received", "refId": "A" },
+        { "expr": "sum(rate(container_network_transmit_bytes_total{namespace=\"logicapps-aca-ns\",pod=~\"psrivas-logicapp-hybrid2.*\"}[5m]))", "legendFormat": "Transmitted", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [
+        { "matcher": { "id": "byName", "options": "Received" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "Transmitted" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] }
+      ] }
+    },
+    {
+      "id": 76, "title": "Pod Restarts", "type": "timeseries",
+      "datasource": "Prometheus-CRC",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 75 },
+      "targets": [{ "expr": "sum(kube_pod_container_status_restarts_total{namespace=\"logicapps-aca-ns\",pod=~\"psrivas-logicapp-hybrid2.*\"}) by (container)", "legendFormat": "{{container}}", "refId": "A" }],
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 5 } } }
+    },
+    {
+      "id": 80, "title": "K8s Warning Events (Logic Apps)", "type": "table",
+      "datasource": "Prometheus-CRC",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 82 },
+      "targets": [{ "expr": "topk(20, kube_event_count{namespace=\"logicapps-aca-ns\",type=\"Warning\",involved_object_kind=~\"Pod|ContainerApp\"})", "legendFormat": "{{reason}} - {{involved_object_name}}", "refId": "A", "instant": true, "format": "table" }],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true, "container": true, "endpoint": true, "instance": true, "job": true, "namespace": true, "prometheus": true, "service": true, "uid": true, "type": true }, "renameByName": { "involved_object_kind": "Kind", "involved_object_name": "Object", "reason": "Reason", "Value": "Count" } } }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm", "sortBy": [{ "displayName": "Count", "desc": true }] }
+    },
+    {
+      "id": 81, "title": "Top Errors / Warnings Summary", "type": "table",
+      "datasource": "Prometheus-CRC",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 90 },
+      "targets": [{ "expr": "topk(10, sum(kube_event_count{namespace=\"logicapps-aca-ns\",type=\"Warning\"}) by (reason))", "legendFormat": "{{reason}}", "refId": "A", "instant": true, "format": "table" }],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "reason": "Warning Reason", "Value": "Total Occurrences" } } }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm", "sortBy": [{ "displayName": "Total Occurrences", "desc": true }] }
+    },
+    {
+      "id": 82, "title": "Warning Events Over Time", "type": "timeseries",
+      "datasource": "Prometheus-CRC",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 90 },
+      "targets": [
+        { "expr": "sum(rate(kube_event_count{namespace=\"logicapps-aca-ns\",type=\"Warning\",reason=\"Unhealthy\"}[5m]))", "legendFormat": "Unhealthy", "refId": "A" },
+        { "expr": "sum(rate(kube_event_count{namespace=\"logicapps-aca-ns\",type=\"Warning\",reason=\"Failed\"}[5m]))", "legendFormat": "Failed", "refId": "B" },
+        { "expr": "sum(rate(kube_event_count{namespace=\"logicapps-aca-ns\",type=\"Warning\",reason=\"FailedMount\"}[5m]))", "legendFormat": "FailedMount", "refId": "C" },
+        { "expr": "sum(rate(kube_event_count{namespace=\"logicapps-aca-ns\",type=\"Warning\",reason=\"ContainerAppFailure\"}[5m]))", "legendFormat": "ContainerAppFailure", "refId": "D" },
+        { "expr": "sum(rate(kube_event_count{namespace=\"logicapps-aca-ns\",type=\"Warning\",reason=\"RevisionFailure\"}[5m]))", "legendFormat": "RevisionFailure", "refId": "E" }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [
+        { "matcher": { "id": "byName", "options": "Failed" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "Unhealthy" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+        { "matcher": { "id": "byName", "options": "FailedMount" }, "properties": [{ "id": "color", "value": { "fixedColor": "dark-red", "mode": "fixed" } }] }
+      ] }
+    },
+    {
+      "id": 83, "title": "Workflow Execution Errors (from SQL)", "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 98 },
+      "targets": [{ "rawSql": "SELECT TOP 20 'sendfile' AS Workflow, FlowRunSequenceId AS RunId, Status, Code, TriggerName, CreatedTime, EndTime, DATEDIFF(MILLISECOND,CreatedTime,EndTime) AS Duration_ms\nFROM [dt].[flowbbf0356a73a18ba4f5dbacebb23b6aruns]\nWHERE $__timeFilter(CreatedTime) AND Status='Failed'\nUNION ALL\nSELECT TOP 20 'mllpreceiove', FlowRunSequenceId, Status, Code, TriggerName, CreatedTime, EndTime, DATEDIFF(MILLISECOND,CreatedTime,EndTime)\nFROM [dt].[flowbbf0356a73a18ba2207ab2e2103e70runs]\nWHERE $__timeFilter(CreatedTime) AND Status='Failed'\nUNION ALL\nSELECT TOP 20 'wf2', FlowRunSequenceId, Status, Code, TriggerName, CreatedTime, EndTime, DATEDIFF(MILLISECOND,CreatedTime,EndTime)\nFROM [dt].[flowbbf0356a73a18ba9624d4d600b6d80runs]\nWHERE $__timeFilter(CreatedTime) AND Status='Failed'\nUNION ALL\nSELECT TOP 20 'hello-workflow', FlowRunSequenceId, Status, Code, TriggerName, CreatedTime, EndTime, DATEDIFF(MILLISECOND,CreatedTime,EndTime)\nFROM [dt].[flowbbf0356a73a18ba21fc14c095f059aruns]\nWHERE $__timeFilter(CreatedTime) AND Status='Failed'\nORDER BY CreatedTime DESC", "refId": "A", "format": "table" }],
+      "options": { "showHeader": true, "cellHeight": "sm" }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 5
+}

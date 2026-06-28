@@ -1,0 +1,14 @@
+apiVersion: 1
+providers:
+  - name: 'Logic Apps'
+    orgId: 1
+    folder: 'Logic Apps'
+    type: file
+    disableDeletion: false
+    editable: true
+    # Prevent UI-edited stale state from overriding generated dashboard content.
+    allowUiUpdates: false
+    updateIntervalSeconds: 10
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

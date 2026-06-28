@@ -1,0 +1,20 @@
+{
+  "clusterName": "psrivas-sno001",
+  "baseDomain": "<set-base-domain>",
+  "installMode": "single-node-openshift",
+  "pullSecretPath": "C:\\Users\\psrivas\\openshift\\pull-secret.txt",
+  "sshPublicKeyPath": "<set-public-ssh-key-path>",
+  "sshPublicKey": "<set-public-ssh-key>",
+  "machineNetworkCidr": "<set-machine-network-cidr>",
+  "apiVip": "<set-api-vip>",
+  "ingressVip": "<set-ingress-vip>",
+  "installationDisk": "/dev/disk/by-id/<set-installation-disk>",
+  "redHatConsoleUrl": "https://console.redhat.com/openshift/assisted-installer/clusters",
+  "notes": [
+    "Create a new cluster in the Assisted Installer.",
+    "Select 'Install single node OpenShift (SNO)'.",
+    "Use the clusterName and baseDomain values from this file in the wizard.",
+    "Download the discovery ISO from the wizard and boot the target host with it.",
+    "Complete the remaining wizard steps and download kubeconfig after install."
+  ]
+}

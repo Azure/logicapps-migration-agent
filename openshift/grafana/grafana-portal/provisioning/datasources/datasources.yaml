@@ -1,0 +1,30 @@
+apiVersion: 1
+datasources:
+  - name: LogicApp-SQL
+    type: mssql
+    access: proxy
+    url: <SQL_SERVER>:1433
+    database: logicapp
+    user: <SQL_USER>
+    isDefault: true
+    editable: true
+    jsonData:
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+      encrypt: disable
+      trustServerCertificate: true
+    secureJsonData:
+      password: '<SQL_PASSWORD>'
+  - name: Prometheus-Portal
+    type: prometheus
+    access: proxy
+    editable: true
+    url: <PROMETHEUS_URL>
+    jsonData:
+      tlsSkipVerify: true
+      httpMethod: POST
+      timeInterval: 30s
+      httpHeaderName1: Authorization
+    secureJsonData:
+      httpHeaderValue1: 'Bearer <PROMETHEUS_TOKEN>'
