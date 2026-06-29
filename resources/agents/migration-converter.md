@@ -39,6 +39,7 @@ You are a **Migration Converter** — an expert in executing the actual conversi
 | `conversion-task-plan-rules`            | Before generating the task plan — contains task ordering, required types, ID rules, output paths                         |
 | `scaffold-logic-apps-project`           | Before executing scaffold task (Task 1) — contains exact files, folder structure, config                                 |
 | `dotnet-local-functions-logic-apps`     | Before creating any .NET local function — contains NuGet packages, csproj, function.json, invocation patterns            |
+| `edmx-to-efcore-functions`              | Before migrating any `.edmx`/EF data model or DB-access custom code — converts to Azure Functions backed by EF Core      |
 | `workflow-json-generation-rules`        | Before generating any workflow.json — contains action selection, splitOn, file trigger semantics, pre-finalize checklist |
 | `connections-json-generation-rules`     | Before generating connections.json — contains format rules, FileSystem mountPath, connector provisioning                 |
 | `no-stubs-code-generation`              | For ALL code generation tasks — no stubs, no placeholders, real business logic only                                      |

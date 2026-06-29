@@ -120,6 +120,7 @@ const EXTENSION_TO_CATEGORY: Record<string, ArtifactCategory> = {
     '.vbproj': 'custom-code',
     '.dll': 'custom-code',
     '.jar': 'custom-code',
+    '.edmx': 'custom-code',
 };
 
 /**
@@ -134,6 +135,7 @@ const CUSTOM_CODE_EXTENSIONS = new Set([
     '.vbproj',
     '.dll',
     '.jar',
+    '.edmx',
 ]);
 
 // =============================================================================
@@ -521,6 +523,7 @@ export class ArtifactScanner implements vscode.Disposable {
         supportedExtensions.add('.hidx');
         supportedExtensions.add('.brl');
         supportedExtensions.add('.bre');
+        supportedExtensions.add('.edmx');
 
         // Add custom code file extensions so they are discovered
         for (const ext of CUSTOM_CODE_EXTENSIONS) {
@@ -777,6 +780,7 @@ export class ArtifactScanner implements vscode.Disposable {
                 '.vbproj': 'VB.NET Project',
                 '.dll': '.NET Assembly',
                 '.jar': 'Java Archive',
+                '.edmx': 'Entity Framework EDMX',
             }[ext] || ext;
 
         // Create a minimal IR document for the dependency
