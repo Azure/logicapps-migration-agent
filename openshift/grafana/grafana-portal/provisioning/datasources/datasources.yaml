@@ -3,9 +3,9 @@ datasources:
   - name: LogicApp-SQL
     type: mssql
     access: proxy
-    url: <SQL_SERVER>:1433
+    url: 10.26.1.71:1433
     database: logicapp
-    user: <SQL_USER>
+    user: logicappsuser
     isDefault: true
     editable: true
     jsonData:
@@ -15,16 +15,23 @@ datasources:
       encrypt: disable
       trustServerCertificate: true
     secureJsonData:
-      password: '<SQL_PASSWORD>'
+      password: ${SQL_PASSWORD}
   - name: Prometheus-Portal
     type: prometheus
     access: proxy
     editable: true
-    url: <PROMETHEUS_URL>
+    url: https://thanos-querier-openshift-monitoring.apps.psrivasrancher.test:9091
     jsonData:
       tlsSkipVerify: true
       httpMethod: POST
       timeInterval: 30s
       httpHeaderName1: Authorization
     secureJsonData:
-      httpHeaderValue1: 'Bearer <PROMETHEUS_TOKEN>'
+      httpHeaderValue1: 'REPLACED_AT_RUNTIME'
+  - name: LogicApps-KPI-API
+    type: yesoreyeram-infinity-datasource
+    uid: logicapps-kpi-api
+    access: proxy
+    editable: true
+    jsonData:
+      tlsSkipVerify: true

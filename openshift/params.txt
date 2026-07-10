@@ -24,7 +24,7 @@
 # Optional: if omitted, setup discovers all apps in namespace and generates one dashboard per app
 # LOGICAPPS_APP_NAME=<logic-app-container-app-name>
 # Optional: defaults to %USERPROFILE%\.kube\config when present
-# KUBECONFIG=<path-to-kubeconfig>
+ KUBECONFIG="C:\Users\psrivas\Downloads\kubeconfig"
 # Optional: defaults to current oc context
 # KUBE_CONTEXT=<kube-context-name>
 
@@ -37,7 +37,7 @@
 # Optional in local setup: auto-resolved from current oc context when available
 # OPENSHIFT_API_URL=<https://api.<cluster-domain>:6443>
 # Optional in local setup: auto-resolved from current oc context/session when available
-# OPENSHIFT_USERNAME=<openshift-username>
+ OPENSHIFT_USERNAME=kubeadmin
 # OPENSHIFT_PASSWORD=<openshift-password>
 # OPENSHIFT_TOKEN=<openshift-bearer-token>
 # Optional: if omitted, setup auto-detects a local host IP reachable by the cluster

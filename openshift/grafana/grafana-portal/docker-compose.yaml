@@ -10,9 +10,14 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_PANELS_DISABLE_SANITIZE_HTML: "true"
       GF_SECURITY_ALLOW_EMBEDDING: "true"
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/logicapps-workflow-hub.json
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_NAME: "Main Org."
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      GF_FEATURE_TOGGLES_dashboardNewLayouts: "true"
+      GF_INSTALL_PLUGINS: "yesoreyeram-infinity-datasource"
     extra_hosts:
-      - "-gateway"
+      - "thanos-querier-openshift-monitoring.apps.psrivasrancher.test:host-gateway"
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./provisioning/datasources:/etc/grafana/provisioning/datasources
       - ./provisioning/dashboards:/etc/grafana/provisioning/dashboards

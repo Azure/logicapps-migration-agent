@@ -262,7 +262,7 @@ param(
     [string]$HyperVVmName = "",
 
     [Parameter(Mandatory = $false)]
-    [string]$HyperVSwitchName = "",
+    [string]$HyperVSwitchName = "Default Switch",
 
     [Parameter(Mandatory = $false)]
     [string]$HyperVVmPath = "",
@@ -295,13 +295,19 @@ $script:StepCounter = 0
 $script:LastStepLabel = ""
 
 function Stop-OnError {
-    param([string]$Message = "")
+    param(
+        [string]$Message = "",
+        [string]$Detail = ""
+    )
     if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
         $errorMsg = "Command failed with exit code $LASTEXITCODE."
         if ($script:LastStepLabel) {
             $errorMsg += " Step $($script:StepCounter): $($script:LastStepLabel)"
         } elseif ($Message) {
             $errorMsg += " Step: $Message"
+        }
+        if (-not [string]::IsNullOrWhiteSpace($Detail)) {
+            $errorMsg += " Details: $($Detail.Trim())"
         }
         throw $errorMsg
     }
@@ -343,6 +349,27 @@ function Get-PreferredHostAccessIp {
 # ============================================================================
 # CONFIGURATION - Modify these values for your environment
 # ============================================================================
+
+function Test-CommandAvailable([string]$Name) {
+    $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
+}
+
+function New-DynamicSqlPassword {
+    # Generates a strong password satisfying SQL Server complexity rules
+    $upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+    $lower  = 'abcdefghijkmnpqrstuvwxyz'
+    $digits = '23456789'
+    $special = '!@#$%^&*()-_=+'
+    $all = $upper + $lower + $digits + $special
+    $pwd = @(
+        $upper[(Get-Random -Maximum $upper.Length)]
+        $lower[(Get-Random -Maximum $lower.Length)]
+        $digits[(Get-Random -Maximum $digits.Length)]
+        $special[(Get-Random -Maximum $special.Length)]
+    )
+    for ($i = 0; $i -lt 20; $i++) { $pwd += $all[(Get-Random -Maximum $all.Length)] }
+    -join ($pwd | Sort-Object { Get-Random })
+}
 
 function Get-FirstEnvValue {
     param([string[]]$Names)
@@ -459,7 +486,21 @@ if (-not $SQL_DATABASE) { $SQL_DATABASE = "logicapp" }
 $SQL_USER = if ($SqlUser) { $SqlUser } else { (Get-FirstEnvValue @('SQL_USER', 'LOGICAPPS_SQL_USER', 'SQL_SERVER_USERNAME')) }
 if (-not $SQL_USER) { $SQL_USER = "logicappsuser" }
 $SQL_PASSWORD = if ($SqlPassword) { $SqlPassword } else { (Get-FirstEnvValue @('SQL_PASSWORD', 'LOGICAPPS_SQL_PASSWORD', 'SQL_SERVER_PASSWORD')) }
-if (-not $SQL_PASSWORD) { throw "SQL password is required. Provide -SqlPassword or set SQL_PASSWORD." }
+$SQL_PASSWORD_GENERATED = $false
+if (-not $SQL_PASSWORD) {
+    $SQL_PASSWORD = New-DynamicSqlPassword
+    $SQL_PASSWORD_GENERATED = $true
+    Write-Host "  SQL password: auto-generated (no -SqlPassword/SQL_PASSWORD provided)"
+}
+$CREDENTIALS_FILE = Join-Path $PSScriptRoot "credentials.txt"
+@(
+    "# Logic Apps SNO setup credentials (auto-generated $(Get-Date -Format 's'))"
+    "SQL_SERVER=$SQL_SERVER_IP"
+    "SQL_DATABASE=$SQL_DATABASE"
+    "SQL_USER=$SQL_USER"
+    "SQL_PASSWORD=$SQL_PASSWORD"
+) | Set-Content -Path $CREDENTIALS_FILE -Encoding UTF8
+Write-Host "  SQL credentials written to: $CREDENTIALS_FILE"
 
 # SMB Share config (for workflow artifact storage)
 $SMB_SHARE_PATH = "C:\storage"
@@ -541,39 +582,74 @@ function Invoke-OcBestEffort {
             $PSNativeCommandUseErrorActionPreference = $previousNativePreference
         }
     }
+}
 
-    function Get-OpenShiftFirewallRemoteAddresses {
-        param([string]$RequestedCidr)
+function Get-OpenShiftFirewallRemoteAddresses {
+    param([string]$RequestedCidr)
 
-        if ([string]::IsNullOrWhiteSpace($RequestedCidr) -or $RequestedCidr -eq "Any") {
-            return @("Any")
-        }
+    if ([string]::IsNullOrWhiteSpace($RequestedCidr) -or $RequestedCidr -eq "Any") {
+        return @("Any")
+    }
 
-        $cidrs = New-Object 'System.Collections.Generic.List[string]'
-        $cidrs.Add($RequestedCidr)
+    $cidrs = New-Object 'System.Collections.Generic.List[string]'
+    $cidrs.Add($RequestedCidr)
 
-        if (Connect-OpenShiftCluster -BestEffort) {
-            $networkJson = Invoke-OcBestEffort -Arguments @('get', 'network.config', 'cluster', '-o', 'json')
-            if (-not [string]::IsNullOrWhiteSpace($networkJson)) {
-                try {
-                    $network = $networkJson | ConvertFrom-Json -ErrorAction Stop
-                    foreach ($entry in @($network.status.clusterNetwork)) {
-                        if ($entry.cidr) {
-                            $cidrs.Add([string]$entry.cidr)
-                        }
+    if (Connect-OpenShiftCluster -BestEffort) {
+        $networkJson = Invoke-OcBestEffort -Arguments @('get', 'network.config', 'cluster', '-o', 'json')
+        if (-not [string]::IsNullOrWhiteSpace($networkJson)) {
+            try {
+                $network = $networkJson | ConvertFrom-Json -ErrorAction Stop
+                foreach ($entry in @($network.status.clusterNetwork)) {
+                    if ($entry.cidr) {
+                        $cidrs.Add([string]$entry.cidr)
                     }
-                    foreach ($entry in @($network.status.serviceNetwork)) {
-                        if ($entry) {
-                            $cidrs.Add([string]$entry)
-                        }
-                    }
-                } catch {
-                    Write-Warn "Could not parse OpenShift network CIDRs from cluster API. Continuing with '$RequestedCidr' only."
                 }
+                foreach ($entry in @($network.status.serviceNetwork)) {
+                    if ($entry) {
+                        $cidrs.Add([string]$entry)
+                    }
+                }
+            } catch {
+                Write-Warn "Could not parse OpenShift network CIDRs from cluster API. Continuing with '$RequestedCidr' only."
             }
         }
+    }
 
-        return @($cidrs | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+    return @($cidrs | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+}
+
+function Ensure-AzExtension {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    # Inspect az exit codes directly instead of letting native command errors abort the script,
+    # so a failed *upgrade* that rolls back to a working version does not stop the run.
+    $previousNativePreference = $null
+    $hadNativePreference = $false
+    if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+        $hadNativePreference = $true
+        $previousNativePreference = $PSNativeCommandUseErrorActionPreference
+        $PSNativeCommandUseErrorActionPreference = $false
+    }
+
+    try {
+        az extension add --upgrade --yes --name $Name --verbose
+        $addExit = $LASTEXITCODE
+        if ($addExit -ne 0) {
+            # An upgrade can fail (e.g. pip error) yet leave a usable version installed.
+            az extension show --name $Name 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Warn "Could not upgrade Azure CLI extension '$Name' (exit $addExit); continuing with the currently installed version."
+            } else {
+                throw "Azure CLI extension '$Name' could not be installed or upgraded (az exit code $addExit)."
+            }
+        }
+    } finally {
+        if ($hadNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativePreference
+        }
     }
 }
 
@@ -989,6 +1065,107 @@ function Find-ReachableClusterApiUrl {
     return $null
 }
 
+function Get-HyperVVmIPAddress {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$VmName
+    )
+
+    if (-not (Get-Command Get-VM -ErrorAction SilentlyContinue)) {
+        return $null
+    }
+
+    $vm = Get-VM -Name $VmName -ErrorAction SilentlyContinue
+    if (-not $vm) {
+        return $null
+    }
+
+    $adapters = @(Get-VMNetworkAdapter -VMName $VmName -ErrorAction SilentlyContinue)
+    foreach ($adapter in $adapters) {
+        # Prefer guest-reported IPv4 addresses when Hyper-V integration services are available.
+        $reported = @($adapter.IPAddresses | Where-Object { $_ -match '^\d+\.\d+\.\d+\.\d+$' })
+        foreach ($ip in $reported) {
+            if (Test-TcpEndpoint -HostName $ip -Port 6443) {
+                return $ip
+            }
+        }
+
+        # Fall back to the neighbor (ARP) table, matching the adapter MAC address.
+        if (-not [string]::IsNullOrWhiteSpace($adapter.MacAddress)) {
+            $macFmt = (($adapter.MacAddress -replace '[:-]', '') -replace '(..)(?=.)', '$1-').ToUpperInvariant()
+            $neighbors = @(Get-NetNeighbor -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+                Where-Object { $_.LinkLayerAddress -eq $macFmt -and $_.State -ne 'Unreachable' } |
+                Select-Object -ExpandProperty IPAddress)
+            foreach ($ip in $neighbors) {
+                if (Test-TcpEndpoint -HostName $ip -Port 6443) {
+                    return $ip
+                }
+            }
+        }
+    }
+
+    return $null
+}
+
+function Ensure-ClusterEndpointResolvable {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ApiUrl
+    )
+
+    $apiUri = $null
+    try {
+        $apiUri = [uri]$ApiUrl
+    } catch {
+        return
+    }
+
+    $apiHost = $apiUri.Host
+    if ([string]::IsNullOrWhiteSpace($apiHost)) {
+        return
+    }
+
+    # IP-based endpoints do not require DNS remediation.
+    $parsedIp = $null
+    if ([System.Net.IPAddress]::TryParse($apiHost, [ref]$parsedIp)) {
+        return
+    }
+
+    $apiPort = if ($apiUri.Port -gt 0) { $apiUri.Port } else { 6443 }
+
+    # If the API host already resolves and is reachable, there is nothing to fix.
+    $resolves = $false
+    try {
+        $resolves = [bool](Resolve-DnsName -Name $apiHost -ErrorAction SilentlyContinue)
+    } catch {
+        $resolves = $false
+    }
+    if ($resolves -and (Test-TcpEndpoint -HostName $apiHost -Port $apiPort)) {
+        return
+    }
+
+    # Single Node OpenShift serves the API server and the ingress/apps routes from the node IP.
+    $clusterIp = Get-HyperVVmIPAddress -VmName $HYPERV_VM_NAME
+    if ([string]::IsNullOrWhiteSpace($clusterIp)) {
+        Write-Warn "Cluster endpoint '$apiHost' does not resolve and no reachable IP could be auto-detected from Hyper-V VM '$HYPERV_VM_NAME'. Pass -OpenShiftApiUrl with the cluster IP or add a hosts entry manually."
+        return
+    }
+
+    # Map the API host and the OpenShift routes needed for password (OAuth) login.
+    $hostNames = New-Object System.Collections.Generic.List[string]
+    $hostNames.Add($apiHost) | Out-Null
+    if ($apiHost -match '^api\.(?<base>.+)$') {
+        $baseDomain = $matches['base']
+        $hostNames.Add("oauth-openshift.apps.$baseDomain") | Out-Null
+        $hostNames.Add("console-openshift-console.apps.$baseDomain") | Out-Null
+    }
+
+    foreach ($name in ($hostNames | Select-Object -Unique)) {
+        Ensure-HostsFileMapping -HostName $name -IPAddress $clusterIp
+    }
+    Write-Warn "Cluster endpoint '$apiHost' did not resolve; mapped it (and OpenShift OAuth/console routes) to $clusterIp via the hosts file."
+}
+
 function Initialize-KubeConfig {
     Install-OcCli | Out-Null
 
@@ -1019,19 +1196,33 @@ function Try-ResolveOpenShiftFromCurrentContext {
         Username = ""
     }
 
-    $server = Normalize-Text (& oc whoami --show-server 2>$null)
-    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($server)) {
-        $result.ApiUrl = $server
+    $previousNativePreference = $null
+    $hadNativePreference = $false
+    if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+        $hadNativePreference = $true
+        $previousNativePreference = $PSNativeCommandUseErrorActionPreference
+        $PSNativeCommandUseErrorActionPreference = $false
     }
 
-    $user = Normalize-Text (& oc whoami 2>$null)
-    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($user) -and $user -ne "system:anonymous") {
-        $result.Username = $user
-    }
+    try {
+        $server = Normalize-Text (& oc whoami --show-server 2>$null)
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($server)) {
+            $result.ApiUrl = $server
+        }
 
-    $token = Normalize-Text (& oc whoami -t 2>$null)
-    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($token) -and $token -notmatch 'Unauthorized|forbidden|error') {
-        $result.Token = $token
+        $user = Normalize-Text (& oc whoami 2>$null)
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($user) -and $user -ne "system:anonymous") {
+            $result.Username = $user
+        }
+
+        $token = Normalize-Text (& oc whoami -t 2>$null)
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($token) -and $token -notmatch 'Unauthorized|forbidden|error') {
+            $result.Token = $token
+        }
+    } finally {
+        if ($hadNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativePreference
+        }
     }
 
     return [pscustomobject]$result
@@ -1050,12 +1241,19 @@ function Connect-OpenShiftCluster {
             return $true
         }
 
+        # Make sure the API endpoint resolves before probing the current context, so an
+        # already-authenticated kubeconfig (e.g. certificate based) can be reused below.
+        if (-not [string]::IsNullOrWhiteSpace($OpenShiftApiUrl)) {
+            Ensure-ClusterEndpointResolvable -ApiUrl $OpenShiftApiUrl
+        }
+
         $currentContext = Try-ResolveOpenShiftFromCurrentContext
         if ([string]::IsNullOrWhiteSpace($OpenShiftApiUrl) -and -not [string]::IsNullOrWhiteSpace($currentContext.ApiUrl)) {
             $OpenShiftApiUrl = $currentContext.ApiUrl
             if (-not $BestEffort) {
                 Write-Step "Using OpenShift API from current oc context: $OpenShiftApiUrl"
             }
+            Ensure-ClusterEndpointResolvable -ApiUrl $OpenShiftApiUrl
         }
         if ([string]::IsNullOrWhiteSpace($OpenShiftToken) -and
             [string]::IsNullOrWhiteSpace($OpenShiftPassword) -and
@@ -1065,27 +1263,64 @@ function Connect-OpenShiftCluster {
                 Write-Step "Using OpenShift token from current oc session"
             }
         }
+        # Never feed a certificate identity (system:*) into a basic-auth login.
         if ((-not $script:OpenShiftUsernameWasExplicit -or $OpenShiftUsername -eq "kubeadmin") -and
-            -not [string]::IsNullOrWhiteSpace($currentContext.Username)) {
+            -not [string]::IsNullOrWhiteSpace($currentContext.Username) -and
+            $currentContext.Username -notlike "system:*") {
             $OpenShiftUsername = $currentContext.Username
+        }
+
+        # If the current kubeconfig context already authenticates, reuse it instead of
+        # attempting a fresh basic-auth/token login. A certificate-based admin context
+        # (user "system:admin") is valid for kubeconfig auth but invalid for basic auth.
+        $contextAuthenticated = (-not [string]::IsNullOrWhiteSpace($currentContext.Username) -and
+            $currentContext.Username -ne "system:anonymous")
+        if ($contextAuthenticated -and -not $BestEffort) {
+            Write-Step "Reusing authenticated kubeconfig context (user: $($currentContext.Username))"
         }
 
         $skipTlsFlag = "--insecure-skip-tls-verify=$($SkipTlsVerify.ToString().ToLowerInvariant())"
 
-        if (-not [string]::IsNullOrWhiteSpace($OpenShiftToken)) {
+        if (-not $contextAuthenticated -and -not [string]::IsNullOrWhiteSpace($OpenShiftToken)) {
             if ([string]::IsNullOrWhiteSpace($OpenShiftApiUrl)) {
                 throw "OpenShiftApiUrl is required when OpenShiftToken is provided."
             }
 
-            & oc login $OpenShiftApiUrl "--token=$OpenShiftToken" $skipTlsFlag --request-timeout=30s 2>&1 | Out-Null
-            Stop-OnError "oc login with token"
-        } elseif (-not [string]::IsNullOrWhiteSpace($OpenShiftPassword)) {
+            $previousNativePreference = $null
+            $hadNativePreference = $false
+            if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+                $hadNativePreference = $true
+                $previousNativePreference = $PSNativeCommandUseErrorActionPreference
+                $PSNativeCommandUseErrorActionPreference = $false
+            }
+            try {
+                $loginOutput = & oc login $OpenShiftApiUrl "--token=$OpenShiftToken" $skipTlsFlag --request-timeout=30s 2>&1
+            } finally {
+                if ($hadNativePreference) {
+                    $PSNativeCommandUseErrorActionPreference = $previousNativePreference
+                }
+            }
+            Stop-OnError "oc login with token" ($loginOutput -join "`n")
+        } elseif (-not $contextAuthenticated -and -not [string]::IsNullOrWhiteSpace($OpenShiftPassword)) {
             if ([string]::IsNullOrWhiteSpace($OpenShiftApiUrl)) {
                 throw "OpenShiftApiUrl is required when OpenShiftPassword is provided."
             }
 
-            & oc login -u $OpenShiftUsername -p $OpenShiftPassword $OpenShiftApiUrl $skipTlsFlag --request-timeout=30s 2>&1 | Out-Null
-            Stop-OnError "oc login with username/password"
+            $previousNativePreference = $null
+            $hadNativePreference = $false
+            if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+                $hadNativePreference = $true
+                $previousNativePreference = $PSNativeCommandUseErrorActionPreference
+                $PSNativeCommandUseErrorActionPreference = $false
+            }
+            try {
+                $loginOutput = & oc login -u $OpenShiftUsername -p $OpenShiftPassword $OpenShiftApiUrl $skipTlsFlag --request-timeout=30s 2>&1
+            } finally {
+                if ($hadNativePreference) {
+                    $PSNativeCommandUseErrorActionPreference = $previousNativePreference
+                }
+            }
+            Stop-OnError "oc login with username/password" ($loginOutput -join "`n")
         } else {
             $previousNativePreference = $null
             $hadNativePreference = $false
@@ -1194,9 +1429,9 @@ function Resolve-MetalLbRange {
 
     if (-not $startOctets -and -not $endOctets) {
         $randomStartHost = Get-Random -Minimum 200 -Maximum 241
-        $METALLB_IP_START = "$prefix.$randomStartHost"
-        $METALLB_IP_END = "$prefix.$($randomStartHost + 9)"
-        Write-Step "Auto-selected local MetalLB range: $METALLB_IP_START - $METALLB_IP_END"
+        $script:METALLB_IP_START = "$prefix.$randomStartHost"
+        $script:METALLB_IP_END = "$prefix.$($randomStartHost + 9)"
+        Write-Step "Auto-selected local MetalLB range: $($script:METALLB_IP_START) - $($script:METALLB_IP_END)"
         return
     }
 
@@ -1204,18 +1439,18 @@ function Resolve-MetalLbRange {
         $startHost = [int]$startOctets[3]
         $endHost = [Math]::Min(254, $startHost + 9)
         if ($endHost -le $startHost) { $endHost = [Math]::Min(254, $startHost + 1) }
-        $METALLB_IP_START = "$($startOctets[0]).$($startOctets[1]).$($startOctets[2]).$startHost"
-        $METALLB_IP_END = "$($startOctets[0]).$($startOctets[1]).$($startOctets[2]).$endHost"
-        Write-Step "Derived MetalLB end IP from start: $METALLB_IP_START - $METALLB_IP_END"
+        $script:METALLB_IP_START = "$($startOctets[0]).$($startOctets[1]).$($startOctets[2]).$startHost"
+        $script:METALLB_IP_END = "$($startOctets[0]).$($startOctets[1]).$($startOctets[2]).$endHost"
+        Write-Step "Derived MetalLB end IP from start: $($script:METALLB_IP_START) - $($script:METALLB_IP_END)"
         return
     }
 
     $endHost = [int]$endOctets[3]
     $startHost = [Math]::Max(1, $endHost - 9)
     if ($startHost -ge $endHost) { $startHost = [Math]::Max(1, $endHost - 1) }
-    $METALLB_IP_START = "$($endOctets[0]).$($endOctets[1]).$($endOctets[2]).$startHost"
-    $METALLB_IP_END = "$($endOctets[0]).$($endOctets[1]).$($endOctets[2]).$endHost"
-    Write-Step "Derived MetalLB start IP from end: $METALLB_IP_START - $METALLB_IP_END"
+    $script:METALLB_IP_START = "$($endOctets[0]).$($endOctets[1]).$($endOctets[2]).$startHost"
+    $script:METALLB_IP_END = "$($endOctets[0]).$($endOctets[1]).$($endOctets[2]).$endHost"
+    Write-Step "Derived MetalLB start IP from end: $($script:METALLB_IP_START) - $($script:METALLB_IP_END)"
     return
 }
 
@@ -1770,14 +2005,10 @@ az group create --name $RESOURCE_GROUP --location $LOCATION --output table --ver
 Stop-OnError "az group create"
 
 Write-Step "Adding Azure CLI extensions"
-az extension add --upgrade --yes --name connectedk8s --verbose
-Stop-OnError "az extension add connectedk8s"
-az extension add --upgrade --yes --name k8s-extension --verbose
-Stop-OnError "az extension add k8s-extension"
-az extension add --upgrade --yes --name customlocation --verbose
-Stop-OnError "az extension add customlocation"
-az extension add --upgrade --yes --name containerapp --verbose
-Stop-OnError "az extension add containerapp"
+Ensure-AzExtension -Name connectedk8s
+Ensure-AzExtension -Name k8s-extension
+Ensure-AzExtension -Name customlocation
+Ensure-AzExtension -Name containerapp
 
 Write-Step "Registering providers (this takes ~5 minutes)"
 az provider register --namespace Microsoft.Kubernetes --wait --verbose

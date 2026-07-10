@@ -1,0 +1,15 @@
+{
+  "GrafanaBaseUrl": "http://localhost:3000",
+  "GrafanaUser": "admin",
+  "GrafanaPassword": "admin",
+  "DatasourceName": "Prometheus-Portal",
+  "OcPath": "C:\\src\\logicapps-migration-agent\\openshift\\openshift-tools\\oc.exe",
+  "KubeconfigPath": "C:\\Users\\psrivas\\Downloads\\kubeconfig",
+  "KubeContext": "",
+  "PromNamespace": "openshift-monitoring",
+  "TokenDuration": "24h",
+  "PromServiceAccounts": [
+    "prometheus-k8s",
+    "thanos-querier"
+  ]
+}
