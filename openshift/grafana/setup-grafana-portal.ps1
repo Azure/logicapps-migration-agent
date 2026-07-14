@@ -2095,13 +2095,37 @@ WHERE 1 = 1 $workflowFilterClause
     # states still render) for the donut. A one-frame [metric, value] result is the
     # canonical piechart input with reduceOptions.values=true; the previous 3-target +
     # merge shape did not render reliably on Grafana 13.
-    $statusDistributionQuery = New-DynamicFlowRunsQuery -QueryBody @'
-SELECT 'Succeeded' AS metric, SUM(CASE WHEN Status = 'Succeeded' THEN 1 ELSE 0 END) AS value FROM runs WHERE 1 = 1 $workflowFilterClause
-UNION ALL
-SELECT 'Failed' AS metric, SUM(CASE WHEN Status = 'Failed' THEN 1 ELSE 0 END) AS value FROM runs WHERE 1 = 1 $workflowFilterClause
-UNION ALL
-SELECT 'Running' AS metric, SUM(CASE WHEN Status = 'Running' THEN 1 ELSE 0 END) AS value FROM runs WHERE 1 = 1 $workflowFilterClause
+    #
+    # NOTE(psrivas): this is built as a standalone dynamic-SQL template (like
+    # $kpiTrendTemplate) rather than via New-DynamicFlowRunsQuery. That helper injects
+    # $workflowFilterClause, which contains ${workflow:sqlstring}. Grafana expands
+    # sqlstring to SINGLE-quoted text ('name') that lands INSIDE the dynamic @sql = N'...'
+    # literal, terminating it early and yielding "Operand data type nvarchar is invalid
+    # for multiply operator" (the leftover bare * reads as multiplication). Here the
+    # workflow filter is applied safely via ${workflow:csv} (unquoted, so it survives
+    # inside N'...') passed as the @wf sp_executesql parameter and split with STRING_SPLIT
+    # using an @sep parameter (no quoted delimiter inside the literal). All remaining
+    # literals use doubled quotes so they survive one level of dynamic-SQL parsing.
+    $statusDistributionQuery = @'
+SET NOCOUNT ON;
+DECLARE @from DATETIME = $__timeFrom();
+DECLARE @to   DATETIME = $__timeTo();
+DECLARE @wf NVARCHAR(MAX) = N'${workflow:csv}';
+DECLARE @sep NCHAR(1) = N',';
+DECLARE @union NVARCHAR(MAX)=N'';
+SELECT @union = @union + CASE WHEN @union=N'' THEN N'' ELSE N' UNION ALL ' END +
+   N'SELECT Status, COALESCE(NULLIF(LTRIM(RTRIM(FlowName)),''''),'''+t.name+''') AS FlowName, CreatedTime FROM [__SCHEMA__].'+QUOTENAME(t.name)
+FROM sys.tables t JOIN sys.schemas s ON t.schema_id=s.schema_id
+WHERE s.name='__SCHEMA__' AND t.name LIKE 'flow%runs';
+IF @union=N'' SET @union=N'SELECT CAST(NULL AS NVARCHAR(64)) AS Status, CAST(NULL AS NVARCHAR(255)) AS FlowName, CAST(NULL AS DATETIME) AS CreatedTime WHERE 1=0';
+DECLARE @sql NVARCHAR(MAX)=
+  N'WITH runs AS (SELECT Status, FlowName, CreatedTime FROM ('+@union+N') x WHERE CreatedTime>=@from AND CreatedTime<@to AND (@wf=N''*'' OR FlowName IN (SELECT LTRIM(RTRIM(value)) FROM STRING_SPLIT(@wf, @sep))))
+    SELECT ''Succeeded'' AS metric, COALESCE(SUM(CASE WHEN Status=''Succeeded'' THEN 1 ELSE 0 END),0) AS value FROM runs
+    UNION ALL SELECT ''Failed'', COALESCE(SUM(CASE WHEN Status=''Failed'' THEN 1 ELSE 0 END),0) FROM runs
+    UNION ALL SELECT ''Running'', COALESCE(SUM(CASE WHEN Status=''Running'' THEN 1 ELSE 0 END),0) FROM runs';
+EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@wf NVARCHAR(MAX),@sep NCHAR(1)',@from,@to,@wf,@sep;
 '@
+    $statusDistributionQuery = $statusDistributionQuery.Replace('__SCHEMA__', $runSchema)
 
     # Overview KPI trend stats (Total Runs / Succeeded / Failed) query the durable SQL
     # run-history tables over the dashboard time range so the stat value AND its sparkline
