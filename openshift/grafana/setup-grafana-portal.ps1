@@ -13,6 +13,10 @@ param(
     [string]$ResourceGroup,
     [string]$KubeConfigPath,
     [string]$KubeContext,
+    [string]$OpenShiftUsername = 'kubeadmin',
+    [string]$OpenShiftPassword,
+    [string]$OpenShiftToken,
+    [bool]$SkipTlsVerify = $true,
     [int]$GrafanaPort = 3000,
     [int]$RunManagerPort = 3001,
     [bool]$UsePortForward = $true,
@@ -208,6 +212,60 @@ function Try-ResolveMasterKeyFromHostSecrets {
         }
         catch {
             Write-Info "Could not parse '$candidate' while resolving master key: $($_.Exception.Message)"
+        }
+    }
+
+    return ''
+}
+
+function Try-ResolveMasterKeyFromPodSecrets {
+    if (-not (Test-CommandAvailable -Name 'oc')) {
+        return ''
+    }
+
+    $targetAppName = if (-not [string]::IsNullOrWhiteSpace($AppName)) { $AppName } elseif (-not [string]::IsNullOrWhiteSpace($script:PrimaryLogicAppName)) { $script:PrimaryLogicAppName } else { '' }
+    if ([string]::IsNullOrWhiteSpace($Namespace) -or [string]::IsNullOrWhiteSpace($targetAppName)) {
+        return ''
+    }
+
+    $podName = (& oc -n $Namespace get pods -l "containerapps.io/app-name=$targetAppName" -o jsonpath='{.items[0].metadata.name}' 2>$null).Trim()
+    if ([string]::IsNullOrWhiteSpace($podName)) {
+        return ''
+    }
+
+    $candidateFiles = @(
+        '/home/site/wwwroot/Functions/Secrets/host.json',
+        '/home/site/wwwroot/host.json',
+        '/home/data/Functions/Secrets/host.json'
+    )
+
+    foreach ($candidate in $candidateFiles) {
+        $content = (& oc -n $Namespace exec -c logicapps-container $podName -- cat $candidate 2>$null)
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($content)) {
+            continue
+        }
+
+        try {
+            $secrets = ($content | ConvertFrom-Json -ErrorAction Stop)
+            $resolved = ''
+            if ($secrets.PSObject.Properties.Name -contains 'masterKey') {
+                if ($secrets.masterKey -is [string]) {
+                    $resolved = [string]$secrets.masterKey
+                }
+                elseif ($secrets.masterKey -and ($secrets.masterKey.PSObject.Properties.Name -contains 'value')) {
+                    $resolved = [string]$secrets.masterKey.value
+                }
+            }
+            if ($secrets.PSObject.Properties.Name -contains 'hostName') {
+                $script:LogicAppHostName = [string]$secrets.hostName
+            }
+            if (-not [string]::IsNullOrWhiteSpace($resolved)) {
+                Write-Info "Resolved Logic Apps master key from pod '$podName' ($candidate)."
+                return $resolved
+            }
+        }
+        catch {
+            Write-Info "Could not parse '$candidate' from pod '$podName' while resolving master key: $($_.Exception.Message)"
         }
     }
 
@@ -814,6 +872,24 @@ function Test-CommandAvailable([string]$Name) {
     $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
+function Get-DefaultSwitchIPv4 {
+    $candidates = @(
+        Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.InterfaceAlias -like '*Default Switch*' -and
+            $_.IPAddress -match '^\d{1,3}(\.\d{1,3}){3}$' -and
+            $_.IPAddress -notlike '169.254.*'
+        } |
+        Sort-Object @{ Expression = { $_.AddressState -eq 'Preferred' }; Descending = $true }, InterfaceMetric
+    )
+
+    if ($candidates.Count -gt 0) {
+        return [string]$candidates[0].IPAddress
+    }
+
+    return ''
+}
+
 function Get-ActiveTcpPorts {
     [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners().Port
 }
@@ -870,12 +946,75 @@ function Stop-ManagedProcess {
             $process = Get-Process -Id ([int]$pidValue) -ErrorAction SilentlyContinue
             if ($process) {
                 Write-Info "Stopping managed $Name process (PID $pidValue)."
-                Stop-Process -Id ([int]$pidValue) -Force -ErrorAction Stop
+                try {
+                    Stop-Process -Id ([int]$pidValue) -Force -ErrorAction Stop
+                }
+                catch [System.Management.Automation.ItemNotFoundException] {
+                    Write-Info "Managed $Name process (PID $pidValue) already exited."
+                }
+                catch {
+                    if ($_.Exception.Message -match 'Cannot find a process with the process identifier') {
+                        Write-Info "Managed $Name process (PID $pidValue) already exited."
+                    }
+                    else {
+                        throw
+                    }
+                }
             }
         }
     }
     finally {
         Remove-Item -LiteralPath $PidFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Stop-ProcessOnPort {
+    param(
+        [Parameter(Mandatory)][int]$Port,
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    $connections = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)
+    if (-not $connections -or $connections.Count -eq 0) {
+        return
+    }
+
+    $pids = @($connections | Where-Object { $_.OwningProcess -gt 0 } | Select-Object -ExpandProperty OwningProcess -Unique)
+    foreach ($processId in $pids) {
+        $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
+        if ($process) {
+            Write-Info "Stopping stale $Name listener on port $Port (PID $processId)."
+            Stop-Process -Id $processId -Force -ErrorAction Stop
+        }
+    }
+}
+
+function Stop-StaleRunManagerListener {
+    param(
+        [Parameter(Mandatory)][int]$Port
+    )
+
+    $connections = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)
+    if (-not $connections -or $connections.Count -eq 0) {
+        return
+    }
+
+    $pids = @($connections | Where-Object { $_.OwningProcess -gt 0 } | Select-Object -ExpandProperty OwningProcess -Unique)
+    foreach ($processId in $pids) {
+        $commandLine = ''
+        try {
+            $procInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction Stop
+            $commandLine = [string]$procInfo.CommandLine
+        }
+        catch {
+            # Best-effort only; if we cannot inspect command line, don't kill.
+            continue
+        }
+
+        if ($commandLine -match '(?i)(workflow-manager\.js|run-manager\.js)') {
+            Write-Info "Stopping stale Workflow Manager listener on port $Port (PID $processId)."
+            Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -953,26 +1092,108 @@ function Ensure-NodeJs {
 function Ensure-OcCli {
     Write-Step 'Checking oc CLI'
 
+    $ocResolved = $false
     if (Test-CommandAvailable -Name 'oc') {
         Write-Info "oc detected."
-        return
+        $ocResolved = $true
     }
-
-    $fallbackOc = Join-Path (Split-Path -Parent $ScriptRoot) 'openshift-tools\oc.exe'
-    if (Test-Path -LiteralPath $fallbackOc) {
-        $fallbackDir = Split-Path -Parent $fallbackOc
-        $env:Path = "$fallbackDir;$env:Path"
-        if (Test-CommandAvailable -Name 'oc') {
-            Write-Info "oc detected via fallback path: $fallbackOc"
-            return
+    else {
+        $fallbackOc = Join-Path (Split-Path -Parent $ScriptRoot) 'openshift-tools\oc.exe'
+        if (Test-Path -LiteralPath $fallbackOc) {
+            $fallbackDir = Split-Path -Parent $fallbackOc
+            $env:Path = "$fallbackDir;$env:Path"
+            if (Test-CommandAvailable -Name 'oc') {
+                Write-Info "oc detected via fallback path: $fallbackOc"
+                $ocResolved = $true
+            }
         }
     }
 
-    if ($UsePortForward) {
-        throw 'The oc CLI is required when -UsePortForward is true. Install oc and ensure it is available in PATH.'
+    if (-not $ocResolved) {
+        if ($UsePortForward) {
+            throw 'The oc CLI is required when -UsePortForward is true. Install oc and ensure it is available in PATH.'
+        }
+
+        Write-Warning 'oc CLI is not available. Continuing because -UsePortForward is false.'
+        return
     }
 
-    Write-Warning 'oc CLI is not available. Continuing because -UsePortForward is false.'
+    $authArgs = @()
+    if (-not [string]::IsNullOrWhiteSpace($KubeContext)) {
+        $authArgs += @('--context', $KubeContext)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($KubeConfigPath) -and (Test-Path -LiteralPath $KubeConfigPath)) {
+        $authArgs += @('--kubeconfig', $KubeConfigPath)
+    }
+
+    $apiServer = (& oc @authArgs config view --minify -o "jsonpath={.clusters[0].cluster.server}" 2>$null)
+    if ($null -ne $apiServer) {
+        $apiServer = $apiServer.ToString().Trim()
+    }
+    if ([string]::IsNullOrWhiteSpace($apiServer)) {
+        throw "Unable to resolve OpenShift API server URL from kubeconfig using 'oc config view --minify -o jsonpath={.clusters[0].cluster.server}'."
+    }
+
+    $previousNativeErrorPreference = $null
+    $nativeErrorPreferenceVar = Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue
+    $hasNativeErrorPreference = $null -ne $nativeErrorPreferenceVar
+    if ($hasNativeErrorPreference) {
+        $previousNativeErrorPreference = [bool]$nativeErrorPreferenceVar.Value
+        $PSNativeCommandUseErrorActionPreference = $false
+    }
+
+    try {
+        $tokenAutoDetected = $false
+        if ([string]::IsNullOrWhiteSpace($OpenShiftToken)) {
+            $detectedToken = (& oc @authArgs whoami -t 2>$null)
+            if ($null -ne $detectedToken) {
+                $detectedToken = $detectedToken.ToString().Trim()
+            }
+            if ($LASTEXITCODE -eq 0 -and
+                -not [string]::IsNullOrWhiteSpace($detectedToken) -and
+                $detectedToken -notmatch 'Unauthorized|forbidden|error') {
+                $OpenShiftToken = $detectedToken
+                $tokenAutoDetected = $true
+                Write-Info 'Using OpenShift token resolved from current oc context (oc whoami -t).'
+            }
+        }
+
+        $tokenLoginSucceeded = $false
+        if (-not [string]::IsNullOrWhiteSpace($OpenShiftToken)) {
+            $loginOutput = (& oc @authArgs login $apiServer "--token=$OpenShiftToken" "--insecure-skip-tls-verify=$($SkipTlsVerify.ToString().ToLowerInvariant())" --request-timeout=30s 2>$null)
+            if ($LASTEXITCODE -eq 0) {
+                $tokenLoginSucceeded = $true
+            }
+            elseif ($tokenAutoDetected) {
+                Write-Warning "Auto-detected OpenShift token failed to login for '$apiServer'. Falling back to password/current context."
+                $OpenShiftToken = ''
+            }
+            else {
+                throw "oc login with token failed for '$apiServer': $($loginOutput -join [Environment]::NewLine)"
+            }
+        }
+
+        if (-not $tokenLoginSucceeded -and -not [string]::IsNullOrWhiteSpace($OpenShiftPassword)) {
+            $loginOutput = (& oc @authArgs login -u $OpenShiftUsername -p $OpenShiftPassword $apiServer "--insecure-skip-tls-verify=$($SkipTlsVerify.ToString().ToLowerInvariant())" --request-timeout=30s 2>$null)
+            if ($LASTEXITCODE -ne 0) {
+                throw "oc login with username/password failed for '$apiServer': $($loginOutput -join [Environment]::NewLine)"
+            }
+        }
+
+        $identity = (& oc @authArgs whoami 2>$null)
+        if ($null -ne $identity) {
+            $identity = $identity.ToString().Trim()
+        }
+        $contextLabel = if (-not [string]::IsNullOrWhiteSpace($KubeContext)) { $KubeContext } else { '(current context)' }
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($identity)) {
+            throw "oc CLI is available but authentication failed for context '$contextLabel' (API: $apiServer). Provide -OpenShiftToken or -OpenShiftPassword (or OPENSHIFT_TOKEN / OPENSHIFT_PASSWORD), then retry."
+        }
+    }
+    finally {
+        if ($hasNativeErrorPreference) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativeErrorPreference
+        }
+    }
 }
 
 function Initialize-KubeConfig {
@@ -997,6 +1218,7 @@ function Ensure-PortAvailability {
 
     if (-not $PreserveManagedProcesses) {
         Stop-ManagedProcess -PidFile $RunManagerPidFile -Name 'run-manager'
+        Stop-StaleRunManagerListener -Port $RunManagerPort
         if ($UsePortForward) {
             Stop-ManagedProcess -PidFile $PortForwardPidFile -Name 'oc port-forward'
         }
@@ -1280,13 +1502,16 @@ function Get-WorkflowMetadata {
 
     $code = [uri]::EscapeDataString($MasterKey)
     $response = Invoke-LogicAppRequest -Method GET -RelativePath "/runtime/webhooks/workflow/api/management/workflows?api-version=2020-05-01-preview&code=$code"
-    $workflowItems = if ($response.PSObject.Properties.Name -contains 'value') { @($response.value) } else { @($response) }
+    $workflowItems = @(
+        if ($response -and ($response.PSObject.Properties.Name -contains 'value')) { @($response.value) } else { @($response) }
+    )
     if (-not $workflowItems -or $workflowItems.Count -eq 0) {
         Write-Warning 'No workflows were returned by the Logic Apps management API. Continuing with SQL table-only mapping.'
         return @()
     }
 
-    $workflows = foreach ($workflow in $workflowItems) {
+    $workflows = @(
+        foreach ($workflow in $workflowItems) {
         $workflowName = [string]$workflow.name
         $detail = Invoke-LogicAppRequest -Method GET -RelativePath ("/runtime/webhooks/workflow/api/management/workflows/{0}?api-version=2020-05-01-preview&code={1}" -f ([uri]::EscapeDataString($workflowName)), $code)
         $triggerSource = $detail.triggers
@@ -1302,14 +1527,16 @@ function Get-WorkflowMetadata {
             ItemJson   = ($workflow | ConvertTo-Json -Depth 20 -Compress)
             Normalized = ($workflowName.ToLowerInvariant() -replace '[^a-z0-9]', '')
         }
-    }
+        }
+    )
 
     $workflowNames = @(
         $workflows |
         Where-Object { $_ -and $_.PSObject.Properties.Name -contains 'Name' -and -not [string]::IsNullOrWhiteSpace([string]$_.Name) } |
         ForEach-Object { [string]$_.Name }
     )
-    Write-Info "Discovered $($workflows.Count) workflow(s): $($workflowNames -join ', ')"
+    $workflowCount = @($workflows).Count
+    Write-Info "Discovered $workflowCount workflow(s): $($workflowNames -join ', ')"
     $workflows
 }
 
@@ -1393,6 +1620,23 @@ function Get-WorkflowTableMapping {
 
     $mappings = New-Object 'System.Collections.Generic.List[object]'
     $usedTables = New-Object 'System.Collections.Generic.HashSet[string]'
+    $candidateWorkflows = @(
+        @($Workflows) |
+        Where-Object {
+            $_ -and $_.PSObject -and
+            ($_.PSObject.Properties.Name -contains 'Name') -and
+            -not [string]::IsNullOrWhiteSpace([string]$_.Name)
+        } |
+        ForEach-Object {
+            [pscustomobject]@{
+                Name       = [string]$_.Name
+                Triggers   = @($_.Triggers)
+                DetailJson = [string]$_.DetailJson
+                ItemJson   = [string]$_.ItemJson
+                Normalized = if (-not [string]::IsNullOrWhiteSpace([string]$_.Normalized)) { [string]$_.Normalized } else { ([string]$_.Name).ToLowerInvariant() -replace '[^a-z0-9]', '' }
+            }
+        }
+    )
 
     function Get-MappedWorkflowNames {
         @($mappings | ForEach-Object { if ($_.PSObject.Properties.Name -contains 'WorkflowName') { [string]$_.WorkflowName } })
@@ -1411,7 +1655,7 @@ function Get-WorkflowTableMapping {
         return [datetime]::MinValue
     }
 
-    if (-not $Workflows -or $Workflows.Count -eq 0) {
+    if (-not $candidateWorkflows -or $candidateWorkflows.Count -eq 0) {
         foreach ($table in ($Tables | Sort-Object TableName)) {
             $tableLabel = if ($table.TableName -match '^flow([a-f0-9]{32})runs$') {
                 "workflow-$($Matches[1].Substring(0,8))"
@@ -1430,7 +1674,7 @@ function Get-WorkflowTableMapping {
         }
     }
 
-    foreach ($workflow in $Workflows) {
+    foreach ($workflow in $candidateWorkflows) {
         $matchByHash = @($Tables | Where-Object {
             -not $usedTables.Contains($_.TableName) -and $_.TableHash -and (
                 $workflow.DetailJson -match [regex]::Escape($_.TableHash) -or
@@ -1442,7 +1686,7 @@ function Get-WorkflowTableMapping {
         }
     }
 
-    foreach ($workflow in $Workflows | Where-Object { $_.Name -notin (Get-MappedWorkflowNames) }) {
+    foreach ($workflow in $candidateWorkflows | Where-Object { $_.Name -notin (Get-MappedWorkflowNames) }) {
         $triggerCandidates = @()
         foreach ($trigger in $workflow.Triggers) {
             $triggerCandidates += $Tables | Where-Object { -not $usedTables.Contains($_.TableName) -and ($_.Triggers -contains $trigger) }
@@ -1453,7 +1697,7 @@ function Get-WorkflowTableMapping {
         }
     }
 
-    foreach ($workflow in $Workflows | Where-Object { $_.Name -notin (Get-MappedWorkflowNames) }) {
+    foreach ($workflow in $candidateWorkflows | Where-Object { $_.Name -notin (Get-MappedWorkflowNames) }) {
         $nameCandidates = @($Tables | Where-Object {
             -not $usedTables.Contains($_.TableName) -and $_.TableName.ToLowerInvariant().Contains($workflow.Normalized)
         })
@@ -1462,7 +1706,7 @@ function Get-WorkflowTableMapping {
         }
     }
 
-    $remainingWorkflows = @($Workflows | Where-Object { $_.Name -notin (Get-MappedWorkflowNames) } | Sort-Object Name)
+    $remainingWorkflows = @($candidateWorkflows | Where-Object { $_.Name -notin (Get-MappedWorkflowNames) } | Sort-Object Name)
     foreach ($workflow in $remainingWorkflows) {
         $remainingTables = @($Tables | Where-Object { -not $usedTables.Contains($_.TableName) })
         if ($remainingTables.Count -eq 0) {
@@ -1575,14 +1819,19 @@ function New-DashboardObject {
         [object]$JobTable,
         [bool]$HasPrometheus,
         [string]$DashboardAppName,
+        [string[]]$DashboardAppNames,
         [string]$DashboardUid,
-        [string]$DashboardTitle
+       [string]$DashboardTitle,
+       [bool]$IncludeLiveAppPanels = $true
     )
 
     $panels = New-Object System.Collections.ArrayList
     $script:PanelCounter = 0
-    $effectiveAppName = if ($DashboardAppName) { $DashboardAppName } else { $AppName }
-    $podRegex = (($effectiveAppName -replace '([.^$|?*+(){}\[\]\\])', '\\$1') + '.*')
+    $grafanaAppVar = '$' + '{app}'
+    $grafanaWorkflowVar = '$' + '{workflow}'
+    $grafanaWorkflowSql = '$' + '{workflow:sqlstring}'
+    $workflowFilterClause = if ($IncludeLiveAppPanels) { "AND ('" + $grafanaWorkflowVar + "' = '*' OR FlowName IN (" + $grafanaWorkflowSql + "))" } else { '' }
+    $podRegex = '^' + $grafanaAppVar + '.*'
 
     function Next-PanelId {
         $script:PanelCounter++
@@ -1593,6 +1842,45 @@ function New-DashboardObject {
         [ordered]@{ refId = $RefId; rawSql = $RawSql; format = $Format }
     }
 
+    function New-KpiApiTarget([string]$Selector) {
+        [ordered]@{
+            refId = 'A'
+            type = 'json'
+            source = 'url'
+            format = 'table'
+            parser = 'backend'
+            datasource = @{ type = 'yesoreyeram-infinity-datasource'; uid = 'logicapps-kpi-api' }
+            url = 'http://host.docker.internal:3001/api/kpi/summary?window=24h&app=' + $grafanaAppVar
+            url_options = @{ method = 'GET'; data = '' }
+            root_selector = ''
+            json_options = @{ columnar = $false; root_is_not_array = $true }
+            columns = @(@{ selector = $Selector; text = 'value'; type = 'number' })
+            filters = @()
+            global_query_id = ''
+        }
+    }
+
+    function New-KpiTimeseriesTarget([string]$Selector) {
+        [ordered]@{
+            refId = 'A'
+            type = 'json'
+            source = 'url'
+            format = 'table'
+            parser = 'backend'
+            datasource = @{ type = 'yesoreyeram-infinity-datasource'; uid = 'logicapps-kpi-api' }
+            url = 'http://host.docker.internal:3001/api/kpi/timeseries?window=24h&app=' + $grafanaAppVar
+            url_options = @{ method = 'GET'; data = '' }
+            root_selector = 'series'
+            json_options = @{ columnar = $false; root_is_not_array = $false }
+            columns = @(
+                @{ selector = 'time'; text = 'time'; type = 'timestamp_epoch' },
+                @{ selector = $Selector; text = 'value'; type = 'number' }
+            )
+            filters = @()
+            global_query_id = ''
+        }
+    }
+
     function New-PromTarget([string]$RefId, [string]$Expr, [string]$LegendFormat, [bool]$Instant = $false, [string]$Format = $null) {
         $target = [ordered]@{ refId = $RefId; expr = $Expr; legendFormat = $LegendFormat }
         if ($Instant) { $target.instant = $true }
@@ -1600,30 +1888,39 @@ function New-DashboardObject {
         $target
     }
 
-    $allCreatedUnion = ($WorkflowMappings | ForEach-Object {
-        'SELECT CreatedTime FROM [{0}].[{1}] WHERE $__timeFilter(CreatedTime)' -f (Escape-SqlIdentifier $_.SchemaName), (Escape-SqlIdentifier $_.TableName)
-    }) -join "`nUNION ALL`n"
-    $allStatusUnion = ($WorkflowMappings | ForEach-Object {
-        'SELECT CreatedTime, Status FROM [{0}].[{1}] WHERE $__timeFilter(CreatedTime)' -f (Escape-SqlIdentifier $_.SchemaName), (Escape-SqlIdentifier $_.TableName)
-    }) -join "`nUNION ALL`n"
-    $allSucceededUnion = ($WorkflowMappings | ForEach-Object {
-        'SELECT Status FROM [{0}].[{1}] WHERE $__timeFilter(CreatedTime) AND Status=''Succeeded''' -f (Escape-SqlIdentifier $_.SchemaName), (Escape-SqlIdentifier $_.TableName)
-    }) -join "`nUNION ALL`n"
-    $allSucceededTimeUnion = ($WorkflowMappings | ForEach-Object {
-        'SELECT CreatedTime FROM [{0}].[{1}] WHERE $__timeFilter(CreatedTime) AND Status=''Succeeded''' -f (Escape-SqlIdentifier $_.SchemaName), (Escape-SqlIdentifier $_.TableName)
-    }) -join "`nUNION ALL`n"
-    $allFailedUnion = ($WorkflowMappings | ForEach-Object {
-        'SELECT Status FROM [{0}].[{1}] WHERE $__timeFilter(CreatedTime) AND Status=''Failed''' -f (Escape-SqlIdentifier $_.SchemaName), (Escape-SqlIdentifier $_.TableName)
-    }) -join "`nUNION ALL`n"
-    $allFailedTimeUnion = ($WorkflowMappings | ForEach-Object {
-        'SELECT CreatedTime FROM [{0}].[{1}] WHERE $__timeFilter(CreatedTime) AND Status=''Failed''' -f (Escape-SqlIdentifier $_.SchemaName), (Escape-SqlIdentifier $_.TableName)
-    }) -join "`nUNION ALL`n"
-    $allRunningUnion = ($WorkflowMappings | ForEach-Object {
-        'SELECT Status FROM [{0}].[{1}] WHERE $__timeFilter(CreatedTime) AND Status=''Running''' -f (Escape-SqlIdentifier $_.SchemaName), (Escape-SqlIdentifier $_.TableName)
-    }) -join "`nUNION ALL`n"
-    $allDurationUnion = ($WorkflowMappings | ForEach-Object {
-        'SELECT CreatedTime, EndTime FROM [{0}].[{1}] WHERE $__timeFilter(CreatedTime) AND EndTime IS NOT NULL AND EndTime > CreatedTime' -f (Escape-SqlIdentifier $_.SchemaName), (Escape-SqlIdentifier $_.TableName)
-    }) -join "`nUNION ALL`n"
+    function New-DynamicFlowRunsQuery {
+        param(
+            [Parameter(Mandatory)][string]$QueryBody,
+            [string]$WorkflowName = ''
+        )
+
+        $escapedSchema = Escape-SqlString $runSchema
+        $escapedWorkflow = Escape-SqlString $WorkflowName
+        $resolvedBody = $QueryBody -replace '\$workflowFilterClause', $workflowFilterClause
+        $escapedBody = $resolvedBody -replace "'", "''"
+
+        @"
+DECLARE @from DATETIME = `$__timeFrom();
+DECLARE @to DATETIME = `$__timeTo();
+DECLARE @workflow NVARCHAR(512) = N'$escapedWorkflow';
+DECLARE @u NVARCHAR(MAX) = N'';
+SELECT @u = @u + CASE WHEN @u = N'' THEN N'' ELSE N' UNION ALL ' END +
+  N'SELECT CreatedTime, EndTime, Status, TriggerName, FlowRunSequenceId, Code, COALESCE(NULLIF(LTRIM(RTRIM(FlowName)),''''), N''' + REPLACE(t.name,'''','''''') + N''') AS FlowName FROM [$escapedSchema].[' + t.name + N']'
+FROM sys.tables t
+JOIN sys.schemas s ON t.schema_id = s.schema_id
+WHERE s.name = N'$escapedSchema'
+  AND t.name LIKE N'flow%runs';
+IF @u = N'' SET @u = N'SELECT CAST(NULL AS DATETIME) AS CreatedTime, CAST(NULL AS DATETIME) AS EndTime, CAST(NULL AS NVARCHAR(50)) AS Status, CAST(NULL AS NVARCHAR(255)) AS TriggerName, CAST(NULL AS NVARCHAR(255)) AS FlowRunSequenceId, CAST(NULL AS NVARCHAR(255)) AS Code, CAST(NULL AS NVARCHAR(255)) AS FlowName WHERE 1=0';
+DECLARE @sql NVARCHAR(MAX) = N'
+WITH runs AS (
+  SELECT * FROM (' + @u + N') src
+  WHERE src.CreatedTime >= @from
+    AND src.CreatedTime < @to
+)
+$escapedBody';
+EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@workflow NVARCHAR(512)', @from = @from, @to = @to, @workflow = @workflow;
+"@
+    }
 
     $runSchema = if ($WorkflowMappings -and $WorkflowMappings[0].SchemaName) { $WorkflowMappings[0].SchemaName } else { 'dt' }
     # Discover every per-workflow run table (Logic Apps creates a new flow<hash>runs table on
@@ -1659,37 +1956,36 @@ ORDER BY [Failed] DESC, [Total Runs] DESC';
 EXEC sp_executesql @sql;
 '@ -replace '__SCHEMA__', $runSchema
 
-    $latencyQuery = (($WorkflowMappings | ForEach-Object {
-        $name = Escape-SqlString $_.WorkflowName
-        'SELECT Workflow,
+    $latencyQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT Workflow,
   CAST(P50 / 1000.0 AS DECIMAL(10,3)) AS P50,
   CAST(P95 / 1000.0 AS DECIMAL(10,3)) AS P95,
   CAST(P99 / 1000.0 AS DECIMAL(10,3)) AS P99,
   Runs
 FROM (
-  SELECT ''{0}'' AS Workflow,
-    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND, CreatedTime, EndTime)) OVER() AS P50,
-    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND, CreatedTime, EndTime)) OVER() AS P95,
-    PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND, CreatedTime, EndTime)) OVER() AS P99,
-    COUNT(*) OVER() AS Runs,
-    ROW_NUMBER() OVER (ORDER BY CreatedTime) AS rn
-  FROM [{1}].[{2}]
-  WHERE $__timeFilter(CreatedTime) AND EndTime IS NOT NULL AND EndTime > CreatedTime
-) t WHERE rn = 1' -f $name, (Escape-SqlIdentifier $_.SchemaName), (Escape-SqlIdentifier $_.TableName)
-    }) -join "`nUNION ALL`n") + "`nORDER BY Runs DESC"
+  SELECT FlowName AS Workflow,
+    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND, CreatedTime, EndTime)) OVER(PARTITION BY FlowName) AS P50,
+    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND, CreatedTime, EndTime)) OVER(PARTITION BY FlowName) AS P95,
+    PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY DATEDIFF(MILLISECOND, CreatedTime, EndTime)) OVER(PARTITION BY FlowName) AS P99,
+    COUNT(*) OVER(PARTITION BY FlowName) AS Runs,
+    ROW_NUMBER() OVER (PARTITION BY FlowName ORDER BY CreatedTime DESC) AS rn
+  FROM runs
+  WHERE EndTime IS NOT NULL AND EndTime > CreatedTime $workflowFilterClause
+) t
+WHERE rn = 1
+ORDER BY Runs DESC
+'@
 
-    $topFailedQuery = @(
-        'SELECT * FROM ('
-        (($WorkflowMappings | ForEach-Object {
-            $name = Escape-SqlString $_.WorkflowName
-            'SELECT ''{0}'' AS Workflow,
-  SUM(CASE WHEN Status=''Failed'' THEN 1 ELSE 0 END) AS [Failed],
-  CAST(SUM(CASE WHEN Status=''Failed'' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) AS DECIMAL(5,1)) AS [Failure%]
-FROM [{1}].[{2}] WHERE $__timeFilter(CreatedTime)' -f $name, (Escape-SqlIdentifier $_.SchemaName), (Escape-SqlIdentifier $_.TableName)
-        }) -join "`nUNION ALL`n")
-        ') failures'
-        'ORDER BY [Failed] DESC, [Failure%] DESC'
-    ) -join "`n"
+    $topFailedQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT
+  FlowName AS Workflow,
+  SUM(CASE WHEN Status = ''Failed'' THEN 1 ELSE 0 END) AS [Failed],
+  CAST(SUM(CASE WHEN Status = ''Failed'' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) AS DECIMAL(5,1)) AS [Failure%]
+FROM runs
+WHERE 1 = 1 $workflowFilterClause
+GROUP BY FlowName
+ORDER BY [Failed] DESC, [Failure%] DESC
+'@
 
     $retryQuery = if ($JobTable) {
         'SELECT ISNULL(SUM(CurrentRetryCount), 0) AS retries FROM [{0}].[{1}] WHERE JobId LIKE ''FlowTriggerJob%%''' -f (Escape-SqlIdentifier $JobTable.SchemaName), (Escape-SqlIdentifier $JobTable.TableName)
@@ -1729,11 +2025,9 @@ FROM [{1}].[{2}] WHERE $__timeFilter(CreatedTime)' -f $name, (Escape-SqlIdentifi
         'SELECT ''Job definition table not found'' AS [Info]'
     }
 
-    $workflowErrorsQuery = @(
-        'SELECT TOP 50 * FROM ('
-        (($WorkflowMappings | ForEach-Object {
-            $name = Escape-SqlString $_.WorkflowName
-            'SELECT TOP 20 ''{0}'' AS Workflow,
+    $workflowErrorsQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT TOP 50
+  FlowName AS Workflow,
   FlowRunSequenceId AS RunId,
   Status,
   Code,
@@ -1741,12 +2035,10 @@ FROM [{1}].[{2}] WHERE $__timeFilter(CreatedTime)' -f $name, (Escape-SqlIdentifi
   CreatedTime,
   EndTime,
   DATEDIFF(MILLISECOND, CreatedTime, EndTime) AS Duration_ms
-FROM [{1}].[{2}]
-WHERE $__timeFilter(CreatedTime) AND Status = ''Failed''' -f $name, (Escape-SqlIdentifier $_.SchemaName), (Escape-SqlIdentifier $_.TableName)
-        }) -join "`nUNION ALL`n")
-        ') errors'
-        'ORDER BY CreatedTime DESC'
-    ) -join "`n"
+FROM runs
+WHERE Status = ''Failed'' $workflowFilterClause
+ORDER BY CreatedTime DESC
+'@
 
     $escapedSqlServer = Escape-SqlString $SqlServer
     $escapedNamespace = Escape-SqlString $Namespace
@@ -1763,32 +2055,81 @@ WHERE $__timeFilter(CreatedTime) AND Status = ''Failed''' -f $name, (Escape-SqlI
     foreach ($mapping in $WorkflowMappings) {
         $targetRefIndex++
         $refId = [char](64 + [Math]::Min($targetRefIndex, 26))
-        $allExecutionTargets += New-SqlTarget -RefId $refId -Format 'time_series' -RawSql ('SELECT CreatedTime AS time, DATEDIFF(MILLISECOND, CreatedTime, EndTime) AS [{0}] FROM [{1}].[{2}] WHERE $__timeFilter(CreatedTime) AND EndTime IS NOT NULL AND EndTime > CreatedTime ORDER BY time' -f (Escape-SqlIdentifier $mapping.WorkflowName), (Escape-SqlIdentifier $mapping.SchemaName), (Escape-SqlIdentifier $mapping.TableName))
+        $allExecutionTargets += New-SqlTarget -RefId $refId -Format 'time_series' -RawSql (New-DynamicFlowRunsQuery -WorkflowName $mapping.WorkflowName -QueryBody ('SELECT CreatedTime AS time, DATEDIFF(MILLISECOND, CreatedTime, EndTime) AS [{0}] FROM runs WHERE EndTime IS NOT NULL AND EndTime > CreatedTime ORDER BY time' -f (Escape-SqlIdentifier $mapping.WorkflowName)))
     }
+
+    $totalRunsQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT $__timeGroupAlias(CreatedTime, $__interval), COUNT(*) AS [Total Runs]
+FROM runs
+WHERE 1 = 1 $workflowFilterClause
+GROUP BY $__timeGroup(CreatedTime, $__interval)
+ORDER BY 1
+'@
+    $succeededQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT $__timeGroupAlias(CreatedTime, $__interval), COUNT(*) AS [Succeeded]
+FROM runs
+WHERE Status = ''Succeeded'' $workflowFilterClause
+GROUP BY $__timeGroup(CreatedTime, $__interval)
+ORDER BY 1
+'@
+    $failedQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT $__timeGroupAlias(CreatedTime, $__interval), COUNT(*) AS [Failed]
+FROM runs
+WHERE Status = ''Failed'' $workflowFilterClause
+GROUP BY $__timeGroup(CreatedTime, $__interval)
+ORDER BY 1
+'@
+    $avgDurationQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT $__timeGroupAlias(CreatedTime, $__interval), CAST(AVG(DATEDIFF(MILLISECOND, CreatedTime, EndTime)) / 1000.0 AS DECIMAL(10,2)) AS [Avg Duration]
+FROM runs
+WHERE EndTime IS NOT NULL AND EndTime > CreatedTime $workflowFilterClause
+GROUP BY $__timeGroup(CreatedTime, $__interval)
+ORDER BY 1
+'@
+    $successRateQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT CAST(ISNULL(SUM(CASE WHEN Status = ''Succeeded'' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0), 0) AS DECIMAL(5,1)) AS success_rate
+FROM runs
+WHERE 1 = 1 $workflowFilterClause
+'@
+    $statusSucceededQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT ''Succeeded'' AS metric, COUNT(*) AS value
+FROM runs
+WHERE Status = ''Succeeded'' $workflowFilterClause
+'@
+    $statusFailedQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT ''Failed'' AS metric, COUNT(*) AS value
+FROM runs
+WHERE Status = ''Failed'' $workflowFilterClause
+'@
+    $statusRunningQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT ''Running'' AS metric, COUNT(*) AS value
+FROM runs
+WHERE Status = ''Running'' $workflowFilterClause
+'@
 
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Total Runs'; type = 'stat'; gridPos = (New-GridPos 5 4 0 0)
-        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql ("SELECT `$__timeGroupAlias(CreatedTime, `$__interval), COUNT(*) AS [Total Runs] FROM (`n{0}`n) t GROUP BY `$__timeGroup(CreatedTime, `$__interval) ORDER BY 1" -f $allCreatedUnion)))
+        targets = @((New-KpiTimeseriesTarget -Selector 'total'))
         fieldConfig = @{ defaults = @{ noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'blue' }) } } }
         options = @{ reduceOptions = @{ calcs = @('sum') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'area' }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Succeeded'; type = 'stat'; gridPos = (New-GridPos 5 4 4 0)
-        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql ("SELECT `$__timeGroupAlias(CreatedTime, `$__interval), COUNT(*) AS [Succeeded] FROM (`n{0}`n) t GROUP BY `$__timeGroup(CreatedTime, `$__interval) ORDER BY 1" -f $allSucceededTimeUnion)))
+        targets = @((New-KpiTimeseriesTarget -Selector 'succeeded'))
         fieldConfig = @{ defaults = @{ noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'green' }) } } }
         options = @{ reduceOptions = @{ calcs = @('sum') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'area' }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Failed'; type = 'stat'; gridPos = (New-GridPos 5 4 8 0)
-        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql ("SELECT `$__timeGroupAlias(CreatedTime, `$__interval), COUNT(*) AS [Failed] FROM (`n{0}`n) t GROUP BY `$__timeGroup(CreatedTime, `$__interval) ORDER BY 1" -f $allFailedTimeUnion)))
+        targets = @((New-KpiTimeseriesTarget -Selector 'failed'))
         fieldConfig = @{ defaults = @{ noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'green' }, @{ value = 1; color = 'red' }) } } }
         options = @{ reduceOptions = @{ calcs = @('sum') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'area' }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Avg Duration'; type = 'stat'; gridPos = (New-GridPos 5 4 12 0)
-        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql ("SELECT `$__timeGroupAlias(CreatedTime, `$__interval), CAST(AVG(DATEDIFF(MILLISECOND, CreatedTime, EndTime)) / 1000.0 AS DECIMAL(10,2)) AS [Avg Duration] FROM (`n{0}`n) t GROUP BY `$__timeGroup(CreatedTime, `$__interval) ORDER BY 1" -f $allDurationUnion)))
+        targets = @((New-KpiApiTarget -Selector 'avgDurationSec'))
         fieldConfig = @{ defaults = @{ unit = 's'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'purple' }) } } }
-        options = @{ reduceOptions = @{ calcs = @('mean') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'area' }
+        options = @{ reduceOptions = @{ calcs = @('lastNotNull') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'none' }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Retry Count'; type = 'gauge'; gridPos = (New-GridPos 5 4 16 0)
@@ -1798,7 +2139,7 @@ WHERE $__timeFilter(CreatedTime) AND Status = ''Failed''' -f $name, (Escape-SqlI
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Success Rate'; type = 'gauge'; gridPos = (New-GridPos 5 4 20 0)
-        targets = @((New-SqlTarget -RefId 'A' -RawSql ("SELECT CAST(ISNULL(SUM(CASE WHEN Status = 'Succeeded' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0), 0) AS DECIMAL(5,1)) AS success_rate FROM (`n{0}`n) t" -f $allStatusUnion)))
+        targets = @((New-KpiApiTarget -Selector 'successRate'))
         fieldConfig = @{ defaults = @{ min = 0; max = 100; unit = 'percent'; thresholds = @{ steps = @(@{ value = $null; color = 'red' }, @{ value = 80; color = 'yellow' }, @{ value = 95; color = 'green' }) } } }
         options = @{ reduceOptions = @{ calcs = @('lastNotNull') }; showThresholdMarkers = $true; showThresholdLabels = $false }
     })
@@ -1847,18 +2188,18 @@ WHERE $__timeFilter(CreatedTime) AND Status = ''Failed''' -f $name, (Escape-SqlI
 
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Logic App Manager'; type = 'text'; gridPos = (New-GridPos 24 24 0 12)
-        options = @{ mode = 'html'; content = "<iframe src='http://localhost:$AppManagerPort/?v=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())' style='width:100%;height:100%;border:none;min-height:720px;'></iframe>" }
+        options = @{ mode = 'html'; content = "<iframe src='http://localhost:$AppManagerPort/?app=$grafanaAppVar&v=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())' style='width:100%;height:100%;border:none;min-height:720px;'></iframe>" }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Workflow Manager'; type = 'text'; gridPos = (New-GridPos 22 24 0 24)
-        options = @{ mode = 'html'; content = "<iframe src='http://localhost:$RunManagerPort/?v=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())' style='width:100%;height:100%;border:none;min-height:900px;'></iframe>" }
+        options = @{ mode = 'html'; content = "<iframe src='http://localhost:$RunManagerPort/?app=$grafanaAppVar&v=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())' style='width:100%;height:100%;border:none;min-height:900px;'></iframe>" }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Run Status Distribution'; type = 'piechart'; gridPos = (New-GridPos 8 8 0 36)
         targets = @(
-            (New-SqlTarget -RefId 'A' -RawSql ("SELECT 'Succeeded' AS metric, COUNT(*) AS value FROM (`n{0}`n) t" -f $allSucceededUnion)),
-            (New-SqlTarget -RefId 'B' -RawSql ("SELECT 'Failed' AS metric, COUNT(*) AS value FROM (`n{0}`n) t" -f $allFailedUnion)),
-            (New-SqlTarget -RefId 'C' -RawSql ("SELECT 'Running' AS metric, COUNT(*) AS value FROM (`n{0}`n) t" -f $allRunningUnion))
+            (New-SqlTarget -RefId 'A' -RawSql $statusSucceededQuery),
+            (New-SqlTarget -RefId 'B' -RawSql $statusFailedQuery),
+            (New-SqlTarget -RefId 'C' -RawSql $statusRunningQuery)
         )
         transformations = @(@{ id = 'merge'; options = @{} })
         fieldConfig = @{ overrides = @(
@@ -1888,7 +2229,7 @@ WHERE $__timeFilter(CreatedTime) AND Status = ''Failed''' -f $name, (Escape-SqlI
             @{
                 refId = 'A'; type = 'json'; source = 'url'; format = 'table'; parser = 'backend'
                 datasource = @{ type = 'yesoreyeram-infinity-datasource'; uid = 'logicapps-kpi-api' }
-                url = 'http://host.docker.internal:3001/api/volumes'
+                url = 'http://host.docker.internal:3001/api/volumes?app=' + $grafanaAppVar
                 url_options = @{ method = 'GET'; data = '' }
                 root_selector = ''
                 json_options = @{ columnar = $false; root_is_not_array = $false }
@@ -1912,7 +2253,15 @@ WHERE $__timeFilter(CreatedTime) AND Status = ''Failed''' -f $name, (Escape-SqlI
         options = @{ showHeader = $true; cellHeight = 'sm'; footer = @{ show = $false } }
     })
 
-    $runsOverTimeQuery = "SELECT `$__timeGroup(CreatedTime,'5m') AS time, SUM(CASE WHEN Status = 'Succeeded' THEN 1 ELSE 0 END) AS Succeeded, SUM(CASE WHEN Status = 'Failed' THEN 1 ELSE 0 END) AS Failed FROM ({0}{1}{0}) t GROUP BY `$__timeGroup(CreatedTime,'5m') ORDER BY time" -f [Environment]::NewLine, $allStatusUnion
+    $runsOverTimeQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT $__timeGroup(CreatedTime,''5m'') AS time,
+  SUM(CASE WHEN Status = ''Succeeded'' THEN 1 ELSE 0 END) AS Succeeded,
+  SUM(CASE WHEN Status = ''Failed'' THEN 1 ELSE 0 END) AS Failed
+FROM runs
+WHERE 1 = 1 $workflowFilterClause
+GROUP BY $__timeGroup(CreatedTime,''5m'')
+ORDER BY time
+'@
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Runs Over Time (All Workflows)'; type = 'timeseries'; gridPos = (New-GridPos 8 12 0 52)
         targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $runsOverTimeQuery))
@@ -1950,7 +2299,24 @@ EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT',@from,@to,@bmi
     $totalActionsQuery = $totalTrendTemplate.Replace('__LIKE__', 'flow%actions').Replace('__VALUECOL__', 'Actions')
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Total Runs Over Time'; type = 'timeseries'; gridPos = (New-GridPos 8 24 0 60)
-        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $totalRunsQuery))
+        targets = @([ordered]@{
+            refId = 'A'
+            type = 'json'
+            source = 'url'
+            format = 'table'
+            parser = 'backend'
+            datasource = @{ type = 'yesoreyeram-infinity-datasource'; uid = 'logicapps-kpi-api' }
+            url = 'http://host.docker.internal:3001/api/kpi/timeseries?window=24h&app=' + $grafanaAppVar
+            url_options = @{ method = 'GET'; data = '' }
+            root_selector = 'series'
+            json_options = @{ columnar = $false; root_is_not_array = $false }
+            columns = @(
+                @{ selector = 'time'; text = 'time'; type = 'timestamp_epoch' },
+                @{ selector = 'total'; text = 'Runs'; type = 'number' }
+            )
+            filters = @()
+            global_query_id = ''
+        })
         fieldConfig = @{ defaults = @{ unit = 'none'; decimals = 0; color = @{ mode = 'fixed'; fixedColor = 'blue' }; custom = @{ drawStyle = 'line'; lineInterpolation = 'smooth'; lineWidth = 2; fillOpacity = 10; spanNulls = $true; showPoints = 'never' } } }
         options = @{ legend = @{ showLegend = $true; displayMode = 'list'; placement = 'bottom'; calcs = @('sum', 'max') }; tooltip = @{ mode = 'multi'; sort = 'desc' } }
     })
@@ -1991,19 +2357,8 @@ EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT',@from,@to,@bmi
     })
     $y += 8
 
-    foreach ($mapping in $WorkflowMappings) {
-        $null = $panels.Add([ordered]@{
-            id = (Next-PanelId); title = "$($mapping.WorkflowName) - Runs Over Time"; type = 'timeseries'; gridPos = (New-GridPos 7 12 0 $y)
-            targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql ('SELECT $__timeGroup(CreatedTime,''5m'') AS time, SUM(CASE WHEN Status = ''Succeeded'' THEN 1 ELSE 0 END) AS Succeeded, SUM(CASE WHEN Status = ''Failed'' THEN 1 ELSE 0 END) AS Failed FROM [{0}].[{1}] WHERE $__timeFilter(CreatedTime) GROUP BY $__timeGroup(CreatedTime,''5m'') ORDER BY time' -f (Escape-SqlIdentifier $mapping.SchemaName), (Escape-SqlIdentifier $mapping.TableName))))
-            fieldConfig = @{ defaults = @{ custom = @{ lineWidth = 2; fillOpacity = 10 } } }
-        })
-        $null = $panels.Add([ordered]@{
-            id = (Next-PanelId); title = "$($mapping.WorkflowName) - Recent Runs"; type = 'table'; gridPos = (New-GridPos 7 12 12 $y)
-            targets = @((New-SqlTarget -RefId 'A' -RawSql ('SELECT TOP 20 FlowRunSequenceId AS RunId, Status, TriggerName, CreatedTime, EndTime, DATEDIFF(MILLISECOND, CreatedTime, EndTime) AS Duration_ms FROM [{0}].[{1}] WHERE $__timeFilter(CreatedTime) ORDER BY CreatedTime DESC' -f (Escape-SqlIdentifier $mapping.SchemaName), (Escape-SqlIdentifier $mapping.TableName))))
-            options = @{ showHeader = $true; cellHeight = 'sm' }
-        })
-        $y += 7
-    }
+    # Per-workflow drilldowns moved into the embedded Run Manager so the dashboard
+    # stays single-page and app-selectable.
 
     [ordered]@{
         uid = if ($DashboardUid) { $DashboardUid } else { 'logicapps-monitor' }
@@ -2016,6 +2371,54 @@ EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT',@from,@to,@bmi
         schemaVersion = 39
         # Bump dashboard version each run so Grafana always reloads the latest generated JSON.
         version = [int][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        templating = @{
+            list = @(
+                if ($IncludeLiveAppPanels) {
+                    [ordered]@{
+                        name = 'app'
+                        label = 'App'
+                        type = 'custom'
+                        query = (($DashboardAppNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ',')
+                        current = @{ text = $DashboardAppName; value = $DashboardAppName; selected = $true }
+                        options = @(
+                            $DashboardAppNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object {
+                                @{ text = $_; value = $_; selected = ($_ -eq $DashboardAppName) }
+                            }
+                        )
+                        refresh = 0
+                        allowCustomValue = $false
+                        skipUrlSync = $true
+                        multi = $false
+                        includeAll = $false
+                        hide = 0
+                    }
+                    [ordered]@{
+                        name = 'workflow'
+                        label = 'Workflow'
+                        type = 'query'
+                        datasource = @{ type = 'yesoreyeram-infinity-datasource'; uid = 'logicapps-kpi-api' }
+                        query = @{
+                            parser = 'backend'
+                            type = 'json'
+                            source = 'url'
+                            url = 'http://host.docker.internal:3001/api/workflows?app=' + $grafanaAppVar
+                            root_selector = 'value'
+                            columns = @(@{ selector = 'name'; text = 'name'; type = 'string' })
+                        }
+                        definition = 'http://host.docker.internal:3001/api/workflows?app=' + $grafanaAppVar
+                        current = @{ text = 'All'; value = '$__all'; selected = $true }
+                        options = @()
+                        refresh = 2
+                        allowCustomValue = $false
+                        skipUrlSync = $true
+                        multi = $false
+                        includeAll = $true
+                        allValue = '*'
+                        hide = 2
+                    }
+                }
+            ) | Where-Object { $null -ne $_ }
+        }
         panels = (ConvertTo-AccordionPanels -Panels $panels)
     }
 }
@@ -2043,6 +2446,9 @@ function Invoke-Compose {
 
 function Get-DatasourceYaml {
     $sqlHost = if ($SqlServer -match ':[0-9]+$') { $SqlServer } else { "${SqlServer}:1433" }
+    if ($sqlHost -match '^(localhost|127\.0\.0\.1):') {
+        $sqlHost = $sqlHost -replace '^(localhost|127\.0\.0\.1):', 'host.docker.internal:'
+    }
     # Credentials are NOT written into this file. Grafana interpolates ${SQL_PASSWORD}
     # from the container environment, which is populated by docker-compose env_file
     # (see Get-ComposeYaml) from the out-of-repo credentials file.
@@ -2065,6 +2471,16 @@ function Get-DatasourceYaml {
     $null = $lines.Add('      trustServerCertificate: true')
     $null = $lines.Add('    secureJsonData:')
     $null = $lines.Add('      password: ${SQL_PASSWORD}')
+    $null = $lines.Add('  - name: LogicApps-KPI-API')
+    $null = $lines.Add('    uid: logicapps-kpi-api')
+    $null = $lines.Add('    type: yesoreyeram-infinity-datasource')
+    $null = $lines.Add('    access: proxy')
+    $null = $lines.Add('    editable: true')
+    $null = $lines.Add('    jsonData:')
+    $null = $lines.Add('      auth_method: none')
+    $null = $lines.Add('      allowedHosts:')
+    $null = $lines.Add('        - http://host.docker.internal:3001')
+    $null = $lines.Add('        - http://localhost:3001')
 
     if ($PrometheusUrl) {
         $promDsUrl = $PrometheusUrl
@@ -2154,6 +2570,7 @@ function Get-ComposeYaml {
         '      GF_AUTH_ANONYMOUS_ORG_NAME: "Main Org."',
         '      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"',
         '      GF_FEATURE_TOGGLES_dashboardNewLayouts: "true"',
+        '      GF_INSTALL_PLUGINS: "yesoreyeram-infinity-datasource"',
         '    # Secrets (SQL_PASSWORD, GF_SECURITY_ADMIN_PASSWORD) are injected into the',
         '    # container from the out-of-repo credentials file, never baked into this file.',
         '    env_file:',
@@ -2177,6 +2594,15 @@ function Get-RunManagerScript {
     $portalProjectRoot = ''
     try { $storageShare = Get-SmbShare -Name 'storage' -ErrorAction SilentlyContinue; if ($storageShare -and $storageShare.Path) { $portalProjectRoot = $storageShare.Path } } catch { }
     if ([string]::IsNullOrWhiteSpace($portalProjectRoot)) { $portalProjectRoot = "\\$SqlServer\storage" }
+    $portalSmbHost = Get-FirstEnvironmentValue @('HOST_ACCESS_IP', 'LOGICAPPS_HOST_ACCESS_IP')
+    $portalSmbUser = Get-FirstEnvironmentValue @('LOGICAPPS_SMB_USER', 'SMB_USER', 'LOGICAPPS_STORAGE_USER')
+    $portalSmbPassword = Get-FirstEnvironmentValue @('LOGICAPPS_SMB_PASSWORD', 'SMB_PASSWORD', 'LOGICAPPS_STORAGE_PASSWORD')
+    if ([string]::IsNullOrWhiteSpace($portalSmbHost)) {
+        $portalSmbHost = Get-DefaultSwitchIPv4
+        if (-not [string]::IsNullOrWhiteSpace($portalSmbHost)) {
+            Write-Info "Using Hyper-V Default Switch IP '$portalSmbHost' for SMB host discovery."
+        }
+    }
     $configJson = [ordered]@{
         port         = $RunManagerPort
         logicAppBase = $script:EffectiveLogicAppBaseUrl
@@ -2188,6 +2614,9 @@ function Get-RunManagerScript {
         kubeContext  = $KubeContext
         ocPath       = $ocPathForRunManager
         projectRoot  = $portalProjectRoot
+        smbHost      = $portalSmbHost
+        smbUser      = $portalSmbUser
+        smbPassword  = $portalSmbPassword
     } | ConvertTo-Json -Compress
 
     $existingRunManager = Join-Path $PortalRoot 'run-manager.js'
@@ -2210,6 +2639,7 @@ const fs = require('fs');
 
 const CONFIG = __CONFIG_JSON__;
 const PORT = CONFIG.port;
+const SMB_AUTH_CACHE = new Set();
 
 // Never let a transient upstream error (e.g. the 8088 tunnel dropping during a
 // pod rollover) take the whole manager down — log and keep serving.
@@ -2281,7 +2711,38 @@ function getVolumes() {
 }
 
 function tryParseJson(value) {
-  try { return JSON.parse(value); } catch { return null; }
+  try {
+    const text = String(value == null ? '' : value).replace(/^\uFEFF/, '');
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function tryGetUncShareRoot(inputPath) {
+  const p = String(inputPath || '').trim();
+  const m = p.match(/^\\\\([^\\]+)\\([^\\]+)/);
+  if (!m) return null;
+  return `\\\\${m[1]}\\${m[2]}`;
+}
+
+async function ensureSmbSessionForPath(inputPath) {
+  const user = String(CONFIG.smbUser || '').trim();
+  const pass = String(CONFIG.smbPassword || '').trim();
+  if (!user || !pass) return;
+  const shareRoot = tryGetUncShareRoot(inputPath);
+  if (!shareRoot || SMB_AUTH_CACHE.has(shareRoot)) return;
+  try {
+    await execFileAsync('net', ['use', shareRoot, pass, `/user:${user}`, '/persistent:no'], { windowsHide: true });
+    SMB_AUTH_CACHE.add(shareRoot);
+  } catch (err) {
+    const msg = `${(err && err.stdout) || ''} ${(err && err.stderr) || ''}`.toLowerCase();
+    if (msg.includes('successfully') || msg.includes('1219') || msg.includes('multiple connections')) {
+      SMB_AUTH_CACHE.add(shareRoot);
+      return;
+    }
+    throw new Error(`SMB authentication failed for ${shareRoot}: ${(err && err.message) || err}`);
+  }
 }
 
 function readJsonBody(req) {
@@ -2302,6 +2763,7 @@ function openWorkflowInVSCode(workflow) {
   if (!root) {
     return { ok: false, error: 'Local Logic Apps project root is not configured (CONFIG.projectRoot). Cannot open VS Code.' };
   }
+  ensureSmbSessionForPath(root).catch(() => {});
   if (!workflow || /[\\/]/.test(workflow) || workflow.indexOf('..') !== -1) {
     return { ok: false, error: `Invalid workflow name '${workflow}'.` };
   }
@@ -2428,9 +2890,134 @@ async function setFlowState(name, state) {
   return { workflow: name, state, revisionRollover: true };
 }
 
+function normalizeWorkflowEntryFromDefinition(name, payload) {
+  const doc = payload && typeof payload === 'object' ? payload : {};
+  const definition = (doc.definition && typeof doc.definition === 'object') ? doc.definition : {};
+  const kind = String(doc.kind || definition.kind || '').trim();
+  const triggers = (definition.triggers && typeof definition.triggers === 'object')
+    ? definition.triggers
+    : ((doc.triggers && typeof doc.triggers === 'object') ? doc.triggers : {});
+  return { name, kind, triggers, isDisabled: false, health: { state: 'Unknown' } };
+}
+
+async function listWorkflowsFromVfs() {
+  const dirResult = await makeRequestWithRetry('GET', managementPath('/admin/vfs/home/site/wwwroot/'), undefined, 2);
+  const entries = Array.isArray(dirResult.json) ? dirResult.json : [];
+  const names = [];
+  for (const entry of entries) {
+    const raw = String((entry && entry.name) || '').trim().replace(/[\\/]+$/, '');
+    if (!raw || raw.startsWith('.')) continue;
+    names.push(raw);
+  }
+  if (!names.length) return [];
+
+  const defs = await Promise.all(names.map(async (name) => {
+    try {
+      const result = await makeRequestWithRetry(
+        'GET',
+        managementPath(`/admin/vfs/home/site/wwwroot/${encodeURIComponent(name)}/workflow.json`),
+        undefined,
+        2
+      );
+      if (result.status >= 400 || !result.json) return null;
+      return normalizeWorkflowEntryFromDefinition(name, result.json);
+    } catch {
+      return null;
+    }
+  }));
+  return defs.filter(Boolean);
+}
+
+function findWorkflowNamesOnDisk(root) {
+  let entries = [];
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((e) => e && e.isDirectory && e.isDirectory())
+    .map((e) => e.name)
+    .filter((name) => {
+      try {
+        return fs.existsSync(path.join(root, name, 'workflow.json'));
+      } catch {
+        return false;
+      }
+    });
+}
+
+async function listWorkflowsFromMountedStorage() {
+  const root = CONFIG.projectRoot;
+  if (!root) return [];
+  await ensureSmbSessionForPath(root);
+  const names = findWorkflowNamesOnDisk(root);
+  if (!names.length) return [];
+
+  const scoped = [];
+  for (const name of names) {
+    try {
+      const detail = await makeRequestWithRetry(
+        'GET',
+        managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(name)}`),
+        undefined,
+        1
+      );
+      if (detail.status >= 400 || !detail.json) continue;
+      scoped.push({ ...(detail.json || {}), name });
+    } catch {
+      // ignore per-workflow probe failures
+    }
+  }
+  if (scoped.length) return scoped;
+
+  const out = [];
+  for (const name of names) {
+    try {
+      const wfPath = path.join(root, name, 'workflow.json');
+      let sourcePath = wfPath;
+      if (!fs.existsSync(sourcePath)) {
+        sourcePath = null;
+        const stack = [root];
+        while (stack.length && !sourcePath) {
+          const dir = stack.pop();
+          let entries = [];
+          try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { entries = []; }
+          for (const entry of entries) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) stack.push(full);
+            if (entry.isFile() && entry.name.toLowerCase() === 'workflow.json' && path.basename(path.dirname(full)) === name) {
+              sourcePath = full;
+              break;
+            }
+          }
+        }
+        if (!sourcePath) continue;
+      }
+      const json = tryParseJson(fs.readFileSync(sourcePath, 'utf8')) || {};
+      out.push(normalizeWorkflowEntryFromDefinition(name, json));
+    } catch {
+      // best effort per folder
+    }
+  }
+  return out;
+}
+
 async function listWorkflowsRaw() {
-  const result = await makeRequest('GET', managementPath('/runtime/webhooks/workflow/api/management/workflows'));
-  return (result.json && result.json.value) || (Array.isArray(result.json) ? result.json : []);
+  try {
+    const result = await makeRequestWithRetry('GET', managementPath('/runtime/webhooks/workflow/api/management/workflows'), undefined, 3);
+    const rows = (result.json && result.json.value) || (Array.isArray(result.json) ? result.json : []);
+    if (rows.length) return rows;
+  } catch {}
+  try {
+    const rows = await listWorkflowsFromMountedStorage();
+    if (rows.length) return rows;
+  } catch {}
+  try {
+    const rows = await listWorkflowsFromVfs();
+    if (rows.length) return rows;
+  } catch {}
+  return [];
 }
 
 // Roll up run stats for the last 24h from the management runs API.
@@ -3728,8 +4315,8 @@ const server = http.createServer(async (req, res) => {
 </head>
 <body>
   <script>(function(){try{const p=window.parent&&window.parent.document&&window.parent.document.body;if(p&&(p.classList.contains('theme-dark')||p.getAttribute('data-theme')==='dark'))document.body.classList.add('dark')}catch{} if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)document.body.classList.add('dark');})();</script>
-  <h1>⚡ Logic App Manager</h1>
-  <div id="maxHint" class="muted">Compact view — press <strong>v</strong> or maximize this panel for Live Stream, config &amp; actions.</div>
+  <h1>Logic App Manager</h1>
+  <div id="maxHint" class="muted">Compact view - press <strong>v</strong> or maximize this panel for Live Stream, config &amp; actions.</div>
   <div class="card">
     <div class="row">
       <button class="primary" onclick="refresh()">Refresh</button>
@@ -3743,13 +4330,13 @@ const server = http.createServer(async (req, res) => {
   <div id="replicas"></div>
   <div class="card">
     <div class="row" style="justify-content:space-between;align-items:center;">
-      <h3 style="margin:0;">🔴 Top Errors from Pod Logs</h3>
+      <h3 style="margin:0;">Top Errors from Pod Logs</h3>
       <div class="row">
         <input id="logErrTail" type="number" min="50" max="5000" value="500" title="Lines of log history to scan per pod" style="width:90px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:4px;padding:6px;" />
         <button class="primary" onclick="loadLogErrors()">Scan Recent Logs</button>
       </div>
     </div>
-    <div id="logErrorsMeta" class="muted" style="margin-top:6px;">Scanning recent pod logs…</div>
+    <div id="logErrorsMeta" class="muted" style="margin-top:6px;">Scanning recent pod logs...</div>
     <div id="logErrors" style="margin-top:8px;"></div>
   </div>
   <div class="card">
@@ -3862,7 +4449,7 @@ const server = http.createServer(async (req, res) => {
       const meta = [];
       if (data.lastChecked) meta.push('Last checked: ' + data.lastChecked);
       if (data.message) meta.push(data.message);
-      if (meta.length) html += '<div class="muted" style="margin-top:6px;">' + meta.join(' — ') + '</div>';
+      if (meta.length) html += '<div class="muted" style="margin-top:6px;">' + meta.join(' - ') + '</div>';
       clusterLoginEl.innerHTML = html;
     }
     async function loadClusterLogin(){ try { renderClusterLogin(await api('/api/cluster-login')); } catch(err){ clusterLoginEl.textContent = err.message; } }
@@ -3880,7 +4467,7 @@ const server = http.createServer(async (req, res) => {
       var ready = pods.filter(function(p){ return p.ready; }).length;
       var restarts = pods.reduce(function(a,p){ return a + (Number(p.restarts)||0); }, 0);
       var allReady = pods.length > 0 && ready === pods.length;
-      var icon = allReady ? '✅' : (pods.length ? '❌' : '—');
+      var icon = allReady ? 'OK' : (pods.length ? 'X' : '-');
       var iconColor = allReady ? 'var(--success)' : 'var(--danger)';
       var html = '<div style="margin-bottom:6px;"><strong>App Pods</strong> '
         + '<span style="color:' + iconColor + ';font-weight:600;">' + icon + '</span> '
@@ -3892,7 +4479,7 @@ const server = http.createServer(async (req, res) => {
         html += '<table style="margin-top:8px;"><tr><th>Status</th><th>Pod</th><th>Phase</th><th>Restarts</th></tr>';
         pods.forEach(function(p){
           var ok = !!p.ready && String(p.phase).toLowerCase() === 'running';
-          var st = ok ? '<span style="color:var(--success);font-weight:600;">✅</span>' : '<span style="color:var(--danger);font-weight:600;">❌</span>';
+          var st = ok ? '<span style="color:var(--success);font-weight:600;">OK</span>' : '<span style="color:var(--danger);font-weight:600;">X</span>';
           html += '<tr><td style="text-align:center;">' + st + '</td><td>' + p.pod + '</td><td>' + p.phase + '</td><td>' + p.restarts + '</td></tr>';
         });
         html += '</table>';
@@ -3926,19 +4513,19 @@ const server = http.createServer(async (req, res) => {
       if(!d){ logErrorsEl.textContent = ''; logErrorsMetaEl.textContent = ''; return; }
       var errs = d.errors || [];
       var when = d.capturedAt ? new Date(d.capturedAt).toLocaleString() : '';
-      logErrorsMetaEl.innerHTML = 'Revision <strong>' + escapeHtml(d.revision || '-') + '</strong> &nbsp;•&nbsp; '
+      logErrorsMetaEl.innerHTML = 'Revision <strong>' + escapeHtml(d.revision || '-') + '</strong> &nbsp;|&nbsp; '
         + (d.podsScanned || []).length + ' pod(s), ' + (d.linesScanned || 0) + ' lines scanned, tail=' + (d.tail || 0)
-        + ' &nbsp;•&nbsp; ' + errs.length + ' distinct error group(s)'
-        + (when ? (' &nbsp;•&nbsp; captured ' + escapeHtml(when)) : '');
+        + ' &nbsp;|&nbsp; ' + errs.length + ' distinct error group(s)'
+        + (when ? (' &nbsp;|&nbsp; captured ' + escapeHtml(when)) : '');
       if(!errs.length){
-        logErrorsEl.innerHTML = '<div class="pill" style="color:var(--success);border-color:var(--success);font-weight:600;">✅ No errors found in recent logs.</div>';
+        logErrorsEl.innerHTML = '<div class="pill" style="color:var(--success);border-color:var(--success);font-weight:600;">No errors found in recent logs.</div>';
         return;
       }
       var html = '<table style="table-layout:fixed;width:100%;"><tr>'
         + '<th style="width:70px;">Severity</th><th style="width:56px;">Count</th><th>Recent error line</th><th style="width:150px;">Last seen</th></tr>';
       errs.forEach(function(e){
         var color = e.severity === 'error' ? 'var(--danger)' : 'var(--accent)';
-        var tag = e.severity === 'error' ? '🔴 Error' : '🟠 Warn';
+        var tag = e.severity === 'error' ? 'Error' : 'Warn';
         html += '<tr>'
           + '<td style="color:' + color + ';font-weight:600;white-space:nowrap;">' + tag + '</td>'
           + '<td style="text-align:center;font-weight:600;">' + e.count + '</td>'
@@ -3949,7 +4536,7 @@ const server = http.createServer(async (req, res) => {
       logErrorsEl.innerHTML = html + '</table>';
     }
     async function loadLogErrors(){
-      logErrorsMetaEl.textContent = 'Scanning recent pod logs…';
+      logErrorsMetaEl.textContent = 'Scanning recent pod logs...';
       var tail = (logErrTailEl && logErrTailEl.value) || '500';
       try { renderLogErrors(await api('/api/log-errors?tail=' + encodeURIComponent(tail))); }
       catch(err){ logErrorsMetaEl.textContent = 'Could not scan logs: ' + err.message; logErrorsEl.textContent = ''; }
@@ -4134,6 +4721,7 @@ function Publish-TabbedDashboards {
 }
 
 Write-Step 'Resolving parameters'
+$openShiftUsernameWasExplicit = $PSBoundParameters.ContainsKey('OpenShiftUsername')
 $SqlServer = if (-not [string]::IsNullOrWhiteSpace($SqlServer)) { $SqlServer } else { Get-FirstEnvironmentValue @('SQL_SERVER', 'LOGICAPPS_SQL_SERVER') }
 $SqlDatabase = if (-not [string]::IsNullOrWhiteSpace($SqlDatabase)) { $SqlDatabase } else { Get-FirstEnvironmentValue @('SQL_DATABASE', 'LOGICAPPS_SQL_DATABASE') }
 $SqlUser = if (-not [string]::IsNullOrWhiteSpace($SqlUser)) { $SqlUser } else { Get-FirstEnvironmentValue @('SQL_USER', 'LOGICAPPS_SQL_USER') }
@@ -4148,6 +4736,10 @@ $AppName = if (-not [string]::IsNullOrWhiteSpace($AppName)) { $AppName } else { 
 $ResourceGroup = if (-not [string]::IsNullOrWhiteSpace($ResourceGroup)) { $ResourceGroup } else { Get-FirstEnvironmentValue @('LOGICAPPS_RESOURCE_GROUP', 'RESOURCE_GROUP') }
 $KubeConfigPath = if (-not [string]::IsNullOrWhiteSpace($KubeConfigPath)) { $KubeConfigPath } else { Get-FirstEnvironmentValue @('KUBECONFIG', 'KUBE_CONFIG_PATH') }
 $KubeContext = if (-not [string]::IsNullOrWhiteSpace($KubeContext)) { $KubeContext } else { Get-FirstEnvironmentValue @('KUBE_CONTEXT', 'KUBECONTEXT') }
+$OpenShiftUsername = if ($openShiftUsernameWasExplicit) { $OpenShiftUsername } else { (Get-FirstEnvironmentValue @('OPENSHIFT_USERNAME', 'KUBE_USERNAME', 'OC_USERNAME')) }
+$OpenShiftUsername = if (-not [string]::IsNullOrWhiteSpace($OpenShiftUsername)) { $OpenShiftUsername } else { 'kubeadmin' }
+$OpenShiftPassword = if (-not [string]::IsNullOrWhiteSpace($OpenShiftPassword)) { $OpenShiftPassword } else { Get-FirstEnvironmentValue @('OPENSHIFT_PASSWORD') }
+$OpenShiftToken = if (-not [string]::IsNullOrWhiteSpace($OpenShiftToken)) { $OpenShiftToken } else { Get-FirstEnvironmentValue @('OPENSHIFT_TOKEN') }
 
 if ([string]::IsNullOrWhiteSpace($KubeConfigPath)) {
     $defaultKubeConfig = Join-Path $env:USERPROFILE '.kube\config'
@@ -4190,6 +4782,10 @@ if ([string]::IsNullOrWhiteSpace($script:PrimaryLogicAppName) -and -not [string]
         $script:PrimaryLogicAppName = [string]$discoveredApps[0]
         Write-Info "Using '$script:PrimaryLogicAppName' as the primary Logic App for secret/resource discovery."
     }
+}
+
+if ([string]::IsNullOrWhiteSpace($MasterKey)) {
+    $MasterKey = Try-ResolveMasterKeyFromPodSecrets
 }
 
 if ([string]::IsNullOrWhiteSpace($SqlServer) -or
@@ -4267,27 +4863,34 @@ Ensure-OcCli
 Initialize-KubeConfig
 
 $allAppNames = @()
+$hasLiveAppPanels = $true
 if (-not [string]::IsNullOrWhiteSpace($AppName)) {
     $allAppNames = @($AppName)
 }
 else {
     $allAppNames = @(Get-LogicAppNamesFromNamespace)
     if ($allAppNames.Count -eq 0) {
-        throw "No Logic Apps were discovered in namespace '$Namespace'. Provide -AppName or deploy at least one app."
+        $hasLiveAppPanels = $false
+        Write-Warning "No Logic Apps were discovered in namespace '$Namespace'. Continuing in SQL-only mode."
+        $AppName = ''
     }
     Write-Info "Discovered $($allAppNames.Count) app(s) for dashboard generation: $($allAppNames -join ', ')"
-    $AppName = $allAppNames[0]
-    Write-Info "Using '$AppName' for Workflow/App Manager and port-forward."
+    if ($allAppNames.Count -gt 0) {
+        $AppName = $allAppNames[0]
+        Write-Info "Using '$AppName' for Workflow/App Manager and port-forward."
+    }
 }
 
 Ensure-PortAvailability -PreserveManagedProcesses ([bool]$SkipStart)
 
 $script:EffectiveLogicAppBaseUrl = if ($UsePortForward) { "http://127.0.0.1:$LocalLogicAppPort" } else { $LogicAppBaseUrl.TrimEnd('/') }
-$podResource = Resolve-PodResource
-$portForwardStatus = Start-LogicAppPortForward -PodResource $podResource
-$script:EffectiveLogicAppBaseUrl = $portForwardStatus.BaseUrl
+if ($hasLiveAppPanels) {
+    $podResource = Resolve-PodResource
+    $portForwardStatus = Start-LogicAppPortForward -PodResource $podResource
+    $script:EffectiveLogicAppBaseUrl = $portForwardStatus.BaseUrl
+}
 
-$workflows = Get-WorkflowMetadata
+$workflows = if ($hasLiveAppPanels) { Get-WorkflowMetadata } else { @() }
 $sqlMetadata = Get-SqlMetadata
 $workflowMappings = Get-WorkflowTableMapping -Workflows $workflows -Tables $sqlMetadata.Tables
 # Defensive: only keep mappings whose run table still exists in SQL. Logic Apps drops/recreates
@@ -4296,43 +4899,44 @@ $workflowMappings = Get-WorkflowTableMapping -Workflows $workflows -Tables $sqlM
 $existingTableKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 foreach ($t in $sqlMetadata.Tables) { $null = $existingTableKeys.Add(("{0}.{1}" -f $t.SchemaName, $t.TableName)) }
 $workflowMappings = @($workflowMappings | Where-Object { $existingTableKeys.Contains(("{0}.{1}" -f $_.SchemaName, $_.TableName)) })
-$dashboardDefinitions = New-Object System.Collections.Generic.List[object]
-foreach ($dashboardAppName in $allAppNames) {
-    $slug = Get-SafeDashboardSlug -Value $dashboardAppName
-    $dashboardUid = if ($slug -eq 'default') { 'logicapps-monitor-default' } else { "logicapps-monitor-$slug" }
-    $dashboardTitle = "Logic Apps - Workflow Hub ($dashboardAppName)"
-    $dashboardObject = New-DashboardObject -WorkflowMappings $workflowMappings -JobTable $sqlMetadata.JobTable -HasPrometheus ([bool]$PrometheusUrl) -DashboardAppName $dashboardAppName -DashboardUid $dashboardUid -DashboardTitle $dashboardTitle
-    $dashboardDefinitions.Add([pscustomobject]@{
-        AppName  = $dashboardAppName
-        FileName = "logicapps-workflow-hub-$slug.json"
-        Uid      = $dashboardUid
-        Object   = $dashboardObject
-    })
-}
-
-$firstDashboard = $dashboardDefinitions | Select-Object -First 1
-$script:DefaultDashboardFileName = $firstDashboard.FileName
-$script:DefaultDashboardUid = $firstDashboard.Uid
-Write-PortalFiles -Dashboards $dashboardDefinitions.ToArray()
+$dashboardUid = 'logicapps-monitor'
+$dashboardTitle = 'Logic Apps - Workflow Hub'
+$dashboardObject = New-DashboardObject -WorkflowMappings $workflowMappings -JobTable $sqlMetadata.JobTable -HasPrometheus ([bool]$PrometheusUrl) -DashboardAppName $AppName -DashboardAppNames $allAppNames -DashboardUid $dashboardUid -DashboardTitle $dashboardTitle -IncludeLiveAppPanels $hasLiveAppPanels
+$dashboardDefinitions = @([pscustomobject]@{
+    AppName  = $AppName
+    FileName = 'logicapps-workflow-hub.json'
+    Uid      = $dashboardUid
+    Object   = $dashboardObject
+})
+$script:DefaultDashboardFileName = 'logicapps-workflow-hub.json'
+$script:DefaultDashboardUid = $dashboardUid
+Write-PortalFiles -Dashboards $dashboardDefinitions
 
 if (-not $SkipStart) {
     Start-ThanosTunnel
 
     Write-Step 'Starting Grafana'
-    Invoke-Compose -ComposeArgs @('-f', $ComposeFile, 'up', '-d')
+    Invoke-Compose -ComposeArgs @('-f', $ComposeFile, 'up', '-d', '--force-recreate')
 
-    Write-Step 'Starting Workflow Manager'
-    $null = Start-ManagedProcess -Name 'workflow-manager' -FilePath 'node' -ArgumentList @('workflow-manager.js') -WorkingDirectory $PortalRoot -PidFile $RunManagerPidFile -StdOutLog $RunManagerOutLog -StdErrLog $RunManagerErrLog
-    Wait-PortListening -Port $RunManagerPort -TimeoutSeconds 20 -Description 'Workflow Manager'
+    if ($hasLiveAppPanels) {
+        Write-Step 'Starting Workflow Manager'
+        Stop-ProcessOnPort -Port $RunManagerPort -Name 'Workflow Manager'
+        $null = Start-ManagedProcess -Name 'workflow-manager' -FilePath 'node' -ArgumentList @('workflow-manager.js') -WorkingDirectory $PortalRoot -PidFile $RunManagerPidFile -StdOutLog $RunManagerOutLog -StdErrLog $RunManagerErrLog
+        Wait-PortListening -Port $RunManagerPort -TimeoutSeconds 20 -Description 'Workflow Manager'
 
-    Write-Step 'Starting Logic App Manager'
-    $null = Start-ManagedProcess -Name 'app-manager' -FilePath 'node' -ArgumentList @('app-manager.js') -WorkingDirectory $PortalRoot -PidFile $AppManagerPidFile -StdOutLog $AppManagerOutLog -StdErrLog $AppManagerErrLog
-    Wait-PortListening -Port $AppManagerPort -TimeoutSeconds 20 -Description 'Logic App Manager'
+        Write-Step 'Starting Logic App Manager'
+        Stop-ProcessOnPort -Port $AppManagerPort -Name 'Logic App Manager'
+        $null = Start-ManagedProcess -Name 'app-manager' -FilePath 'node' -ArgumentList @('app-manager.js') -WorkingDirectory $PortalRoot -PidFile $AppManagerPidFile -StdOutLog $AppManagerOutLog -StdErrLog $AppManagerErrLog
+        Wait-PortListening -Port $AppManagerPort -TimeoutSeconds 20 -Description 'Logic App Manager'
+    }
+    else {
+        Write-Info 'SQL-only mode active; skipping Workflow/App Manager startup.'
+    }
 
     Write-Step 'Waiting for Grafana health check'
     Wait-GrafanaHealthy -TimeoutSeconds 120
 
-    Publish-TabbedDashboards -Dashboards $dashboardDefinitions.ToArray()
+    Publish-TabbedDashboards -Dashboards $dashboardDefinitions
 }
 
 $grafanaUrl = "http://localhost:$GrafanaPort/d/$script:DefaultDashboardUid"
