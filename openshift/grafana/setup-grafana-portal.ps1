@@ -228,7 +228,7 @@ function Try-ResolveMasterKeyFromPodSecrets {
         return ''
     }
 
-    $podName = (& oc -n $Namespace get pods -l "containerapps.io/app-name=$targetAppName" -o jsonpath='{.items[0].metadata.name}' 2>$null).Trim()
+    $podName = ([string](& oc -n $Namespace get pods -l "containerapps.io/app-name=$targetAppName" -o jsonpath='{.items[0].metadata.name}' 2>$null)).Trim()
     if ([string]::IsNullOrWhiteSpace($podName)) {
         return ''
     }
@@ -479,7 +479,7 @@ function Resolve-ContainerAppResourceGroup {
         return ''
     }
 
-    $rg = (& az resource list --name $targetAppName --resource-type Microsoft.App/containerApps --query "[0].resourceGroup" -o tsv 2>$null).Trim()
+    $rg = ([string](& az resource list --name $targetAppName --resource-type Microsoft.App/containerApps --query "[0].resourceGroup" -o tsv 2>$null)).Trim()
     if (-not [string]::IsNullOrWhiteSpace($rg)) {
         Write-Info "Resolved resource group '$rg' for container app '$targetAppName'."
         return $rg
@@ -566,7 +566,7 @@ function Try-ResolveSqlSettingsFromPod {
         return $null
     }
 
-    $podName = (& oc -n $Namespace get pods -l "containerapps.io/app-name=$AppName" -o jsonpath='{.items[0].metadata.name}' 2>$null).Trim()
+    $podName = ([string](& oc -n $Namespace get pods -l "containerapps.io/app-name=$AppName" -o jsonpath='{.items[0].metadata.name}' 2>$null)).Trim()
     if ([string]::IsNullOrWhiteSpace($podName)) {
         return $null
     }
@@ -832,7 +832,7 @@ function Try-ResolveLogicAppsNamespace {
         $baseArgs += @('--kubeconfig', $KubeConfigPath)
     }
 
-    $currentNamespace = (& oc @baseArgs config view --minify --output 'jsonpath={..namespace}' 2>$null).Trim()
+    $currentNamespace = ([string](& oc @baseArgs config view --minify --output 'jsonpath={..namespace}' 2>$null)).Trim()
     if (-not [string]::IsNullOrWhiteSpace($currentNamespace)) {
         $podCheck = (& oc @baseArgs -n $currentNamespace get pods -l 'containerapps.io/app-name' -o name 2>$null)
         if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($podCheck)) {
@@ -1361,7 +1361,7 @@ function Resolve-PodResource {
             return $PodSelector
         }
         if ($PodSelector -match '=' -or $PodSelector -match ',') {
-            $podName = (& oc -n $Namespace get pods -l $PodSelector -o jsonpath='{.items[0].metadata.name}' 2>$null).Trim()
+            $podName = ([string](& oc -n $Namespace get pods -l $PodSelector -o jsonpath='{.items[0].metadata.name}' 2>$null)).Trim()
             if (-not $podName) {
                 throw "No pod matched label selector '$PodSelector' in namespace '$Namespace'."
             }
@@ -1383,7 +1383,7 @@ function Resolve-PodResource {
             return "pod/$nameMatch"
         }
 
-        $labelMatch = (& oc -n $Namespace get pods -l "containerapps.io/app-name=$AppName" -o jsonpath='{.items[0].metadata.name}' 2>$null).Trim()
+        $labelMatch = ([string](& oc -n $Namespace get pods -l "containerapps.io/app-name=$AppName" -o jsonpath='{.items[0].metadata.name}' 2>$null)).Trim()
         if ($LASTEXITCODE -eq 0 -and $labelMatch) {
             return "pod/$labelMatch"
         }
@@ -1979,8 +1979,8 @@ ORDER BY Runs DESC
     $topFailedQuery = New-DynamicFlowRunsQuery -QueryBody @'
 SELECT
   FlowName AS Workflow,
-  SUM(CASE WHEN Status = ''Failed'' THEN 1 ELSE 0 END) AS [Failed],
-  CAST(SUM(CASE WHEN Status = ''Failed'' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) AS DECIMAL(5,1)) AS [Failure%]
+  SUM(CASE WHEN Status = 'Failed' THEN 1 ELSE 0 END) AS [Failed],
+  CAST(SUM(CASE WHEN Status = 'Failed' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0) AS DECIMAL(5,1)) AS [Failure%]
 FROM runs
 WHERE 1 = 1 $workflowFilterClause
 GROUP BY FlowName
@@ -2036,7 +2036,7 @@ SELECT TOP 50
   EndTime,
   DATEDIFF(MILLISECOND, CreatedTime, EndTime) AS Duration_ms
 FROM runs
-WHERE Status = ''Failed'' $workflowFilterClause
+WHERE Status = 'Failed' $workflowFilterClause
 ORDER BY CreatedTime DESC
 '@
 
@@ -2092,36 +2092,65 @@ FROM runs
 WHERE 1 = 1 $workflowFilterClause
 '@
     $statusSucceededQuery = New-DynamicFlowRunsQuery -QueryBody @'
-SELECT ''Succeeded'' AS metric, COUNT(*) AS value
+SELECT 'Succeeded' AS metric, COUNT(*) AS value
 FROM runs
-WHERE Status = ''Succeeded'' $workflowFilterClause
+WHERE Status = 'Succeeded' $workflowFilterClause
 '@
     $statusFailedQuery = New-DynamicFlowRunsQuery -QueryBody @'
-SELECT ''Failed'' AS metric, COUNT(*) AS value
+SELECT 'Failed' AS metric, COUNT(*) AS value
 FROM runs
-WHERE Status = ''Failed'' $workflowFilterClause
+WHERE Status = 'Failed' $workflowFilterClause
 '@
     $statusRunningQuery = New-DynamicFlowRunsQuery -QueryBody @'
-SELECT ''Running'' AS metric, COUNT(*) AS value
+SELECT 'Running' AS metric, COUNT(*) AS value
 FROM runs
-WHERE Status = ''Running'' $workflowFilterClause
+WHERE Status = 'Running' $workflowFilterClause
 '@
+
+    # Overview KPI trend stats (Total Runs / Succeeded / Failed) query the durable SQL
+    # run-history tables over the dashboard time range so the stat value AND its sparkline
+    # reflect all runs, not the ~40/workflow cap of the live management KPI API.
+    # NOTE(psrivas): the time bucket is built with DATEADD/DATEDIFF anchored at @from and
+    # is deliberately quote-free. The $__timeGroup macro expands to a date string literal
+    # ('1970-01-01') whose single quotes terminate the dynamic @sql N'...' literal early,
+    # yielding "Must declare the scalar variable @sql". Any Status filter must therefore use
+    # doubled quotes (''Succeeded'') so it survives one level of dynamic-SQL parsing.
+    $kpiTrendTemplate = @'
+SET NOCOUNT ON;
+DECLARE @from DATETIME = $__timeFrom();
+DECLARE @to   DATETIME = $__timeTo();
+DECLARE @bmin INT = CASE WHEN DATEDIFF(MINUTE,@from,@to)<=0 THEN 1 ELSE (DATEDIFF(MINUTE,@from,@to)/120)+1 END;
+DECLARE @union NVARCHAR(MAX)=N'';
+SELECT @union = @union + CASE WHEN @union=N'' THEN N'' ELSE N' UNION ALL ' END +
+   N'SELECT CreatedTime, Status FROM [dt].'+QUOTENAME(t.name)
+FROM sys.tables t JOIN sys.schemas s ON t.schema_id=s.schema_id
+WHERE s.name='dt' AND t.name LIKE 'flow%runs';
+IF @union=N'' SET @union=N'SELECT CAST(NULL AS DATETIME) AS CreatedTime, CAST(NULL AS NVARCHAR(64)) AS Status WHERE 1=0';
+DECLARE @sql NVARCHAR(MAX)=
+  N'SELECT DATEADD(MINUTE,(DATEDIFF(MINUTE,@from,CreatedTime)/@bmin)*@bmin,@from) AS time, COUNT(*) AS [__VALUECOL__]
+    FROM ('+@union+N') x WHERE CreatedTime>=@from AND CreatedTime<@to __STATUSFILTER__
+    GROUP BY DATEADD(MINUTE,(DATEDIFF(MINUTE,@from,CreatedTime)/@bmin)*@bmin,@from) ORDER BY 1';
+EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT',@from,@to,@bmin;
+'@
+    $statTotalRunsQuery = $kpiTrendTemplate.Replace('__VALUECOL__', 'Runs').Replace('__STATUSFILTER__', '')
+    $statSucceededQuery = $kpiTrendTemplate.Replace('__VALUECOL__', 'Succeeded').Replace('__STATUSFILTER__', "AND Status=''Succeeded''")
+    $statFailedQuery    = $kpiTrendTemplate.Replace('__VALUECOL__', 'Failed').Replace('__STATUSFILTER__', "AND Status=''Failed''")
 
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Total Runs'; type = 'stat'; gridPos = (New-GridPos 5 4 0 0)
-        targets = @((New-KpiTimeseriesTarget -Selector 'total'))
+        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $statTotalRunsQuery))
         fieldConfig = @{ defaults = @{ noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'blue' }) } } }
         options = @{ reduceOptions = @{ calcs = @('sum') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'area' }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Succeeded'; type = 'stat'; gridPos = (New-GridPos 5 4 4 0)
-        targets = @((New-KpiTimeseriesTarget -Selector 'succeeded'))
+        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $statSucceededQuery))
         fieldConfig = @{ defaults = @{ noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'green' }) } } }
         options = @{ reduceOptions = @{ calcs = @('sum') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'area' }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Failed'; type = 'stat'; gridPos = (New-GridPos 5 4 8 0)
-        targets = @((New-KpiTimeseriesTarget -Selector 'failed'))
+        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $statFailedQuery))
         fieldConfig = @{ defaults = @{ noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'green' }, @{ value = 1; color = 'red' }) } } }
         options = @{ reduceOptions = @{ calcs = @('sum') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'area' }
     })
@@ -2188,11 +2217,11 @@ WHERE Status = ''Running'' $workflowFilterClause
 
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Logic App Manager'; type = 'text'; gridPos = (New-GridPos 24 24 0 12)
-        options = @{ mode = 'html'; content = "<iframe src='http://localhost:$AppManagerPort/?app=$grafanaAppVar&v=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())' style='width:100%;height:100%;border:none;min-height:720px;'></iframe>" }
+        options = @{ mode = 'html'; content = "<iframe src='http://localhost:$AppManagerPort/?app=$grafanaAppVar&v=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())' style='width:100%;height:100%;border:none;display:block;'></iframe>" }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Workflow Manager'; type = 'text'; gridPos = (New-GridPos 22 24 0 24)
-        options = @{ mode = 'html'; content = "<iframe src='http://localhost:$RunManagerPort/?app=$grafanaAppVar&v=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())' style='width:100%;height:100%;border:none;min-height:900px;'></iframe>" }
+        options = @{ mode = 'html'; content = "<iframe src='http://localhost:$RunManagerPort/?app=$grafanaAppVar&v=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())' style='width:100%;height:100%;border:none;display:block;'></iframe>" }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Run Status Distribution'; type = 'piechart'; gridPos = (New-GridPos 8 8 0 36)
@@ -2253,13 +2282,18 @@ WHERE Status = ''Running'' $workflowFilterClause
         options = @{ showHeader = $true; cellHeight = 'sm'; footer = @{ show = $false } }
     })
 
+    # NOTE: $__timeGroup cannot be used inside a New-DynamicFlowRunsQuery body: the macro
+    # expands to a quoted date literal that terminates the dynamic @sql N'...' string early
+    # ("Must declare the scalar variable @sql"). Bucket manually with DATEADD/DATEDIFF anchored
+    # at @from (a declared sp_executesql parameter) instead. Literals use single quotes because
+    # New-DynamicFlowRunsQuery doubles every quote for the dynamic-SQL layer.
     $runsOverTimeQuery = New-DynamicFlowRunsQuery -QueryBody @'
-SELECT $__timeGroup(CreatedTime,''5m'') AS time,
-  SUM(CASE WHEN Status = ''Succeeded'' THEN 1 ELSE 0 END) AS Succeeded,
-  SUM(CASE WHEN Status = ''Failed'' THEN 1 ELSE 0 END) AS Failed
+SELECT DATEADD(MINUTE, (DATEDIFF(MINUTE, @from, CreatedTime) / 5) * 5, @from) AS time,
+  SUM(CASE WHEN Status = 'Succeeded' THEN 1 ELSE 0 END) AS Succeeded,
+  SUM(CASE WHEN Status = 'Failed' THEN 1 ELSE 0 END) AS Failed
 FROM runs
 WHERE 1 = 1 $workflowFilterClause
-GROUP BY $__timeGroup(CreatedTime,''5m'')
+GROUP BY DATEADD(MINUTE, (DATEDIFF(MINUTE, @from, CreatedTime) / 5) * 5, @from)
 ORDER BY time
 '@
     $null = $panels.Add([ordered]@{
@@ -2299,24 +2333,7 @@ EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT',@from,@to,@bmi
     $totalActionsQuery = $totalTrendTemplate.Replace('__LIKE__', 'flow%actions').Replace('__VALUECOL__', 'Actions')
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Total Runs Over Time'; type = 'timeseries'; gridPos = (New-GridPos 8 24 0 60)
-        targets = @([ordered]@{
-            refId = 'A'
-            type = 'json'
-            source = 'url'
-            format = 'table'
-            parser = 'backend'
-            datasource = @{ type = 'yesoreyeram-infinity-datasource'; uid = 'logicapps-kpi-api' }
-            url = 'http://host.docker.internal:3001/api/kpi/timeseries?window=24h&app=' + $grafanaAppVar
-            url_options = @{ method = 'GET'; data = '' }
-            root_selector = 'series'
-            json_options = @{ columnar = $false; root_is_not_array = $false }
-            columns = @(
-                @{ selector = 'time'; text = 'time'; type = 'timestamp_epoch' },
-                @{ selector = 'total'; text = 'Runs'; type = 'number' }
-            )
-            filters = @()
-            global_query_id = ''
-        })
+        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $totalRunsQuery))
         fieldConfig = @{ defaults = @{ unit = 'none'; decimals = 0; color = @{ mode = 'fixed'; fixedColor = 'blue' }; custom = @{ drawStyle = 'line'; lineInterpolation = 'smooth'; lineWidth = 2; fillOpacity = 10; spanNulls = $true; showPoints = 'never' } } }
         options = @{ legend = @{ showLegend = $true; displayMode = 'list'; placement = 'bottom'; calcs = @('sum', 'max') }; tooltip = @{ mode = 'multi'; sort = 'desc' } }
     })
@@ -4754,7 +4771,7 @@ if ([string]::IsNullOrWhiteSpace($KubeContext) -and (Test-CommandAvailable -Name
     if (-not [string]::IsNullOrWhiteSpace($KubeConfigPath) -and (Test-Path -LiteralPath $KubeConfigPath)) {
         $contextArgs += @('--kubeconfig', $KubeConfigPath)
     }
-    $detectedContext = (& oc @contextArgs config current-context 2>$null).Trim()
+    $detectedContext = ([string](& oc @contextArgs config current-context 2>$null)).Trim()
     if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($detectedContext)) {
         $KubeContext = $detectedContext
         Write-Info "Kube context not provided; using current context '$KubeContext'."
