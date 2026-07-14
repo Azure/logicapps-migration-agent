@@ -1830,7 +1830,15 @@ function New-DashboardObject {
     $grafanaAppVar = '$' + '{app}'
     $grafanaWorkflowVar = '$' + '{workflow}'
     $grafanaWorkflowSql = '$' + '{workflow:sqlstring}'
-    $workflowFilterClause = if ($IncludeLiveAppPanels) { "AND ('" + $grafanaWorkflowVar + "' = '*' OR FlowName IN (" + $grafanaWorkflowSql + "))" } else { '' }
+    $grafanaWorkflowCsv = '$' + '{workflow:csv}'
+    # The filter references the @wf/@sep sp_executesql parameters that New-DynamicFlowRunsQuery
+    # declares from ${workflow:csv} at the TOP level of the generated query. We must NOT inline
+    # ${workflow:sqlstring} here: Grafana expands it to single-quoted text ('name') that would
+    # land INSIDE the dynamic @sql = N'...' literal and terminate it early, yielding
+    # "Operand data type nvarchar is invalid for multiply operator" (the leftover bare * reads
+    # as multiplication) and an empty panel. ${workflow:csv} is unquoted (safe inside N'...')
+    # and is passed as a parameter, then split with STRING_SPLIT using the @sep parameter.
+    $workflowFilterClause = if ($IncludeLiveAppPanels) { "AND (@wf = N'*' OR FlowName IN (SELECT LTRIM(RTRIM(value)) FROM STRING_SPLIT(@wf, @sep)))" } else { '' }
     $podRegex = '^' + $grafanaAppVar + '.*'
 
     function Next-PanelId {
@@ -1903,6 +1911,8 @@ function New-DashboardObject {
 DECLARE @from DATETIME = `$__timeFrom();
 DECLARE @to DATETIME = `$__timeTo();
 DECLARE @workflow NVARCHAR(512) = N'$escapedWorkflow';
+DECLARE @wf NVARCHAR(MAX) = N'$grafanaWorkflowCsv';
+DECLARE @sep NCHAR(1) = N',';
 DECLARE @u NVARCHAR(MAX) = N'';
 SELECT @u = @u + CASE WHEN @u = N'' THEN N'' ELSE N' UNION ALL ' END +
   N'SELECT CreatedTime, EndTime, Status, TriggerName, FlowRunSequenceId, Code, COALESCE(NULLIF(LTRIM(RTRIM(FlowName)),''''), N''' + REPLACE(t.name,'''','''''') + N''') AS FlowName FROM [$escapedSchema].[' + t.name + N']'
@@ -1918,7 +1928,7 @@ WITH runs AS (
     AND src.CreatedTime < @to
 )
 $escapedBody';
-EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@workflow NVARCHAR(512)', @from = @from, @to = @to, @workflow = @workflow;
+EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@workflow NVARCHAR(512),@wf NVARCHAR(MAX),@sep NCHAR(1)', @from = @from, @to = @to, @workflow = @workflow, @wf = @wf, @sep = @sep;
 "@
     }
 
