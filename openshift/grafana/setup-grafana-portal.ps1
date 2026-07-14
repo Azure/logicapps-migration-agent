@@ -2091,20 +2091,16 @@ SELECT CAST(ISNULL(SUM(CASE WHEN Status = ''Succeeded'' THEN 1 ELSE 0 END) * 100
 FROM runs
 WHERE 1 = 1 $workflowFilterClause
 '@
-    $statusSucceededQuery = New-DynamicFlowRunsQuery -QueryBody @'
-SELECT 'Succeeded' AS metric, COUNT(*) AS value
-FROM runs
-WHERE Status = 'Succeeded' $workflowFilterClause
-'@
-    $statusFailedQuery = New-DynamicFlowRunsQuery -QueryBody @'
-SELECT 'Failed' AS metric, COUNT(*) AS value
-FROM runs
-WHERE Status = 'Failed' $workflowFilterClause
-'@
-    $statusRunningQuery = New-DynamicFlowRunsQuery -QueryBody @'
-SELECT 'Running' AS metric, COUNT(*) AS value
-FROM runs
-WHERE Status = 'Running' $workflowFilterClause
+    # Single query returns all three status categories as fixed rows (so zero-count
+    # states still render) for the donut. A one-frame [metric, value] result is the
+    # canonical piechart input with reduceOptions.values=true; the previous 3-target +
+    # merge shape did not render reliably on Grafana 13.
+    $statusDistributionQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT 'Succeeded' AS metric, SUM(CASE WHEN Status = 'Succeeded' THEN 1 ELSE 0 END) AS value FROM runs WHERE 1 = 1 $workflowFilterClause
+UNION ALL
+SELECT 'Failed' AS metric, SUM(CASE WHEN Status = 'Failed' THEN 1 ELSE 0 END) AS value FROM runs WHERE 1 = 1 $workflowFilterClause
+UNION ALL
+SELECT 'Running' AS metric, SUM(CASE WHEN Status = 'Running' THEN 1 ELSE 0 END) AS value FROM runs WHERE 1 = 1 $workflowFilterClause
 '@
 
     # Overview KPI trend stats (Total Runs / Succeeded / Failed) query the durable SQL
@@ -2226,11 +2222,8 @@ EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT',@from,@to,@bmi
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Run Status Distribution'; type = 'piechart'; gridPos = (New-GridPos 8 8 0 36)
         targets = @(
-            (New-SqlTarget -RefId 'A' -RawSql $statusSucceededQuery),
-            (New-SqlTarget -RefId 'B' -RawSql $statusFailedQuery),
-            (New-SqlTarget -RefId 'C' -RawSql $statusRunningQuery)
+            (New-SqlTarget -RefId 'A' -RawSql $statusDistributionQuery)
         )
-        transformations = @(@{ id = 'merge'; options = @{} })
         fieldConfig = @{ overrides = @(
             @{ matcher = @{ id = 'byName'; options = 'Succeeded' }; properties = @(@{ id = 'color'; value = @{ fixedColor = 'green'; mode = 'fixed' } }) },
             @{ matcher = @{ id = 'byName'; options = 'Failed' }; properties = @(@{ id = 'color'; value = @{ fixedColor = 'red'; mode = 'fixed' } }) },
