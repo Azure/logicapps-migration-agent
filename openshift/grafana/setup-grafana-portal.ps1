@@ -1325,6 +1325,7 @@ function Invoke-LogicAppRequest {
     # with backoff so the runtime has time to finish booting.
     $maxAttempts = 30
     $delaySeconds = 5
+    $refreshedMasterKey = $false
     for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
         try {
             return Invoke-RestMethod @params
@@ -1335,6 +1336,37 @@ function Invoke-LogicAppRequest {
                 $statusCode = [int]$_.Exception.Response.StatusCode
             }
             $message = $_.Exception.Message
+
+            if ($statusCode -eq 401 -and -not $refreshedMasterKey -and $RelativePath -match '(^|[?&])code=') {
+                $resolvedKey = Try-ResolveMasterKeyFromHostSecrets
+                if ([string]::IsNullOrWhiteSpace($resolvedKey)) {
+                    $resolvedKey = Try-ResolveMasterKeyFromPodSecrets
+                }
+                if (-not [string]::IsNullOrWhiteSpace($resolvedKey)) {
+                    $MasterKey = $resolvedKey
+                    $escapedKey = [uri]::EscapeDataString($MasterKey)
+                    if ($RelativePath -match '([?&])code=[^&]*') {
+                        $separator = [string]$matches[1]
+                        $RelativePath = $RelativePath -replace '([?&])code=[^&]*', ($separator + 'code=' + $escapedKey)
+                    }
+                    elseif ($RelativePath -match '\?') {
+                        $RelativePath = "$RelativePath&code=$escapedKey"
+                    }
+                    else {
+                        $RelativePath = "$RelativePath?code=$escapedKey"
+                    }
+                    $uri = Resolve-LogicAppUrl -RelativePath $RelativePath
+                    $params.Uri = $uri
+                    if (-not [string]::IsNullOrWhiteSpace($script:LogicAppHostName) -and
+                        ([uri]$uri).Host -match '^(localhost|127\.0\.0\.1)$') {
+                        $params.Headers = @{ Host = $script:LogicAppHostName }
+                    }
+                    $refreshedMasterKey = $true
+                    Write-Warning "Logic Apps API returned 401. Refreshed master key from host/pod secrets and retrying request."
+                    continue
+                }
+            }
+
             $isTransient = ($statusCode -eq 503) -or ($statusCode -eq 502) -or ($statusCode -eq 504) -or
                 ($message -match 'actively refused|connection (was )?refused|ECONNREFUSED|unable to connect|connection reset|timed out|Service Unavailable')
 
@@ -1501,7 +1533,18 @@ function Get-WorkflowMetadata {
     Write-Step 'Discovering workflows from Logic Apps management API'
 
     $code = [uri]::EscapeDataString($MasterKey)
-    $response = Invoke-LogicAppRequest -Method GET -RelativePath "/runtime/webhooks/workflow/api/management/workflows?api-version=2020-05-01-preview&code=$code"
+    try {
+        $response = Invoke-LogicAppRequest -Method GET -RelativePath "/runtime/webhooks/workflow/api/management/workflows?api-version=2020-05-01-preview&code=$code"
+    }
+    catch {
+        $msg = $_.Exception.Message
+        if ($msg -match '\(401\)|Unauthorized') {
+            Write-Warning 'Logic Apps management API returned 401 while discovering workflows. Continuing with SQL-only mapping.'
+            return @()
+        }
+        throw
+    }
+    $code = [uri]::EscapeDataString($MasterKey)
     $workflowItems = @(
         if ($response -and ($response.PSObject.Properties.Name -contains 'value')) { @($response.value) } else { @($response) }
     )
@@ -1513,7 +1556,21 @@ function Get-WorkflowMetadata {
     $workflows = @(
         foreach ($workflow in $workflowItems) {
         $workflowName = [string]$workflow.name
-        $detail = Invoke-LogicAppRequest -Method GET -RelativePath ("/runtime/webhooks/workflow/api/management/workflows/{0}?api-version=2020-05-01-preview&code={1}" -f ([uri]::EscapeDataString($workflowName)), $code)
+        $code = [uri]::EscapeDataString($MasterKey)
+        $detail = $null
+        try {
+            $detail = Invoke-LogicAppRequest -Method GET -RelativePath ("/runtime/webhooks/workflow/api/management/workflows/{0}?api-version=2020-05-01-preview&code={1}" -f ([uri]::EscapeDataString($workflowName)), $code)
+        }
+        catch {
+            $msg = $_.Exception.Message
+            if ($msg -match '\(401\)|Unauthorized') {
+                Write-Warning "Skipping workflow detail lookup for '$workflowName' due to 401 Unauthorized."
+                $detail = $workflow
+            }
+            else {
+                throw
+            }
+        }
         $triggerSource = $detail.triggers
         if (-not $triggerSource -and $detail.properties) {
             $triggerSource = $detail.properties.triggers
@@ -1747,7 +1804,7 @@ function ConvertTo-AccordionPanels {
         @{ Title = 'Overview & Health'; Titles = @('Total Runs','Succeeded','Failed','Avg Duration','Retry Count','Success Rate','Cluster Pods','Pods Running','Pods Failed','Pods CrashLooping','Pods Pending','Cluster Health Rate','Pod Health (per Pod)','Volume Mounts') }
         @{ Title = 'Management'; Titles = @('Logic App Manager') }
         @{ Title = 'Workflows'; Titles = @('Workflow Manager','Run Status Distribution','P50 / P95 / P99 Latency (sec)','Top Failed Workflows','Runs Over Time (All Workflows)','Execution Duration Over Time','Workflow Execution Errors (SQL)'); Like = @('* - Runs Over Time','* - Recent Runs') }
-        @{ Title = 'Resource Metrics'; Titles = @('Total Runs Over Time','Total Action Executions Over Time','Pod Instances','CPU Usage (cores)','Memory Usage (MB)','CPU by Container','Memory by Container (MB)','Network I/O','Pod Restarts','Infrastructure Metrics') }
+        @{ Title = 'Resource Metrics'; Titles = @('Total Runs Over Time','Total Action Executions Over Time','SQL Operations / sec (Query Store)','SQL Avg Duration & CPU (ms)','SQL Wait Stats by Category','SQL Top Queries by Total Duration','Pod Instances','CPU Usage (cores)','Memory Usage (MB)','CPU by Container','Memory by Container (MB)','Network I/O','Pod Restarts','Infrastructure Metrics') }
     )
     $otherTitle = 'Other'
 
@@ -1838,7 +1895,7 @@ function New-DashboardObject {
     # "Operand data type nvarchar is invalid for multiply operator" (the leftover bare * reads
     # as multiplication) and an empty panel. ${workflow:csv} is unquoted (safe inside N'...')
     # and is passed as a parameter, then split with STRING_SPLIT using the @sep parameter.
-    $workflowFilterClause = if ($IncludeLiveAppPanels) { "AND (@wf = N'*' OR FlowName IN (SELECT LTRIM(RTRIM(value)) FROM STRING_SPLIT(@wf, @sep)))" } else { '' }
+    $workflowFilterClause = if ($IncludeLiveAppPanels) { "AND (@wf IN (N'', N'*') OR FlowName IN (SELECT LTRIM(RTRIM(value)) FROM STRING_SPLIT(@wf, @sep)))" } else { '' }
     $podRegex = '^' + $grafanaAppVar + '.*'
 
     function Next-PanelId {
@@ -2068,6 +2125,17 @@ ORDER BY CreatedTime DESC
         $allExecutionTargets += New-SqlTarget -RefId $refId -Format 'time_series' -RawSql (New-DynamicFlowRunsQuery -WorkflowName $mapping.WorkflowName -QueryBody ('SELECT CreatedTime AS time, DATEDIFF(MILLISECOND, CreatedTime, EndTime) AS [{0}] FROM runs WHERE EndTime IS NOT NULL AND EndTime > CreatedTime ORDER BY time' -f (Escape-SqlIdentifier $mapping.WorkflowName)))
     }
 
+    # Define upfront so strict-mode never sees an uninitialized variable during panel assembly.
+    $runsOverTimeQuery = New-DynamicFlowRunsQuery -QueryBody @'
+SELECT DATEADD(MINUTE, (DATEDIFF(MINUTE, @from, CreatedTime) / 5) * 5, @from) AS time,
+  SUM(CASE WHEN Status = 'Succeeded' THEN 1 ELSE 0 END) AS Succeeded,
+  SUM(CASE WHEN Status = 'Failed' THEN 1 ELSE 0 END) AS Failed
+FROM runs
+WHERE 1 = 1 $workflowFilterClause
+GROUP BY DATEADD(MINUTE, (DATEDIFF(MINUTE, @from, CreatedTime) / 5) * 5, @from)
+ORDER BY time
+'@
+
     $totalRunsQuery = New-DynamicFlowRunsQuery -QueryBody @'
 SELECT $__timeGroupAlias(CreatedTime, $__interval), COUNT(*) AS [Total Runs]
 FROM runs
@@ -2129,7 +2197,7 @@ FROM sys.tables t JOIN sys.schemas s ON t.schema_id=s.schema_id
 WHERE s.name='__SCHEMA__' AND t.name LIKE 'flow%runs';
 IF @union=N'' SET @union=N'SELECT CAST(NULL AS NVARCHAR(64)) AS Status, CAST(NULL AS NVARCHAR(255)) AS FlowName, CAST(NULL AS DATETIME) AS CreatedTime WHERE 1=0';
 DECLARE @sql NVARCHAR(MAX)=
-  N'WITH runs AS (SELECT Status, FlowName, CreatedTime FROM ('+@union+N') x WHERE CreatedTime>=@from AND CreatedTime<@to AND (@wf=N''*'' OR FlowName IN (SELECT LTRIM(RTRIM(value)) FROM STRING_SPLIT(@wf, @sep))))
+  N'WITH runs AS (SELECT Status, FlowName, CreatedTime FROM ('+@union+N') x WHERE CreatedTime>=@from AND CreatedTime<@to AND (@wf IN (N'''', N''*'') OR FlowName IN (SELECT LTRIM(RTRIM(value)) FROM STRING_SPLIT(@wf, @sep))))
     SELECT ''Succeeded'' AS metric, COALESCE(SUM(CASE WHEN Status=''Succeeded'' THEN 1 ELSE 0 END),0) AS value FROM runs
     UNION ALL SELECT ''Failed'', COALESCE(SUM(CASE WHEN Status=''Failed'' THEN 1 ELSE 0 END),0) FROM runs
     UNION ALL SELECT ''Running'', COALESCE(SUM(CASE WHEN Status=''Running'' THEN 1 ELSE 0 END),0) FROM runs';
@@ -2150,17 +2218,19 @@ SET NOCOUNT ON;
 DECLARE @from DATETIME = $__timeFrom();
 DECLARE @to   DATETIME = $__timeTo();
 DECLARE @bmin INT = CASE WHEN DATEDIFF(MINUTE,@from,@to)<=0 THEN 1 ELSE (DATEDIFF(MINUTE,@from,@to)/120)+1 END;
-DECLARE @union NVARCHAR(MAX)=N'';
-SELECT @union = @union + CASE WHEN @union=N'' THEN N'' ELSE N' UNION ALL ' END +
-   N'SELECT CreatedTime, Status FROM [dt].'+QUOTENAME(t.name)
-FROM sys.tables t JOIN sys.schemas s ON t.schema_id=s.schema_id
-WHERE s.name='dt' AND t.name LIKE 'flow%runs';
-IF @union=N'' SET @union=N'SELECT CAST(NULL AS DATETIME) AS CreatedTime, CAST(NULL AS NVARCHAR(64)) AS Status WHERE 1=0';
-DECLARE @sql NVARCHAR(MAX)=
-  N'SELECT DATEADD(MINUTE,(DATEDIFF(MINUTE,@from,CreatedTime)/@bmin)*@bmin,@from) AS time, COUNT(*) AS [__VALUECOL__]
-    FROM ('+@union+N') x WHERE CreatedTime>=@from AND CreatedTime<@to __STATUSFILTER__
-    GROUP BY DATEADD(MINUTE,(DATEDIFF(MINUTE,@from,CreatedTime)/@bmin)*@bmin,@from) ORDER BY 1';
-EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT',@from,@to,@bmin;
+    DECLARE @wf NVARCHAR(MAX) = N'${workflow:csv}';
+    DECLARE @sep NCHAR(1) = N',';
+    DECLARE @union NVARCHAR(MAX)=N'';
+    SELECT @union = @union + CASE WHEN @union=N'' THEN N'' ELSE N' UNION ALL ' END +
+       N'SELECT CreatedTime, Status, COALESCE(NULLIF(LTRIM(RTRIM(FlowName)),''''),'''+t.name+''') AS FlowName FROM [dt].'+QUOTENAME(t.name)
+    FROM sys.tables t JOIN sys.schemas s ON t.schema_id=s.schema_id
+    WHERE s.name='dt' AND t.name LIKE 'flow%runs';
+    IF @union=N'' SET @union=N'SELECT CAST(NULL AS DATETIME) AS CreatedTime, CAST(NULL AS NVARCHAR(64)) AS Status, CAST(NULL AS NVARCHAR(255)) AS FlowName WHERE 1=0';
+    DECLARE @sql NVARCHAR(MAX)=
+      N'SELECT DATEADD(MINUTE,(DATEDIFF(MINUTE,@from,CreatedTime)/@bmin)*@bmin,@from) AS time, COUNT(*) AS [__VALUECOL__]
+        FROM ('+@union+N') x WHERE CreatedTime>=@from AND CreatedTime<@to AND (@wf IN (N'''', N''*'') OR FlowName IN (SELECT LTRIM(RTRIM(value)) FROM STRING_SPLIT(@wf, @sep))) __STATUSFILTER__
+        GROUP BY DATEADD(MINUTE,(DATEDIFF(MINUTE,@from,CreatedTime)/@bmin)*@bmin,@from) ORDER BY 1';
+    EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT,@wf NVARCHAR(MAX),@sep NCHAR(1)',@from,@to,@bmin,@wf,@sep;
 '@
     $statTotalRunsQuery = $kpiTrendTemplate.Replace('__VALUECOL__', 'Runs').Replace('__STATUSFILTER__', '')
     $statSucceededQuery = $kpiTrendTemplate.Replace('__VALUECOL__', 'Succeeded').Replace('__STATUSFILTER__', "AND Status=''Succeeded''")
@@ -2168,21 +2238,21 @@ EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT',@from,@to,@bmi
 
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Total Runs'; type = 'stat'; gridPos = (New-GridPos 5 4 0 0)
-        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $statTotalRunsQuery))
+        targets = @((New-KpiApiTarget -Selector 'totalRuns'))
         fieldConfig = @{ defaults = @{ noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'blue' }) } } }
-        options = @{ reduceOptions = @{ calcs = @('sum') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'area' }
+        options = @{ reduceOptions = @{ calcs = @('lastNotNull') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'none' }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Succeeded'; type = 'stat'; gridPos = (New-GridPos 5 4 4 0)
-        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $statSucceededQuery))
+        targets = @((New-KpiApiTarget -Selector 'succeeded'))
         fieldConfig = @{ defaults = @{ noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'green' }) } } }
-        options = @{ reduceOptions = @{ calcs = @('sum') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'area' }
+        options = @{ reduceOptions = @{ calcs = @('lastNotNull') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'none' }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Failed'; type = 'stat'; gridPos = (New-GridPos 5 4 8 0)
-        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $statFailedQuery))
+        targets = @((New-KpiApiTarget -Selector 'failed'))
         fieldConfig = @{ defaults = @{ noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'green' }, @{ value = 1; color = 'red' }) } } }
-        options = @{ reduceOptions = @{ calcs = @('sum') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'area' }
+        options = @{ reduceOptions = @{ calcs = @('lastNotNull') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'none' }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Avg Duration'; type = 'stat'; gridPos = (New-GridPos 5 4 12 0)
@@ -2344,23 +2414,72 @@ SET NOCOUNT ON;
 DECLARE @from DATETIME = $__timeFrom();
 DECLARE @to   DATETIME = $__timeTo();
 DECLARE @bmin INT = CASE WHEN DATEDIFF(MINUTE,@from,@to)<=0 THEN 1 ELSE (DATEDIFF(MINUTE,@from,@to)/120)+1 END;
+DECLARE @wf NVARCHAR(MAX) = N'${workflow:csv}';
+DECLARE @sep NCHAR(1) = N',';
 DECLARE @union NVARCHAR(MAX)=N'';
 SELECT @union = @union + CASE WHEN @union=N'' THEN N'' ELSE N' UNION ALL ' END +
-   N'SELECT CreatedTime FROM [dt].'+QUOTENAME(t.name)
+   N'SELECT CreatedTime, COALESCE(NULLIF(LTRIM(RTRIM(FlowName)),''''),'''+t.name+''') AS FlowName FROM [dt].'+QUOTENAME(t.name)
 FROM sys.tables t JOIN sys.schemas s ON t.schema_id=s.schema_id
 WHERE s.name='dt' AND t.name LIKE '__LIKE__';
-IF @union=N'' SET @union=N'SELECT CAST(NULL AS DATETIME) AS CreatedTime WHERE 1=0';
+IF @union=N'' SET @union=N'SELECT CAST(NULL AS DATETIME) AS CreatedTime, CAST(NULL AS NVARCHAR(255)) AS FlowName WHERE 1=0';
 DECLARE @sql NVARCHAR(MAX)=
   N'SELECT DATEADD(MINUTE,(DATEDIFF(MINUTE,@from,CreatedTime)/@bmin)*@bmin,@from) AS time, COUNT(*) AS [__VALUECOL__]
-    FROM ('+@union+N') x WHERE CreatedTime>=@from AND CreatedTime<@to
+    FROM ('+@union+N') x WHERE CreatedTime>=@from AND CreatedTime<@to AND (@wf IN (N'''', N''*'') OR FlowName IN (SELECT LTRIM(RTRIM(value)) FROM STRING_SPLIT(@wf, @sep)))
     GROUP BY DATEADD(MINUTE,(DATEDIFF(MINUTE,@from,CreatedTime)/@bmin)*@bmin,@from) ORDER BY 1';
-EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT',@from,@to,@bmin;
+EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT,@wf NVARCHAR(MAX),@sep NCHAR(1)',@from,@to,@bmin,@wf,@sep;
 '@
     $totalRunsQuery = $totalTrendTemplate.Replace('__LIKE__', 'flow%runs').Replace('__VALUECOL__', 'Runs')
     $totalActionsQuery = $totalTrendTemplate.Replace('__LIKE__', 'flow%actions').Replace('__VALUECOL__', 'Actions')
+    $qsOpsPerSecQuery = @'
+SELECT
+  rsi.start_time AS time,
+  CAST(SUM(rs.count_executions) * 1.0 / NULLIF(DATEDIFF(SECOND, rsi.start_time, rsi.end_time), 0) AS DECIMAL(18,2)) AS [SQL Ops/sec]
+FROM sys.query_store_runtime_stats rs
+JOIN sys.query_store_runtime_stats_interval rsi ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
+WHERE $__timeFilter(rsi.start_time)
+GROUP BY rsi.start_time, rsi.end_time
+ORDER BY rsi.start_time
+'@
+    $qsLatencyCpuQuery = @'
+SELECT
+  rsi.start_time AS time,
+  CAST(SUM(rs.avg_duration * rs.count_executions) / NULLIF(SUM(rs.count_executions), 0) / 1000.0 AS DECIMAL(12,2)) AS [Avg ms],
+  CAST(SUM(rs.avg_cpu_time * rs.count_executions) / NULLIF(SUM(rs.count_executions), 0) / 1000.0 AS DECIMAL(12,2)) AS [CPU ms]
+FROM sys.query_store_runtime_stats rs
+JOIN sys.query_store_runtime_stats_interval rsi ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
+WHERE $__timeFilter(rsi.start_time)
+GROUP BY rsi.start_time
+ORDER BY rsi.start_time
+'@
+    $qsWaitCategoryQuery = @'
+SELECT
+  ws.wait_category_desc AS [Wait Category],
+  CAST(SUM(ws.total_query_wait_time_ms) AS BIGINT) AS [Total Wait ms],
+  CAST(SUM(ws.avg_query_wait_time_ms * ws.count_executions) / NULLIF(SUM(ws.count_executions), 0) AS DECIMAL(12,2)) AS [Avg Wait ms],
+  SUM(ws.count_executions) AS [Execs]
+FROM sys.query_store_wait_stats ws
+GROUP BY ws.wait_category_desc
+ORDER BY [Total Wait ms] DESC
+'@
+    $qsTopDurationQuery = @'
+SELECT TOP 20
+  q.query_id AS [Query ID],
+  SUBSTRING(t.query_sql_text, 1, 180) AS [SQL],
+  SUM(rs.count_executions) AS [Execs],
+  CAST(SUM(rs.avg_duration * rs.count_executions) / 1000.0 AS DECIMAL(18,1)) AS [Total ms],
+  CAST(AVG(rs.avg_duration) / 1000.0 AS DECIMAL(12,2)) AS [Avg ms],
+  CAST(AVG(rs.avg_cpu_time) / 1000.0 AS DECIMAL(12,2)) AS [Avg CPU ms],
+  CAST(AVG(rs.avg_logical_io_reads) AS BIGINT) AS [Avg Reads]
+FROM sys.query_store_runtime_stats rs
+JOIN sys.query_store_plan p ON rs.plan_id = p.plan_id
+JOIN sys.query_store_query q ON p.query_id = q.query_id
+JOIN sys.query_store_query_text t ON q.query_text_id = t.query_text_id
+GROUP BY q.query_id, t.query_sql_text
+ORDER BY [Total ms] DESC
+'@
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Total Runs Over Time'; type = 'timeseries'; gridPos = (New-GridPos 8 24 0 60)
-        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $totalRunsQuery))
+        targets = @((New-KpiTimeseriesTarget -Selector 'total'))
         fieldConfig = @{ defaults = @{ unit = 'none'; decimals = 0; color = @{ mode = 'fixed'; fixedColor = 'blue' }; custom = @{ drawStyle = 'line'; lineInterpolation = 'smooth'; lineWidth = 2; fillOpacity = 10; spanNulls = $true; showPoints = 'never' } } }
         options = @{ legend = @{ showLegend = $true; displayMode = 'list'; placement = 'bottom'; calcs = @('sum', 'max') }; tooltip = @{ mode = 'multi'; sort = 'desc' } }
     })
@@ -2370,8 +2489,30 @@ EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT',@from,@to,@bmi
         fieldConfig = @{ defaults = @{ unit = 'none'; decimals = 0; color = @{ mode = 'fixed'; fixedColor = 'purple' }; custom = @{ drawStyle = 'line'; lineInterpolation = 'smooth'; lineWidth = 2; fillOpacity = 10; spanNulls = $true; showPoints = 'never' } } }
         options = @{ legend = @{ showLegend = $true; displayMode = 'list'; placement = 'bottom'; calcs = @('sum', 'max') }; tooltip = @{ mode = 'multi'; sort = 'desc' } }
     })
+    $null = $panels.Add([ordered]@{
+        id = (Next-PanelId); title = 'SQL Operations / sec (Query Store)'; type = 'timeseries'; gridPos = (New-GridPos 8 12 0 76)
+        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $qsOpsPerSecQuery))
+        fieldConfig = @{ defaults = @{ unit = 'short'; decimals = 2; color = @{ mode = 'fixed'; fixedColor = 'blue' }; custom = @{ drawStyle = 'bars'; lineWidth = 1; fillOpacity = 35; spanNulls = $true; showPoints = 'never' } } }
+        options = @{ legend = @{ showLegend = $true; displayMode = 'list'; placement = 'bottom'; calcs = @('mean', 'max') }; tooltip = @{ mode = 'multi'; sort = 'desc' } }
+    })
+    $null = $panels.Add([ordered]@{
+        id = (Next-PanelId); title = 'SQL Avg Duration & CPU (ms)'; type = 'timeseries'; gridPos = (New-GridPos 8 12 12 76)
+        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $qsLatencyCpuQuery))
+        fieldConfig = @{ defaults = @{ unit = 'ms'; decimals = 2; custom = @{ drawStyle = 'line'; lineWidth = 2; fillOpacity = 10; spanNulls = $true; showPoints = 'never' } } }
+        options = @{ legend = @{ showLegend = $true; displayMode = 'list'; placement = 'bottom'; calcs = @('mean', 'max') }; tooltip = @{ mode = 'multi'; sort = 'desc' } }
+    })
+    $null = $panels.Add([ordered]@{
+        id = (Next-PanelId); title = 'SQL Wait Stats by Category'; type = 'table'; gridPos = (New-GridPos 8 12 0 84)
+        targets = @((New-SqlTarget -RefId 'A' -RawSql $qsWaitCategoryQuery))
+        options = @{ showHeader = $true; cellHeight = 'sm' }
+    })
+    $null = $panels.Add([ordered]@{
+        id = (Next-PanelId); title = 'SQL Top Queries by Total Duration'; type = 'table'; gridPos = (New-GridPos 8 12 12 84)
+        targets = @((New-SqlTarget -RefId 'A' -RawSql $qsTopDurationQuery))
+        options = @{ showHeader = $true; cellHeight = 'sm' }
+    })
 
-    $y = 64
+    $y = 92
     if ($HasPrometheus) {
         $null = $panels.Add([ordered]@{ id = (Next-PanelId); title = 'Pod Instances'; type = 'timeseries'; datasource = $PrometheusDatasourceName; gridPos = (New-GridPos 7 8 0 $y); targets = @((New-PromTarget -RefId 'A' -Expr "count(kube_pod_info{namespace=`"$Namespace`",pod=~`"$podRegex`"})" -LegendFormat 'Running Instances')); fieldConfig = @{ defaults = @{ custom = @{ lineWidth = 2; fillOpacity = 20 }; color = @{ fixedColor = 'blue'; mode = 'fixed' }; decimals = 0 } } })
         $null = $panels.Add([ordered]@{ id = (Next-PanelId); title = 'CPU Usage (cores)'; type = 'timeseries'; datasource = $PrometheusDatasourceName; gridPos = (New-GridPos 7 8 8 $y); targets = @((New-PromTarget -RefId 'A' -Expr "sum(rate(container_cpu_usage_seconds_total{namespace=`"$Namespace`",pod=~`"$podRegex`",container=`"logicapps-container`"}[5m]))" -LegendFormat 'CPU Used'), (New-PromTarget -RefId 'B' -Expr "sum(kube_pod_container_resource_limits{namespace=`"$Namespace`",pod=~`"$podRegex`",container=`"logicapps-container`",resource=`"cpu`"})" -LegendFormat 'CPU Limit')); fieldConfig = @{ defaults = @{ unit = 'short'; custom = @{ lineWidth = 2; fillOpacity = 15 } } } })
@@ -2457,7 +2598,7 @@ EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT',@from,@to,@bmi
                         skipUrlSync = $true
                         multi = $false
                         includeAll = $true
-                        allValue = '*'
+                        allValue = ''
                         hide = 2
                     }
                 }
@@ -2664,14 +2805,19 @@ function Get-RunManagerScript {
     } | ConvertTo-Json -Compress
 
     $existingRunManager = Join-Path $PortalRoot 'run-manager.js'
-    if (Test-Path -LiteralPath $existingRunManager) {
-        $existingScript = Get-Content -LiteralPath $existingRunManager -Raw
-        if ($existingScript -match 'const CONFIG = .+?;' -and $existingScript -match '/api/inventory') {
-            return [regex]::Replace($existingScript, 'const CONFIG = .+?;', "const CONFIG = $configJson;", 1)
-        }
+    if (-not (Test-Path -LiteralPath $existingRunManager)) {
+        throw "Run-manager source file not found at '$existingRunManager'."
     }
+    $existingScript = Get-Content -LiteralPath $existingRunManager -Raw
+    if ($existingScript -match 'const CONFIG = .+?;') {
+        return [regex]::Replace($existingScript, 'const CONFIG = .+?;', "const CONFIG = $configJson;", 1)
+    }
+    if ($existingScript -match 'const PORT = CONFIG\.port;') {
+        return [regex]::Replace($existingScript, 'const PORT = CONFIG\.port;', "const CONFIG = $configJson;`nconst PORT = CONFIG.port;", 1)
+    }
+    throw "Run-manager source file at '$existingRunManager' does not contain a replaceable CONFIG block."
 
-    $template = @'
+    $runManagerScriptTemplate = @'
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
@@ -2800,6 +2946,24 @@ function readJsonBody(req) {
 function sendJson(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(body));
+}
+
+function normalizeAppName(appName) {
+  const value = String(appName || '').trim();
+  if (
+    value === '*' ||
+    value === '$__all' ||
+    value.toLowerCase() === 'all' ||
+    (value.startsWith('${') && value.endsWith('}')) ||
+    value === '$app'
+  ) {
+    return CONFIG.appName;
+  }
+  return value || CONFIG.appName;
+}
+
+function getRequestedApp(url) {
+  return normalizeAppName(url.searchParams.get('app'));
 }
 
 function openWorkflowInVSCode(workflow) {
@@ -3065,10 +3229,10 @@ async function listWorkflowsRaw() {
 }
 
 // Roll up run stats for the last 24h from the management runs API.
-async function getRuns24h(name) {
+async function getRuns24h(name, appName) {
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const apiPath = managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(name)}/runs`) + '&$top=250';
-  const result = await makeRequest('GET', apiPath);
+  const result = await makeRequest('GET', apiPath, undefined, appName);
   const runs = (result.json && result.json.value) || [];
   let total = 0, succeeded = 0, failed = 0, running = 0;
   for (const r of runs) {
@@ -3238,11 +3402,11 @@ if (KPI_WARM_WINDOWS.length) {
   }, 20000).unref();
 }
 
-async function getInventory() {
-  const items = await listWorkflowsRaw();
+async function getInventory(appName) {
+  const items = await listWorkflowsRaw(appName);
   const rows = await Promise.all(items.map(async (w) => {
     let stats = { total: 0, succeeded: 0, failed: 0, running: 0, healthPct: null };
-    try { stats = await getRuns24h(w.name); } catch { /* per-workflow best effort */ }
+    try { stats = await getRuns24h(w.name, w.__appName || appName); } catch { /* per-workflow best effort */ }
     const trigger = w.triggers ? Object.keys(w.triggers)[0] : null;
     const triggerType = trigger && w.triggers[trigger] ? (w.triggers[trigger].type || '') : '';
     return {
@@ -3343,7 +3507,10 @@ var rows=[]; var selected=new Set(); var searchTerm='';
 function currentVisible(){if(!searchTerm)return rows;return rows.filter(function(r){return String(r.name||'').toLowerCase().indexOf(searchTerm)>=0||String(r.subtitle||'').toLowerCase().indexOf(searchTerm)>=0;});}
 function onSearch(v){searchTerm=String(v||'').toLowerCase();render();}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
-function api(path,opts){return fetch(path,opts).then(function(r){return r.json().catch(function(){return{};}).then(function(d){if(!r.ok)throw new Error(d.error||d.message||('HTTP '+r.status));return d;});});}
+const pageApp = new URLSearchParams(window.location.search).get('app') || '';
+function withApp(path){if(!pageApp)return path; return path + (path.indexOf('?')>=0 ? '&' : '?') + 'app=' + encodeURIComponent(pageApp);}
+function errText(v){if(v==null)return '';if(typeof v==='string')return v;if(typeof v==='object'){if(typeof v.message==='string'&&v.message.trim())return v.message;try{return JSON.stringify(v);}catch(_){return String(v);}}return String(v);}
+function api(path,opts){return fetch(withApp(path),opts).then(function(r){return r.json().catch(function(){return{};}).then(function(d){if(!r.ok){var msg=errText(d&&d.error)||errText(d&&d.message)||('HTTP '+r.status);throw new Error(msg);}return d;});});}
 function setStatus(msg){var s=document.getElementById('status');s.textContent=msg||'';s.style.display=msg?'block':'none';}
 function updateToolbar(){document.getElementById('selcount').textContent=selected.size+' selected';var dis=selected.size===0;['btnEnable','btnDisable'].forEach(function(id){document.getElementById(id).disabled=dis;});}
 function stateBadge(st){return '<span class="badge '+(st==='Enabled'?'badge-on':'badge-off')+'">'+esc(st)+'</span>';}
@@ -3424,13 +3591,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (path === '/api/workflows' && req.method === 'GET') {
-      const result = await makeRequest('GET', managementPath('/runtime/webhooks/workflow/api/management/workflows'));
-      sendJson(res, result.status, result.json || []);
+      const rows = await listWorkflowsRaw(appName);
+      sendJson(res, 200, { value: rows });
       return;
     }
 
     if (path === '/api/inventory' && req.method === 'GET') {
-      const rows = await getInventory();
+      const rows = await getInventory(appName);
       sendJson(res, 200, { value: rows });
       return;
     }
@@ -3525,7 +3692,14 @@ const server = http.createServer(async (req, res) => {
       const filter = url.searchParams.get('filter');
       let apiPath = managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs`) + `&$top=${encodeURIComponent(top)}`;
       if (filter) apiPath += `&$filter=${encodeURIComponent(filter)}`;
-      const result = await makeRequest('GET', apiPath);
+      const result = await makeRequest('GET', apiPath, undefined, appName);
+      const upstreamCode = String(result.json && result.json.error && result.json.error.code || '');
+      const upstreamMsg = String(result.json && result.json.error && result.json.error.message || result.body || '');
+      const workflowMissing = result.status === 404 || /workflownotfound/i.test(upstreamCode) || /workflow\s+'.+'\s+could not be found/i.test(upstreamMsg);
+      if (workflowMissing) {
+        sendJson(res, 200, { value: [], workflow, warning: `Workflow '${workflow}' was not found in runtime for app '${appName}'.` });
+        return;
+      }
       sendJson(res, result.status, result.json || {});
       return;
     }
@@ -3533,6 +3707,13 @@ const server = http.createServer(async (req, res) => {
     if (path.match(/^\/api\/workflows\/([^/]+)\/runs\/([^/]+)$/) && req.method === 'GET') {
       const [, workflow, runId] = path.match(/^\/api\/workflows\/([^/]+)\/runs\/([^/]+)$/);
       const runResult = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs/${encodeURIComponent(runId)}`));
+      const runErrCode = String(runResult.json && runResult.json.error && runResult.json.error.code || '');
+      const runErrMsg = String(runResult.json && runResult.json.error && runResult.json.error.message || runResult.body || '');
+      const workflowMissing = runResult.status === 404 || /workflownotfound/i.test(runErrCode) || /workflow\s+'.+'\s+could not be found/i.test(runErrMsg);
+      if (workflowMissing) {
+        sendJson(res, 200, { run: {}, actions: [], workflow, warning: `Workflow '${workflow}' was not found in runtime for app '${appName}'.` });
+        return;
+      }
       let actions = [];
       try {
         const actResult = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs/${encodeURIComponent(runId)}/actions`) + `&$top=100`);
@@ -3631,8 +3812,6 @@ server.listen(PORT, '127.0.0.1', () => {
 
 
 '@
-
-    $template.Replace('__CONFIG_JSON__', $configJson)
 }
 
 function Get-AppManagerScript {
@@ -3680,7 +3859,8 @@ async function runOc(args) {
   const env = { ...process.env };
   if (CONFIG.kubeconfigPath) env.KUBECONFIG = CONFIG.kubeconfigPath;
   const ocArgs = CONFIG.kubeContext ? ['--context', CONFIG.kubeContext, ...args] : args;
-  const result = await execFileAsync(CONFIG.ocPath, ocArgs, { env, maxBuffer: 20 * 1024 * 1024 });
+  const timeoutMs = Math.max(5000, Number(CONFIG.ocTimeoutMs) || 30000);
+  const result = await execFileAsync(CONFIG.ocPath, ocArgs, { env, maxBuffer: 20 * 1024 * 1024, timeout: timeoutMs });
   return (result.stdout || '').trim();
 }
 
@@ -3711,8 +3891,9 @@ function selectAppContainer(containers) {
   }) || list[0] || null;
 }
 
-async function getAppState() {
-  const out = await runOc(['-n', CONFIG.namespace, 'get', 'pods', '-l', `containerapps.io/app-name=${CONFIG.appName}`, '-o', 'json']);
+async function getAppState(appName) {
+  const selectedApp = normalizeAppName(appName);
+  const out = await runOc(['-n', CONFIG.namespace, 'get', 'pods', '-l', `containerapps.io/app-name=${selectedApp}`, '-o', 'json']);
   const payload = tryParseJson(out) || {};
   const items = Array.isArray(payload.items) ? payload.items : [];
   const revisions = new Map();
@@ -3758,7 +3939,7 @@ async function getAppState() {
 
   return {
     namespace: CONFIG.namespace,
-    appName: CONFIG.appName,
+    appName: selectedApp,
     image: container ? container.image || '' : '',
     command: container ? (container.command || []).join(' ') : '',
     args: container ? (container.args || []).join(' ') : '',
@@ -3776,8 +3957,9 @@ function revisionSortKey(rev) {
 // Recent errors for the LATEST revision's pods: container waiting/terminated
 // error reasons, non-ready containers, plus recent Warning events (FailedMount,
 // BackOff, Unhealthy, etc.). Used to highlight problems in the App Manager.
-async function getAppErrors() {
-  const podsOut = await runOc(['-n', CONFIG.namespace, 'get', 'pods', '-l', `containerapps.io/app-name=${CONFIG.appName}`, '-o', 'json']);
+async function getAppErrors(appName) {
+  const selectedApp = normalizeAppName(appName);
+  const podsOut = await runOc(['-n', CONFIG.namespace, 'get', 'pods', '-l', `containerapps.io/app-name=${selectedApp}`, '-o', 'json']);
   const podsPayload = tryParseJson(podsOut) || {};
   const items = Array.isArray(podsPayload.items) ? podsPayload.items : [];
   if (!items.length) return { latestRevision: null, pods: [], problems: [] };
@@ -3940,12 +4122,12 @@ function extractLogError(line) {
   return null;
 }
 
-async function getPodLogErrors(options) {
+async function getPodLogErrors(options, appName) {
   const tailReq = parseInt((options && options.tail), 10);
   const tail = Math.min(Math.max(Number.isFinite(tailReq) ? tailReq : 500, 50), 5000);
   const maxErrors = Math.min(Math.max(parseInt((options && options.max), 10) || 25, 1), 100);
   const container = CONFIG.logContainer || 'logicapps-container';
-  const state = await getAppState();
+  const state = await getAppState(appName);
 
   let latestRevision = null;
   let latestKey = -Infinity;
@@ -4007,8 +4189,9 @@ async function getPodLogErrors(options) {
 const POD_HEALTH_WAIT = new Set(['CrashLoopBackOff', 'ImagePullBackOff', 'ErrImagePull', 'CreateContainerError', 'CreateContainerConfigError', 'InvalidImageName', 'RunContainerError']);
 const POD_HEALTH_TERM = new Set(['Error', 'OOMKilled', 'ContainerCannotRun', 'StartError', 'DeadlineExceeded', 'Evicted', 'ContainerStatusUnknown']);
 
-async function getPodHealth() {
-  const out = await runOc(['get', 'pods', '--all-namespaces', '-o', 'json']);
+async function getPodHealth(appName) {
+  const selectedApp = normalizeAppName(appName);
+  const out = await runOc(['-n', CONFIG.namespace, 'get', 'pods', '-l', `containerapps.io/app-name=${selectedApp}`, '-o', 'json']);
   const payload = tryParseJson(out) || {};
   const items = Array.isArray(payload.items) ? payload.items : [];
   let total = 0, running = 0, pending = 0, failed = 0, succeeded = 0, crashlooping = 0;
@@ -4181,23 +4364,23 @@ function sseWrite(res, event, data) {
   res.write('\n');
 }
 
-async function resolveLogTarget(url) {
+async function resolveLogTarget(url, appName) {
   let pod = (url.searchParams.get('pod') || '').trim();
   let container = (url.searchParams.get('container') || '').trim();
   if (!pod) {
-    const state = await getAppState();
+    const state = await getAppState(appName);
     const running = state.replicas.find((r) => r.phase === 'Running') || state.replicas[0];
-    if (!running) throw new Error('No pods found for app ' + CONFIG.appName + ' in namespace ' + CONFIG.namespace + '.');
+    if (!running) throw new Error('No pods found for app ' + normalizeAppName(appName) + ' in namespace ' + CONFIG.namespace + '.');
     pod = running.pod;
   }
   if (!container) container = CONFIG.logContainer || 'logicapps-container';
   return { pod, container };
 }
 
-async function streamPodLogs(req, res, url) {
+async function streamPodLogs(req, res, url, appName) {
   let target;
   try {
-    target = await resolveLogTarget(url);
+    target = await resolveLogTarget(url, appName);
   } catch (error) {
     sendJson(res, 400, { error: error.message || String(error) });
     return;
@@ -4260,20 +4443,21 @@ const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const path = url.pathname;
+  const appName = getRequestedApp(url);
 
   try {
     if (path === '/api/app' && req.method === 'GET') {
-      sendJson(res, 200, await getAppState());
+      sendJson(res, 200, await getAppState(appName));
       return;
     }
 
     if (path === '/api/pod-health' && req.method === 'GET') {
-      sendJson(res, 200, await getPodHealth());
+      sendJson(res, 200, await getPodHealth(appName));
       return;
     }
 
     if (path === '/api/log-errors' && req.method === 'GET') {
-      sendJson(res, 200, await getPodLogErrors({ tail: url.searchParams.get('tail'), max: url.searchParams.get('max') }));
+      sendJson(res, 200, await getPodLogErrors({ tail: url.searchParams.get('tail'), max: url.searchParams.get('max') }, appName));
       return;
     }
 
@@ -4288,12 +4472,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (path === '/api/logs/stream' && req.method === 'GET') {
-      await streamPodLogs(req, res, url);
+      await streamPodLogs(req, res, url, appName);
       return;
     }
 
     if (path === '/api/app/restart' && req.method === 'POST') {
-      const state = await getAppState();
+      const state = await getAppState(appName);
       const deleted = [];
       for (const replica of state.replicas) {
         await runOc(['-n', CONFIG.namespace, 'delete', 'pod', replica.pod]);
@@ -4305,7 +4489,7 @@ const server = http.createServer(async (req, res) => {
 
     if (path.match(/^\/api\/revisions\/([^/]+)\/restart$/) && req.method === 'POST') {
       const revision = decodeURIComponent(path.match(/^\/api\/revisions\/([^/]+)\/restart$/)[1]);
-      const state = await getAppState();
+      const state = await getAppState(appName);
       const target = state.revisions.find((r) => r.revision === revision);
       if (!target) {
         sendJson(res, 404, { error: `Revision '${revision}' not found.` });
@@ -4347,8 +4531,6 @@ const server = http.createServer(async (req, res) => {
     .muted{color:var(--muted)} .pill{display:inline-block;padding:2px 6px;border-radius:999px;background:var(--surface);border:1px solid var(--border)}
     #maxHint{display:none;margin:2px 0 8px;font-size:12px}
     body.compact h1{font-size:14px;margin:0 0 6px}
-    body.compact .detail{display:none !important}
-    body.compact #app,body.compact #revisions,body.compact #replicas{display:none !important}
     body.compact #maxHint{display:block}
     #podHealth,#appPods{font-size:14px}
     #podHealth strong,#appPods strong{font-size:15px}
@@ -4404,7 +4586,7 @@ const server = http.createServer(async (req, res) => {
     <div id="logStatus" class="muted" style="margin-top:6px;">Idle. Select a pod and press Start.</div>
     <pre id="logConsole" style="margin-top:8px;max-height:340px;overflow:auto;background:#000;color:#f1f1f1;border:1px solid var(--border);border-radius:4px;padding:8px;white-space:pre-wrap;word-break:break-all;font:12px/1.45 Consolas,Menlo,monospace;"></pre>
   </div>
-  <div id="app"></div>
+  <div id="app"><div class="card"><h3 style="margin-top:0;">App Configuration</h3><div class="muted">Loading app settings...</div></div></div>
   <script>
     const summaryEl = document.getElementById('summary');
     const appEl = document.getElementById('app');
@@ -4455,7 +4637,7 @@ const server = http.createServer(async (req, res) => {
       if (pod) params.set('pod', pod);
       params.set('tail', tail);
       logStatusEl.textContent = 'Connecting...';
-      const es = new EventSource('/api/logs/stream?' + params.toString());
+      const es = new EventSource(withApp('/api/logs/stream?' + params.toString()));
       logSource = es;
       es.addEventListener('status', e => { try { logStatusEl.textContent = JSON.parse(e.data).message || 'Streaming...'; } catch { logStatusEl.textContent = 'Streaming...'; } });
       es.addEventListener('log', e => appendLog(e.data));
@@ -4465,7 +4647,38 @@ const server = http.createServer(async (req, res) => {
     }
     const revisionsEl = document.getElementById('revisions');
     const replicasEl = document.getElementById('replicas');
-    async function api(path, options){ const response = await fetch(path, options); const data = await response.json().catch(()=>({})); if(!response.ok) throw new Error(data.error || data.message || ('Request failed (' + response.status + ')')); return data; }
+    const pageApp = new URLSearchParams(window.location.search).get('app') || '';
+    function withApp(path){
+      let next = String(path || '');
+      if (pageApp && !/(?:\\?|&)app=/.test(next)) {
+        next += (next.indexOf('?') >= 0 ? '&' : '?') + 'app=' + encodeURIComponent(pageApp);
+      }
+      next += (next.indexOf('?') >= 0 ? '&' : '?') + '_ts=' + Date.now();
+      return next;
+    }
+    async function api(path, options){
+      const reqOptions = Object.assign({}, options || {});
+      reqOptions.cache = 'no-store';
+      reqOptions.headers = Object.assign({ 'Cache-Control': 'no-cache' }, reqOptions.headers || {});
+      const controller = new AbortController();
+      const requestTimeoutMs = 20000;
+      const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
+      reqOptions.signal = controller.signal;
+      let response;
+      try {
+        response = await fetch(withApp(path), reqOptions);
+      } catch (error) {
+        if (error && error.name === 'AbortError') {
+          throw new Error('Request timed out after ' + requestTimeoutMs + 'ms');
+        }
+        throw error;
+      } finally {
+        clearTimeout(timer);
+      }
+      const data = await response.json().catch(()=>({}));
+      if(!response.ok) throw new Error(data.error || data.message || ('Request failed (' + response.status + ')'));
+      return data;
+    }
     function renderApp(data){
       summaryEl.textContent = 'Namespace: ' + data.namespace + ' | App: ' + data.appName + ' | Image: ' + (data.image || '-');
       let appHtml = '<div class="card"><h3 style="margin-top:0;">App Configuration</h3><div><span class="pill">Image: ' + (data.image || '-') + '</span></div><div class="muted" style="margin-top:6px;">Command: ' + (data.command || '-') + '</div><div class="muted">Args: ' + (data.args || '-') + '</div><div style="margin-top:10px;"><strong>Environment Settings</strong><table><tr><th>Name</th><th>Value / Source</th><th>Type</th></tr>';
@@ -4498,11 +4711,21 @@ const server = http.createServer(async (req, res) => {
     }
     async function loadClusterLogin(){ try { renderClusterLogin(await api('/api/cluster-login')); } catch(err){ clusterLoginEl.textContent = err.message; } }
     async function recheckClusterLogin(){ clusterLoginEl.textContent = 'Re-checking login...'; try { renderClusterLogin(await api('/api/cluster-login/refresh', { method:'POST' })); } catch(err){ clusterLoginEl.textContent = err.message; } }
-    async function refresh(){ summaryEl.textContent = 'Loading...'; const data = await api('/api/app'); renderApp(data); }
+    async function refresh(){
+      summaryEl.textContent = 'Loading...';
+      const data = await api('/api/app');
+      renderApp(data);
+    }
     async function restartApp(){ if(!confirm('Restart the entire app?')) return; await api('/api/app/restart', { method:'POST' }); await refresh(); }
     async function restartRevision(revision){ if(!confirm('Restart revision ' + revision + '?')) return; await api('/api/revisions/' + encodeURIComponent(revision) + '/restart', { method:'POST' }); await refresh(); }
     async function restartReplica(pod){ if(!confirm('Restart replica ' + pod + '?')) return; await api('/api/pods/' + encodeURIComponent(pod) + '/restart', { method:'POST' }); await refresh(); }
-    refresh().catch(err => { summaryEl.textContent = err.message; });
+    refresh().catch(err => {
+      const msg = err && err.message ? err.message : String(err);
+      summaryEl.textContent = msg;
+      appEl.innerHTML = '<div class="card"><h3 style="margin-top:0;">App Configuration</h3><div class="muted" style="color:var(--danger);">Could not load app settings: ' + escapeHtml(msg) + '</div></div>';
+      revisionsEl.innerHTML = '<div class="card"><h3 style="margin-top:0;">Revisions / Replicas / Health</h3><div class="muted" style="color:var(--danger);">Could not load revision data.</div></div>';
+      replicasEl.innerHTML = '<div class="card"><h3 style="margin-top:0;">Replicas</h3><div class="muted" style="color:var(--danger);">Could not load replica data.</div></div>';
+    });
     const podHealthEl = document.getElementById('podHealth');
     const appPodsEl = document.getElementById('appPods');
     function renderAppPods(data){
