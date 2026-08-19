@@ -118,7 +118,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             // Update tab title with flow name
             const selectedFlowName2 =
                 taskPlan?.flowName || flows.find((f) => f.id === selectedFlowId)?.name;
-            this.panel.title = selectedFlowName2 ? `⚙️ ${selectedFlowName2}` : 'Conversion';
+            this.panel.title = selectedFlowName2 ? `⚙️ Conversion: ${selectedFlowName2}` : 'Conversion';
 
             this.panel.webview.html = this.getHtmlContent(flows, selectedFlowId, taskPlan);
         } catch (err) {

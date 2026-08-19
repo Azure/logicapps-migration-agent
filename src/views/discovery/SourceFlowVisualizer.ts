@@ -692,7 +692,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         } else {
             panel = vscode.window.createWebviewPanel(
                 'logicAppsMigrationAgent.flowAnalysis',
-                `🔍 ${title}`,
+                `🔍 Analysis: ${title}`,
                 vscode.ViewColumn.Active,
                 {
                     enableScripts: true,
