@@ -349,7 +349,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                     const resetBtn =
                         hasProgress && !isThisFlowBusy
                             ? `<button class="btn btn-reset" onclick="event.stopPropagation(); resetFlow('${g.id}')"
-                            title="Reset all progress for this flow group">↺ Reset Progress</button>`
+                            title="Reset all progress for this flow and start over">↺ Start Over</button>`
                             : '';
 
                     return `
