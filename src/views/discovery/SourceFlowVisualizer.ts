@@ -1642,6 +1642,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                             }
 
                             // Try deleting each candidate
+                            const failedDeletions: string[] = [];
                             for (const candidate of outCandidates) {
                                 const outPath = pathMod.join(
                                     workspaceFolder.uri.fsPath,
@@ -1649,11 +1650,30 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                                     candidate
                                 );
                                 if (fs.existsSync(outPath)) {
-                                    fs.rmSync(outPath, { recursive: true, force: true });
-                                    this.logger.debug(
-                                        `[FlowViz] Deleted output folder: ${outPath}`
-                                    );
+                                    try {
+                                        // maxRetries/retryDelay handle transient Windows EPERM/EBUSY locks
+                                        fs.rmSync(outPath, {
+                                            recursive: true,
+                                            force: true,
+                                            maxRetries: 5,
+                                            retryDelay: 200,
+                                        });
+                                        this.logger.debug(
+                                            `[FlowViz] Deleted output folder: ${outPath}`
+                                        );
+                                    } catch (delErr) {
+                                        failedDeletions.push(outPath);
+                                        this.logger.warn(
+                                            `[FlowViz] Could not delete output folder (likely locked by a running process): ${outPath} — ${delErr instanceof Error ? delErr.message : String(delErr)}`
+                                        );
+                                    }
                                 }
+                            }
+                            if (failedDeletions.length > 0) {
+                                vscode.window.showWarningMessage(
+                                    `Progress was reset, but ${failedDeletions.length} generated output folder(s) could not be deleted because files are in use ` +
+                                        `(e.g. a running func host or an open terminal in that folder). Stop those processes and delete manually: ${failedDeletions.join(', ')}`
+                                );
                             }
                         }
 
