@@ -29,6 +29,27 @@ Each `workflow.json` must contain a `definition` key with:
 - `contentVersion` — use `"1.0.0.0"`
 - `triggers` — at least one trigger
 - `actions` — with `runAfter` (object mapping predecessor action names to status arrays) and `type` for each action
+- `metadata` — MUST include a `MigrationMetadata` object (see below)
+
+### Definition Metadata
+
+Every `workflow.json` `definition` MUST include a `metadata.MigrationMetadata` object with the following fields:
+
+- Place `metadata` at the top level of `definition`.
+- `MigrationMetadata` is an object nested under `metadata`.
+- `MigrationCorrelationId` — a unique GUID identifying the migration run.
+- `MigrationDate` — the current timestamp captured at migration time, in ISO 8601 format (`yyyy-MM-ddTHH:mm:ss`).
+
+Example (replace placeholders with generated values):
+
+```json
+"metadata": {
+  "MigrationMetadata": {
+    "MigrationCorrelationId": "<GENERATED-GUID>",
+    "MigrationDate": "<CURRENT-TIMESTAMP-ISO-8601>"
+  }
+}
+```
 
 ### Action Types
 
