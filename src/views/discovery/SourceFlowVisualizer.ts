@@ -349,14 +349,19 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                     const resetBtn =
                         hasProgress && !isThisFlowBusy
                             ? `<button class="btn btn-reset" onclick="event.stopPropagation(); resetFlow('${g.id}')"
-                            title="Reset all progress for this flow group">↺ Reset Progress</button>`
+                            title="Reset all progress for this flow and start over">↺ Start Over</button>`
                             : '';
+
+                    // Stop button — shown while any process (analyse/plan/create/execute) runs on this flow
+                    const stopBtn = isThisFlowBusy
+                        ? `<button class="btn btn-stop-flow" onclick="event.stopPropagation(); stopFlow('${g.id}')" title="Stop the running process for this flow (use if you stopped Copilot)">■ Stop</button>`
+                        : '';
 
                     return `
                     <div class="flow-card">
                         <div class="flow-card-header">
                             <span class="flow-name">${escapeHtml(g.name)}</span>
-                            ${resetBtn}
+                            ${resetBtn}${stopBtn}
                         </div>
                         <div class="flow-desc">${escapeHtml(g.description)}</div>
                         <div class="flow-meta">
@@ -431,6 +436,23 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             color: #fff;
         }
         .btn-reset:active {
+            transform: scale(0.97);
+        }
+        .btn-stop-flow {
+            font-size: 11px;
+            padding: 4px 12px;
+            border: 1px solid var(--vscode-errorForeground);
+            background: transparent;
+            color: var(--vscode-errorForeground);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .btn-stop-flow:hover {
+            background: var(--vscode-errorForeground);
+            color: var(--vscode-button-foreground);
+        }
+        .btn-stop-flow:active {
             transform: scale(0.97);
         }
         .flow-desc { font-size: 13px; color: var(--vscode-descriptionForeground); margin-bottom: 8px; }
@@ -645,6 +667,9 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         function executeFlow(flowId) {
             vscode.postMessage({ command: 'executeFlowFromSelector', data: flowId });
         }
+        function stopFlow(flowId) {
+            vscode.postMessage({ command: 'stopFlowFromSelector', data: flowId });
+        }
         function openProject(flowId) {
             vscode.postMessage({ command: 'openProjectFromSelector', data: flowId });
         }
@@ -692,7 +717,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         } else {
             panel = vscode.window.createWebviewPanel(
                 'logicAppsMigrationAgent.flowAnalysis',
-                `🔍 ${title}`,
+                `🔍 Analysis: ${title}`,
                 vscode.ViewColumn.Active,
                 {
                     enableScripts: true,
@@ -1540,6 +1565,38 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 break;
             }
 
+            case 'stopFlowFromSelector': {
+                const stopFlowId = message.data as string;
+                if (stopFlowId) {
+                    this.logger.debug(`[FlowViz] Stop requested for flow ${stopFlowId}`);
+                    // Cancel the running Copilot agent turn so the chat actually stops.
+                    void (async () => {
+                        try {
+                            await vscode.commands.executeCommand('workbench.action.chat.open');
+                            await vscode.commands.executeCommand('workbench.action.chat.cancel');
+                        } catch (err) {
+                            this.logger.debug(`[FlowViz] Chat cancel not available: ${err}`);
+                        }
+                    })();
+                    // Clear every busy flag for this flow so its step buttons revert.
+                    SourceFlowVisualizer.generatingGroupIds.delete(stopFlowId);
+                    SourceFlowVisualizer.planningGroupIds.delete(stopFlowId);
+                    SourceFlowVisualizer.convertingGroupIds.delete(stopFlowId);
+                    SourceFlowVisualizer.executingGroupIds.delete(stopFlowId);
+                    // Reset any in-progress conversion tasks (no-op if not executing).
+                    void (async () => {
+                        try {
+                            const { ConversionService } = await import('../../stages/conversion');
+                            await ConversionService.getInstance().stopExecution(stopFlowId);
+                        } catch (err) {
+                            this.logger.debug(`[FlowViz] stopExecution failed: ${err}`);
+                        }
+                    })();
+                    SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
+                }
+                break;
+            }
+
             case 'refreshFlowGroupSelector': {
                 this.logger.debug('[FlowViz] User requested refresh of flow group selector');
                 SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
@@ -1642,6 +1699,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                             }
 
                             // Try deleting each candidate
+                            const failedDeletions: string[] = [];
                             for (const candidate of outCandidates) {
                                 const outPath = pathMod.join(
                                     workspaceFolder.uri.fsPath,
@@ -1649,11 +1707,30 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                                     candidate
                                 );
                                 if (fs.existsSync(outPath)) {
-                                    fs.rmSync(outPath, { recursive: true, force: true });
-                                    this.logger.debug(
-                                        `[FlowViz] Deleted output folder: ${outPath}`
-                                    );
+                                    try {
+                                        // maxRetries/retryDelay handle transient Windows EPERM/EBUSY locks
+                                        fs.rmSync(outPath, {
+                                            recursive: true,
+                                            force: true,
+                                            maxRetries: 5,
+                                            retryDelay: 200,
+                                        });
+                                        this.logger.debug(
+                                            `[FlowViz] Deleted output folder: ${outPath}`
+                                        );
+                                    } catch (delErr) {
+                                        failedDeletions.push(outPath);
+                                        this.logger.warn(
+                                            `[FlowViz] Could not delete output folder (likely locked by a running process): ${outPath} — ${delErr instanceof Error ? delErr.message : String(delErr)}`
+                                        );
+                                    }
                                 }
+                            }
+                            if (failedDeletions.length > 0) {
+                                vscode.window.showWarningMessage(
+                                    `Progress was reset, but ${failedDeletions.length} generated output folder(s) could not be deleted because files are in use ` +
+                                        `(e.g. a running func host or an open terminal in that folder). Stop those processes and delete manually: ${failedDeletions.join(', ')}`
+                                );
                             }
                         }
 
@@ -2066,13 +2143,26 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         const depAnalysis = result.dependencyAnalysis;
         let depTabBadge = '';
         if (depAnalysis && depAnalysis.missingDependencies.length > 0) {
-            const total = depAnalysis.missingDependencies.length;
-            if (depAnalysis.counts.critical > 0) {
-                depTabBadge = `<span class="tab-badge critical">${total}</span>`;
-            } else if (depAnalysis.counts.warning > 0) {
-                depTabBadge = `<span class="tab-badge warning">${total}</span>`;
+            // Only critical/warning entries are genuinely missing. Standard runtime
+            // assemblies (info severity) are listed for completeness, not missing —
+            // so they must not inflate the badge. Counts may be absent/partial in
+            // older cached analyses, so fall back to counting severities.
+            const deps = depAnalysis.missingDependencies;
+            const criticalCount =
+                typeof depAnalysis.counts?.critical === 'number'
+                    ? depAnalysis.counts.critical
+                    : deps.filter((d) => d.severity === 'critical').length;
+            const warningCount =
+                typeof depAnalysis.counts?.warning === 'number'
+                    ? depAnalysis.counts.warning
+                    : deps.filter((d) => d.severity === 'warning').length;
+            const actionable = criticalCount + warningCount;
+            if (criticalCount > 0) {
+                depTabBadge = `<span class="tab-badge critical">${actionable}</span>`;
+            } else if (warningCount > 0) {
+                depTabBadge = `<span class="tab-badge warning">${actionable}</span>`;
             } else {
-                depTabBadge = `<span class="tab-badge clear">${total}</span>`;
+                depTabBadge = '<span class="tab-badge clear">0</span>';
             }
         } else {
             depTabBadge = '<span class="tab-badge clear">0</span>';
@@ -3497,7 +3587,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     <!-- Missing Dependencies Tab -->
     <div id="tab-dependencies" class="tab-content">
         <h2 style="margin-bottom: 8px;">Missing Dependencies</h2>
-        <p style="margin-bottom: 24px; opacity: 0.8;">Dependencies (DLLs, schemas, maps, etc.) that are referenced but not found in the scanned source files. Resolve these before proceeding to the next stage.</p>
+        <p style="margin-bottom: 24px; opacity: 0.8;">Dependencies referenced by the source flows. Entries under <strong>Custom</strong>, <strong>Unknown Origin</strong>, and <strong>Third-Party</strong> are genuinely missing (no source code or decompiled code was found) and must be resolved before proceeding. Standard framework, runtime, and platform assemblies are listed for completeness only &mdash; they are provided at runtime and are not missing. Referenced code whose source IS present is not missing either: the converter reuses it as a local function.</p>
         <div id="dependenciesContainer">
             <!-- Populated by JavaScript -->
         </div>
@@ -4191,7 +4281,15 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             }
             
             const deps = dependencyAnalysis.missingDependencies;
-            const counts = dependencyAnalysis.counts;
+            // counts may be absent or partial in cached analyses — derive any
+            // missing field from the actual dependency severities so the UI never
+            // shows "undefined".
+            const rawCounts = dependencyAnalysis.counts || {};
+            const counts = {
+                critical: typeof rawCounts.critical === 'number' ? rawCounts.critical : deps.filter(d => d.severity === 'critical').length,
+                warning: typeof rawCounts.warning === 'number' ? rawCounts.warning : deps.filter(d => d.severity === 'warning').length,
+                info: typeof rawCounts.info === 'number' ? rawCounts.info : deps.filter(d => d.severity === 'info').length,
+            };
             const hasCritical = counts.critical > 0;
             const hasWarnings = counts.warning > 0;
             const bannerClass = hasCritical ? 'has-critical' : (hasWarnings ? 'has-warnings' : 'all-clear');
