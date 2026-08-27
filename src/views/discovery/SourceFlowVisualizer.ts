@@ -2086,13 +2086,26 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         const depAnalysis = result.dependencyAnalysis;
         let depTabBadge = '';
         if (depAnalysis && depAnalysis.missingDependencies.length > 0) {
-            const total = depAnalysis.missingDependencies.length;
-            if (depAnalysis.counts.critical > 0) {
-                depTabBadge = `<span class="tab-badge critical">${total}</span>`;
-            } else if (depAnalysis.counts.warning > 0) {
-                depTabBadge = `<span class="tab-badge warning">${total}</span>`;
+            // Only critical/warning entries are genuinely missing. Standard runtime
+            // assemblies (info severity) are listed for completeness, not missing —
+            // so they must not inflate the badge. Counts may be absent/partial in
+            // older cached analyses, so fall back to counting severities.
+            const deps = depAnalysis.missingDependencies;
+            const criticalCount =
+                typeof depAnalysis.counts?.critical === 'number'
+                    ? depAnalysis.counts.critical
+                    : deps.filter((d) => d.severity === 'critical').length;
+            const warningCount =
+                typeof depAnalysis.counts?.warning === 'number'
+                    ? depAnalysis.counts.warning
+                    : deps.filter((d) => d.severity === 'warning').length;
+            const actionable = criticalCount + warningCount;
+            if (criticalCount > 0) {
+                depTabBadge = `<span class="tab-badge critical">${actionable}</span>`;
+            } else if (warningCount > 0) {
+                depTabBadge = `<span class="tab-badge warning">${actionable}</span>`;
             } else {
-                depTabBadge = `<span class="tab-badge clear">${total}</span>`;
+                depTabBadge = '<span class="tab-badge clear">0</span>';
             }
         } else {
             depTabBadge = '<span class="tab-badge clear">0</span>';
@@ -3517,7 +3530,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     <!-- Missing Dependencies Tab -->
     <div id="tab-dependencies" class="tab-content">
         <h2 style="margin-bottom: 8px;">Missing Dependencies</h2>
-        <p style="margin-bottom: 24px; opacity: 0.8;">Dependencies (DLLs, schemas, maps, etc.) that are referenced but not found in the scanned source files. Resolve these before proceeding to the next stage.</p>
+        <p style="margin-bottom: 24px; opacity: 0.8;">Dependencies referenced by the source flows. Entries under <strong>Custom</strong>, <strong>Unknown Origin</strong>, and <strong>Third-Party</strong> are genuinely missing (no source code or decompiled code was found) and must be resolved before proceeding. Standard framework, runtime, and platform assemblies are listed for completeness only &mdash; they are provided at runtime and are not missing. Referenced code whose source IS present is not missing either: the converter reuses it as a local function.</p>
         <div id="dependenciesContainer">
             <!-- Populated by JavaScript -->
         </div>
@@ -4211,7 +4224,15 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             }
             
             const deps = dependencyAnalysis.missingDependencies;
-            const counts = dependencyAnalysis.counts;
+            // counts may be absent or partial in cached analyses — derive any
+            // missing field from the actual dependency severities so the UI never
+            // shows "undefined".
+            const rawCounts = dependencyAnalysis.counts || {};
+            const counts = {
+                critical: typeof rawCounts.critical === 'number' ? rawCounts.critical : deps.filter(d => d.severity === 'critical').length,
+                warning: typeof rawCounts.warning === 'number' ? rawCounts.warning : deps.filter(d => d.severity === 'warning').length,
+                info: typeof rawCounts.info === 'number' ? rawCounts.info : deps.filter(d => d.severity === 'info').length,
+            };
             const hasCritical = counts.critical > 0;
             const hasWarnings = counts.warning > 0;
             const bannerClass = hasCritical ? 'has-critical' : (hasWarnings ? 'has-warnings' : 'all-clear');

@@ -247,6 +247,10 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                         delete state.taskPlans[flowId];
                     }
 
+                    // Clear any stale Execute All orchestration state so the regenerated
+                    // task list starts clean and isn't stuck showing "Executing...".
+                    void this.conversionService.setExecuteAllActive(flowId, false);
+
                     void this.conversionService.selectFlow(flowId);
                     this.update();
                     vscode.commands

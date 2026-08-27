@@ -199,7 +199,12 @@ export class ConversionService implements vscode.Disposable {
             const flow = this.state.flows.find((f) => f.id === flowId);
             if (flow) {
                 flow.status = 'tasks-ready';
+                // A freshly generated task plan starts clean — clear any stale
+                // Execute All orchestration state so the first task is actionable
+                // instead of being stuck showing "Executing...".
+                flow.executeAllActive = false;
             }
+            this.executeAllActiveFlows.delete(flowId);
 
             await this.saveStateToStorage();
             this._onStateChange.fire({ type: 'task-plan-generated', flowId });
