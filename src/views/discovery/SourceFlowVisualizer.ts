@@ -352,11 +352,16 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                             title="Reset all progress for this flow and start over">↺ Start Over</button>`
                             : '';
 
+                    // Stop button — shown while any process (analyse/plan/create/execute) runs on this flow
+                    const stopBtn = isThisFlowBusy
+                        ? `<button class="btn btn-stop-flow" onclick="event.stopPropagation(); stopFlow('${g.id}')" title="Stop the running process for this flow (use if you stopped Copilot)">■ Stop</button>`
+                        : '';
+
                     return `
                     <div class="flow-card">
                         <div class="flow-card-header">
                             <span class="flow-name">${escapeHtml(g.name)}</span>
-                            ${resetBtn}
+                            ${resetBtn}${stopBtn}
                         </div>
                         <div class="flow-desc">${escapeHtml(g.description)}</div>
                         <div class="flow-meta">
@@ -431,6 +436,23 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             color: #fff;
         }
         .btn-reset:active {
+            transform: scale(0.97);
+        }
+        .btn-stop-flow {
+            font-size: 11px;
+            padding: 4px 12px;
+            border: 1px solid var(--vscode-errorForeground);
+            background: transparent;
+            color: var(--vscode-errorForeground);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .btn-stop-flow:hover {
+            background: var(--vscode-errorForeground);
+            color: var(--vscode-button-foreground);
+        }
+        .btn-stop-flow:active {
             transform: scale(0.97);
         }
         .flow-desc { font-size: 13px; color: var(--vscode-descriptionForeground); margin-bottom: 8px; }
@@ -644,6 +666,9 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         }
         function executeFlow(flowId) {
             vscode.postMessage({ command: 'executeFlowFromSelector', data: flowId });
+        }
+        function stopFlow(flowId) {
+            vscode.postMessage({ command: 'stopFlowFromSelector', data: flowId });
         }
         function openProject(flowId) {
             vscode.postMessage({ command: 'openProjectFromSelector', data: flowId });
@@ -1537,6 +1562,38 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                         );
                     }
                 })();
+                break;
+            }
+
+            case 'stopFlowFromSelector': {
+                const stopFlowId = message.data as string;
+                if (stopFlowId) {
+                    this.logger.debug(`[FlowViz] Stop requested for flow ${stopFlowId}`);
+                    // Cancel the running Copilot agent turn so the chat actually stops.
+                    void (async () => {
+                        try {
+                            await vscode.commands.executeCommand('workbench.action.chat.open');
+                            await vscode.commands.executeCommand('workbench.action.chat.cancel');
+                        } catch (err) {
+                            this.logger.debug(`[FlowViz] Chat cancel not available: ${err}`);
+                        }
+                    })();
+                    // Clear every busy flag for this flow so its step buttons revert.
+                    SourceFlowVisualizer.generatingGroupIds.delete(stopFlowId);
+                    SourceFlowVisualizer.planningGroupIds.delete(stopFlowId);
+                    SourceFlowVisualizer.convertingGroupIds.delete(stopFlowId);
+                    SourceFlowVisualizer.executingGroupIds.delete(stopFlowId);
+                    // Reset any in-progress conversion tasks (no-op if not executing).
+                    void (async () => {
+                        try {
+                            const { ConversionService } = await import('../../stages/conversion');
+                            await ConversionService.getInstance().stopExecution(stopFlowId);
+                        } catch (err) {
+                            this.logger.debug(`[FlowViz] stopExecution failed: ${err}`);
+                        }
+                    })();
+                    SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
+                }
                 break;
             }
 
