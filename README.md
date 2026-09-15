@@ -12,7 +12,7 @@ See the extension in action before you install it.
 
 [![Watch the Logic Apps Migration Agent demo](docs/media/logic-apps-migration-agent-demo-poster.png)](https://github.com/Azure/logicapps-migration-agent/tree/main/docs/media/logic-apps-migration-agent-demo.mp4)
 
-Click the preview image above to open the demo video: [logic-apps-migration-agent-demo.mp4](https://github.com/Azure/logicapps-migration-agent/tree/main/docs/media/logic-apps-migration-agent-demo.mp4)
+Click the preview image above to open the demo video: [logic-apps-migration-agent-demo.mp4](https://github.com/user-attachments/assets/764a93e6-09ae-44a2-8451-737b269afd13)
 
 ## Overview
 
