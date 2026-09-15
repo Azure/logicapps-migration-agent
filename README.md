@@ -1,6 +1,6 @@
 # Logic Apps Migration Agent
 
-> **VS Code Extension for migrating BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard**
+> **VS Code Extension for migrating BizTalk, MuleSoft, TIBCO, and other integration platforms to Azure Logic Apps Standard**
 
 [![VS Code](https://img.shields.io/badge/VS%20Code-Extension-007ACC?logo=visual-studio-code)](https://code.visualstudio.com)
 [![Azure](https://img.shields.io/badge/Azure-Logic%20Apps-0078D4?logo=microsoft-azure)](https://azure.microsoft.com)
@@ -20,10 +20,13 @@ The **Logic Apps Migration Agent** is a VS Code extension that automates the mig
 
 ### Supported Source Platforms
 
-| Platform                               | Status            | Parser          |
-| -------------------------------------- | ----------------- | --------------- |
-| **BizTalk Server** (2016, 2020)        | Fully implemented | Built-in        |
-| **MuleSoft Anypoint** (Mule 3, Mule 4) | In progress       | Built-in (stub) |
+| Platform                                  | Status            | Parser   | Current coverage                                      |
+| ----------------------------------------- | ----------------- | -------- | ----------------------------------------------------- |
+| **BizTalk Server** (2016, 2020)           | Fully implemented | Built-in | Projects, orchestrations, maps, schemas, and bindings |
+| **MuleSoft Anypoint** (Mule 3, Mule 4)    | Partial support   | Built-in | Projects, Mule 4 flows, and DataWeave                 |
+| **TIBCO BusinessWorks** (BW5, BW6)        | Partial support   | Built-in | Project discovery and process metadata                |
+
+Partial support includes platform detection, built-in parsing, and platform-specific guidance across the migration workflow. Coverage of source components and generated mappings continues to expand.
 
 This is an open-source project — contributions are welcome! To add support for a new platform, see [Contributing a New Platform](#contributing-a-new-platform).
 
@@ -35,10 +38,10 @@ This is an open-source project — contributions are welcome! To add support for
 
 | Feature                       | Description                                                                                           |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------- |
-| 🔄 **Multi-Platform Support** | BizTalk (built-in), MuleSoft (stub), plus extensible parsers for partner platforms                    |
+| 🔄 **Multi-Platform Support** | Built-in support for BizTalk, MuleSoft, and TIBCO, plus extensible parsers for partner platforms      |
 | 🎯 **5-Stage Workflow**       | Structured migration from Discovery through Deployment                                                |
 | 🧠 **Copilot Integration**    | AI-powered analysis, planning, and conversion via VS Code Language Model API                          |
-| 🏗️ **Built-in Parsers**       | TypeScript-based parsers for BizTalk orchestrations, maps, schemas, pipelines, and bindings           |
+| 🏗️ **Built-in Parsers**       | TypeScript-based parsers for supported BizTalk, MuleSoft, and TIBCO artifacts                         |
 | 🔌 **Parser Plugin System**   | Partner teams can contribute parsers via VS Code extensions                                           |
 | 📊 **Flow Visualization**     | Interactive architecture diagrams, message flows, gap analysis, and dependency tracking               |
 | 🤖 **AI Agents**              | Three specialized Copilot agents: `@migration-analyser`, `@migration-planner`, `@migration-converter` |
@@ -63,7 +66,7 @@ Discovery → Planning → Conversion → Validation → Deployment
 ## Quick Start
 
 1. Install the extension from VS Code Marketplace
-2. Open your BizTalk or MuleSoft project folder in VS Code
+2. Open your BizTalk, MuleSoft, or TIBCO project folder in VS Code
 3. Click the **Logic Apps Migration Agent** icon in the Activity Bar
 4. Select your source folder when prompted (or use the command palette: `Logic Apps Migration Agent: Select Source Folder`)
 5. Follow the guided 5-stage workflow
@@ -114,7 +117,8 @@ Parsers are **TypeScript modules** that transform source platform artifacts into
 │  • BizTalk (.btproj, .odx) │  • Partner Platform Parsers    │
 │  • BizTalk (.btm, .xsd)   │  • Community Parsers           │
 │  • BizTalk (.btp, bindings)│                                │
-│  • MuleSoft (stub)         │                                │
+│  • MuleSoft flows/projects │                                │
+│  • TIBCO processes/projects│                                │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -174,7 +178,7 @@ This project is open-source and designed for extensibility. There are **two ways
 
 ### What You Need to Add
 
-To fully support a new platform (e.g., TIBCO, IBM IIB, Workato), you need:
+To fully support a new platform (e.g., IBM IIB, Boomi, Workato), you need:
 
 1. **A built-in parser** — parses source artifacts into IR documents
 2. **Platform-specific skills** — AI instructions for each migration stage
@@ -383,7 +387,7 @@ src/
 ├── copilot/                   # Copilot integration (LM tools, context builder)
 ├── errors/                    # Error types and handler
 ├── ir/                        # Intermediate Representation (types, validation, serialization)
-├── parsers/                   # Parser system (BizTalk, MuleSoft stubs, plugin loader)
+├── parsers/                   # Parser system (BizTalk, MuleSoft, TIBCO, plugin loader)
 ├── services/                  # Core services (state, config, logging, telemetry)
 ├── stages/                    # Stage implementations (discovery, planning, conversion)
 ├── types/                     # Shared type definitions
