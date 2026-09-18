@@ -1,0 +1,48 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Execute_Query": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "query": "SELECT * FROM OracleWorkflow_TableName WHERE CITY=:CITY",
+            "queryParameters": {
+              "CITY": "CITYPLACEHOLDER"
+            }
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "oracledb",
+            "operationId": "executeQuery",
+            "serviceProviderId": "/serviceProviders/oracledb"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@body('Execute_Query')"
+        },
+        "runAfter": {
+          "Execute_Query": [
+            "Succeeded",
+            "Failed"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

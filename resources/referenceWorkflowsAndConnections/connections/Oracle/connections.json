@@ -1,0 +1,14 @@
+{
+  "serviceProviderConnections": {
+    "oracledb": {
+      "parameterValues": {
+        "serverAddress": "@appsetting('oracledb_serverAddress')",
+        "username": "@appsetting('oracledb_username')",
+        "password": "@appsetting('oracledb_password')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/oracledb"
+      }
+    }
+  }
+}

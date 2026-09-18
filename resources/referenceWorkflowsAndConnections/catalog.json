@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-15T15:42:22.235Z",
-  "totalEntries": 309,
+  "generatedAt": "2026-09-17T07:07:42.133Z",
+  "totalEntries": 314,
   "entries": [
     {
       "id": "workflows/Agent",
@@ -2227,6 +2227,138 @@
         "response",
         "loop",
         "branching"
+      ]
+    },
+    {
+      "id": "workflows/Oracle/oracleExecuteQueryWorkflow",
+      "category": "workflow",
+      "folder": "Oracle/oracleExecuteQueryWorkflow",
+      "path": "workflows/Oracle/oracleExecuteQueryWorkflow.json",
+      "kind": "Stateful",
+      "triggerTypes": [
+        "Request"
+      ],
+      "actionTypes": [
+        "ServiceProvider",
+        "Response"
+      ],
+      "serviceProviderIds": [
+        "/serviceProviders/oracledb"
+      ],
+      "operationIds": [
+        "executeQuery"
+      ],
+      "apiConnectionRefs": [],
+      "hasSplitOn": false,
+      "actionCount": 2,
+      "tags": [
+        "oracle/oracle",
+        "execute",
+        "query",
+        "workflow",
+        "request",
+        "serviceprovider",
+        "response",
+        "oracledb"
+      ]
+    },
+    {
+      "id": "workflows/Oracle/oracleGetRowsWorkflow",
+      "category": "workflow",
+      "folder": "Oracle/oracleGetRowsWorkflow",
+      "path": "workflows/Oracle/oracleGetRowsWorkflow.json",
+      "kind": "Stateful",
+      "triggerTypes": [
+        "Request"
+      ],
+      "actionTypes": [
+        "ServiceProvider",
+        "Response"
+      ],
+      "serviceProviderIds": [
+        "/serviceProviders/oracledb"
+      ],
+      "operationIds": [
+        "getRows"
+      ],
+      "apiConnectionRefs": [],
+      "hasSplitOn": false,
+      "actionCount": 2,
+      "tags": [
+        "oracle/oracle",
+        "get",
+        "rows",
+        "workflow",
+        "request",
+        "serviceprovider",
+        "response",
+        "oracledb"
+      ]
+    },
+    {
+      "id": "workflows/Oracle/oracleGetTablesWorkflow",
+      "category": "workflow",
+      "folder": "Oracle/oracleGetTablesWorkflow",
+      "path": "workflows/Oracle/oracleGetTablesWorkflow.json",
+      "kind": "Stateful",
+      "triggerTypes": [
+        "Request"
+      ],
+      "actionTypes": [
+        "ServiceProvider",
+        "Response"
+      ],
+      "serviceProviderIds": [
+        "/serviceProviders/oracledb"
+      ],
+      "operationIds": [
+        "getTables"
+      ],
+      "apiConnectionRefs": [],
+      "hasSplitOn": false,
+      "actionCount": 2,
+      "tags": [
+        "oracle/oracle",
+        "get",
+        "tables",
+        "workflow",
+        "request",
+        "serviceprovider",
+        "response",
+        "oracledb"
+      ]
+    },
+    {
+      "id": "workflows/Oracle/oracleInsertRowWorkflow",
+      "category": "workflow",
+      "folder": "Oracle/oracleInsertRowWorkflow",
+      "path": "workflows/Oracle/oracleInsertRowWorkflow.json",
+      "kind": "Stateful",
+      "triggerTypes": [
+        "Request"
+      ],
+      "actionTypes": [
+        "ServiceProvider",
+        "Response"
+      ],
+      "serviceProviderIds": [
+        "/serviceProviders/oracledb"
+      ],
+      "operationIds": [
+        "insertRow"
+      ],
+      "apiConnectionRefs": [],
+      "hasSplitOn": false,
+      "actionCount": 2,
+      "tags": [
+        "oracle/oracle",
+        "insert",
+        "row",
+        "workflow",
+        "request",
+        "serviceprovider",
+        "response",
+        "oracledb"
       ]
     },
     {
@@ -9141,6 +9273,26 @@
         "azureblob",
         "service-provider",
         "openai"
+      ]
+    },
+    {
+      "id": "connections/Oracle",
+      "category": "connection",
+      "folder": "Oracle",
+      "path": "connections/Oracle/connections.json",
+      "managedApis": [],
+      "serviceProviders": [
+        {
+          "name": "oracledb",
+          "serviceProviderId": "/serviceProviders/oracledb",
+          "parameterSetName": null
+        }
+      ],
+      "hasAgentConnections": false,
+      "tags": [
+        "oracle",
+        "oracledb",
+        "service-provider"
       ]
     },
     {
