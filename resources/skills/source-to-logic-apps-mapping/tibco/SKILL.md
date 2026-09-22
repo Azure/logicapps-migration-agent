@@ -560,6 +560,12 @@ If Integration Account is chosen:
 | Service Provider | `serviceProviderConnections.{name}` | Built-in, runs in-process       |
 | Managed API      | `managedApiConnections.{name}`      | Azure-hosted connector instance |
 
+### Runtime Destination Selection
+
+Inspect BusinessWorks activity input expressions, endpoint overrides, shared-resource selection, and partner/region routing. When the flow chooses among a known set of endpoints for the same built-in provider/operation, automatically map it to an expression-valued `ServiceProvider` `connectionName` and generate the required predefined connections with an authorized allowlist. Do not leave supported cases as optional suggestions. Follow `connections-json-generation-rules` section 2.1 and search references for `DynamicConnections`.
+
+Do not treat a dynamic path/table/queue within one connection or deployment-time global variables as a need for dynamic connections. Use a dynamic HTTP URI only for actual HTTP behavior. Managed-only connectors, arbitrary runtime credentials/destinations, or cross-provider selection require an explicit alternative or gap; Code View is required for dynamic names.
+
 ---
 
 ## Quick Lookup: TIBCO Connector → Logic Apps Connector

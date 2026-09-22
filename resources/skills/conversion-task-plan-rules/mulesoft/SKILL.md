@@ -15,6 +15,8 @@ description: Rules for generating ordered conversion task plans. Covers mandator
 
 After reading planning results (`migration_conversion_getPlanningResults`), determine ALL conversion tasks needed based on the specific flow's planned architecture.
 
+If the plan uses dynamic built-in connections, reference `connections-json-generation-rules` section 2.1 in the relevant tasks' `executionPrompt`. Include every candidate connection and its settings, and preserve the planned selector, authorization/rejection behavior, and dynamic `connectionName` expression in Code View.
+
 ---
 
 ## 2. Mandatory Task Order

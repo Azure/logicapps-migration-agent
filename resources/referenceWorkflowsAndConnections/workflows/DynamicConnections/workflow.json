@@ -1,0 +1,49 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Execute_operation": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "serviceProviderConfiguration": {
+            "connectionName": "@if(equals(triggerBody()?['team'], 'teamA'), 'connectionA', 'connectionB')",
+            "operationId": "<operationId>",
+            "serviceProviderId": "/serviceProviders/<providerId>"
+          },
+          "parameters": {
+            "<operationParameterName>": "@triggerBody()?['operationInput']"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@body('Execute_operation')"
+        },
+        "runAfter": {
+          "Execute_operation": ["Succeeded"]
+        }
+      }
+    },
+    "triggers": {
+      "When_a_HTTP_request_is_received": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "team": { "type": "string" },
+              "operationInput": {}
+            }
+          }
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0"
+  },
+  "kind": "Stateful"
+}

@@ -76,6 +76,16 @@ For all **other** (non-custom-code) components:
 
 ---
 
+### 3.4 Runtime Connection Selection
+
+For every migration plan, assess each source connection/action and automatically include dynamic connection selection wherever supported and applicable. Do not stop at analysis, leave eligible cases as optional recommendations, or require a separate opt-in.
+
+When source evidence shows dynamic send ports, endpoint/configuration expressions, or tenant/partner/region routing, apply `connections-json-generation-rules` section 2.1. For a known set of built-in connections with the same provider/operation, include a dynamic `connectionName` expression in the workflow definition and account for all candidate connection entries and settings in conversion. This is the default implementation for eligible scenarios, not an optional future enhancement. Preserve source routing behavior and workflow boundaries.
+
+Record source evidence, the selector-to-key mapping, provider/operation, per-target app settings, authorization and unknown-route handling, and the Code View limitation in action mappings/patterns. Keep static connections for fixed destinations; deployment-only configuration and dynamic action parameters are different concerns. When source behavior requires runtime connection selection, record any unsupported managed-only switching, arbitrary runtime destinations/credentials, or unresolved target set as a gap in that requirement, not a gap in ordinary static connectivity.
+
+Keep the existing static connection approach where there is no applicable runtime selection, and preserve normal connector-selection, authentication, and parameterization rules for unaffected actions. Multiple independent static endpoints alone do not justify inventing runtime routing. Eligible dynamic selection does not need additional user approval; ask only for genuinely missing source/configuration decisions. A valid static managed connection is not a migration gap merely because this dynamic pattern is unsupported.
+
 ## 4. Reference Lookup (MANDATORY)
 
 Before generating any workflow definition:
@@ -83,7 +93,7 @@ Before generating any workflow definition:
 1. Read the skill `source-to-logic-apps-mapping` to look up the exact Logic Apps Standard equivalent for every MuleSoft processor.
 2. Call `migration_searchReferenceWorkflows` and `migration_readReferenceWorkflow` to find real reference examples.
 3. Use the operation names from the mapping skill as search terms.
-4. Copy exact `serviceProviderConfiguration` and `operationId` values from references — do NOT invent these.
+4. Copy exact provider IDs, `operationId` values, and configuration structure from references. Adapt only `connectionName` to the planned literal key or validated dynamic expression; read the `DynamicConnections` references when using runtime selection.
 5. If the first search returns no relevant results, RETRY 2-4 more times with different word combinations.
 6. Also call `migration_readReferenceDoc` to verify connector capabilities.
 
