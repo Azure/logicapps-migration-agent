@@ -28,7 +28,7 @@ export class ErrorHandler implements vscode.Disposable {
     private static instance: ErrorHandler | undefined;
     private context: vscode.ExtensionContext | undefined;
     private readonly issueUrl =
-        'https://github.com/microsoft/integration-migration-agent/issues/new';
+        'https://github.com/Azure/logicapps-migration-agent/issues/new';
 
     private constructor() {}
 

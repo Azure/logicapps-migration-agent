@@ -385,7 +385,7 @@ export class PrerequisitesChecker {
             } else if (response === learnMore) {
                 await vscode.env.openExternal(
                     vscode.Uri.parse(
-                        'https://github.com/microsoft/integration-migration-agent#prerequisites'
+                        'https://github.com/Azure/logicapps-migration-agent#prerequisites'
                     )
                 );
             }
