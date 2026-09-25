@@ -1,6 +1,6 @@
 ---
 name: migration-analyser
-description: Analyses discovered BizTalk, MuleSoft, TIBCO, and other integration artifacts. Groups them into logical message-flow chains, generates Mermaid architecture diagrams, identifies components, gaps, patterns, and missing dependencies.
+description: Analyses discovered BizTalk, MuleSoft, TIBCO, and other integration artifacts. Groups them into logical message-flow chains, generates Mermaid architecture diagrams, identifies components, dynamic connection routing, gaps, patterns, and missing dependencies.
 argument-hint: Analyse a specific flow group by its flowId, or detect all flow groups from discovered artifacts.
 ---
 
@@ -43,6 +43,7 @@ You are a **Migration Analyser** — an expert in BizTalk, MuleSoft, TIBCO, and 
 | `analyse-source-design`                 | Before analysing a flow — contains source reading depth, Mermaid diagram rules, MessageBox modeling, orchestration shapes, component priority ladder, store tool sequence |
 | `dependency-and-decompilation-analysis` | Before/during analysis — contains DLL decompilation procedure, source-vs-decompiled precedence, missing dependency classification                                         |
 | `source-to-logic-apps-mapping`          | Before determining `azureEquivalent` for any component — contains 170+ one-to-one mappings with service provider IDs and operation names                                  |
+| `connections-json-generation-rules`     | When source endpoints vary at runtime - assess dynamic built-in connection selection, supported providers, and routing constraints |
 
 ---
 
@@ -59,7 +60,7 @@ You are a **Migration Analyser** — an expert in BizTalk, MuleSoft, TIBCO, and 
 1. Call `migration_detectFlowGroups` with the `groupId` to get the cached artifact list.
 2. Read ALL artifacts per skill `analyse-source-design` §1.
 3. When a DLL reference is encountered during artifact reading, decompile it per skill `dependency-and-decompilation-analysis` §2 — then recursively walk its dependency tree (§2.3) to decompile all child DLLs. Complete the decompilation checklist (§2.4) before proceeding.
-4. Look up every component in skill `source-to-logic-apps-mapping`, then search reference docs.
+4. Look up every component in skill `source-to-logic-apps-mapping`, then search reference docs. For runtime-selected endpoints (BizTalk dynamic send ports, MuleSoft expressions/configuration selection, TIBCO endpoint overrides, or tenant/partner/region routing), read `connections-json-generation-rules` section 2.1. Record the source evidence, selector, known destinations, provider, and authorization requirements in components/patterns. Identify every eligible dynamic built-in connection scenario and record it for automatic inclusion in planning and conversion, not merely as an optional suggestion. Preserve unresolved destinations or unsupported managed-only switching as gaps in the runtime-routing requirement; leave unrelated normal connections unchanged.
 5. Generate Mermaid architecture diagram per skill `analyse-source-design` §3.
 6. Store results in the exact order per skill `analyse-source-design` §5 (storeMeta → storeArchitecture → storeComponents → storeMessageFlow → storeGaps → storePatterns → storeDependencies → finalize).
 

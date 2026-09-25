@@ -46,7 +46,7 @@ You are a **Migration Planner** — an expert in translating discovered integrat
 | `dependency-and-decompilation-analysis` | When source behavior exists only in .dll/.exe — MUST decompile before designing |
 | `source-to-logic-apps-mapping` | Before choosing connectors/actions — contains 170+ component mappings with service provider IDs |
 | `workflow-json-generation-rules` | Before generating workflow definitions — contains action selection, splitOn, file trigger semantics, pre-finalize checklist |
-| `connections-json-generation-rules` | Before generating connections — contains format rules and connector parameters |
+| `connections-json-generation-rules` | Before designing or generating connections - contains format rules, connector parameters, and dynamic connection selection criteria |
 
 ---
 
@@ -73,7 +73,7 @@ Generate a `flowchart TB` showing triggers, workflows, Azure services, and desti
 
 1. Look up every component in skill `source-to-logic-apps-mapping`.
 2. Search `migration_searchReferenceWorkflows` and `migration_readReferenceWorkflow` with those names.
-3. Copy exact `serviceProviderConfiguration` and `operationId` from references — never invent.
+3. Copy the exact provider, `operationId`, and parameter structure from references - never invent. For planned dynamic routing, replace only `connectionName` with the validated selector expression and read the `DynamicConnections` workflow and connection references.
 
 ### STEP 6 — Store Planning Results
 

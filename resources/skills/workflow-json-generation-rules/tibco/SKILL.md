@@ -17,7 +17,7 @@ BEFORE writing ANY `workflow.json`:
 2. Use those operation names to call `migration_searchReferenceWorkflows` and `migration_readReferenceWorkflow` to get exact `operationId` and `serviceProviderConfiguration` for each trigger/action.
 3. If the first search returns no relevant results, RETRY 2-4 more times with different word combinations.
 4. Also call `migration_readReferenceDoc` with `action="search"` then `action="read"` to verify connector capabilities.
-5. Do NOT invent `operationId` values, `serviceProviderConfiguration` structures, or connection formats — ALWAYS copy from references.
+5. Do NOT invent `operationId` values, provider IDs, `serviceProviderConfiguration` structures, or connection formats. Copy those from references; adapt `connectionName` to the planned literal key or dynamic expression as described below.
 
 ---
 
@@ -72,6 +72,13 @@ Prefer `ServiceProvider` type with `serviceProviderConfiguration` over `ApiConne
 - In `parameters.json`, `@appsetting('name')` is the only valid expression type.
 - In `connections.json`, only `@parameters(...)` and `@appsetting(...)` are valid.
 - For more details, fetch Microsoft Learn docs about Standard parameters and app settings (`create-parameters-workflows`, `edit-app-settings-host-settings`).
+
+### Dynamic Connection Names
+
+- When runtime destination selection is required, read `connections-json-generation-rules` section 2.1 and the `DynamicConnections` references before generating the workflow.
+- On a `ServiceProvider` action, `inputs.serviceProviderConfiguration.connectionName` may be a workflow expression such as `@outputs('Resolve_Connection')`. Keep the provider and operation fixed and validate/authorize the selector. Include a resolver's `Succeeded` dependency in `runAfter` only when referencing that preceding action; an inline expression does not require an extra resolver action.
+- The expression must select an existing, case-sensitive `serviceProviderConnections` key for the same provider. Do not apply this to managed `ApiConnection` actions or infer runtime-selected triggers. Keep request-time expressions in the workflow, not in `connections.json`.
+- Automatically generate dynamic names for every eligible action in the migration plan, using Code View and documenting the designer limitation. For unaffected static built-in and managed actions, preserve their existing connection references, connector types, inputs, and `runAfter`. Do not require a separate opt-in for applicable dynamic routing.
 
 ---
 
@@ -215,6 +222,7 @@ Before storing workflow definitions, cross-check EVERY action against this table
 
 | Scenario                    | DO (correct)                                         | DON'T (wrong — fix before storing)                     |
 | --------------------------- | ---------------------------------------------------- | ------------------------------------------------------ |
+| Runtime connection routing   | Guarded expression selecting predefined same-provider keys | Managed dynamic connection, unknown-key fallback, or static replacement of the planned expression |
 | Trigger output assumption   | Verify trigger return type from ref                  | Assume trigger returns file/message content directly   |
 | File/Blob/FTP trigger       | Add `getFileContent`/`readBlob` action after trigger | Use `triggerBody()` for content (it only has metadata) |
 | XML field extraction        | `XmlParse` action + schema                           | `xpath()` expression when schema exists                |

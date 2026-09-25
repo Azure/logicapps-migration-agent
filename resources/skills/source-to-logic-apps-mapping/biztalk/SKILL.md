@@ -979,7 +979,7 @@ BizTalk Server engine and platform features mapped to Logic Apps Standard equiva
 | 8   | **Parallel Convoy**   | Stateful workflow + multiple triggers/correlation | Use separate workflows or parallel branches with correlation.     |
 | 9   | **Scatter-Gather**    | `Parallel Branch` with join                       | Fan-out to multiple endpoints in parallel, collect all results.   |
 | 10  | **Aggregation**       | `For Each` + `Append to Array` + `Compose`        | Iterate and build up an aggregated result.                        |
-| 11  | **Dynamic Send Port** | HTTP action with dynamic URI                      | Use expressions for dynamic endpoint: `@{variables('endpoint')}`. |
+| 11  | **Dynamic Send Port** | Built-in `ServiceProvider` action with dynamic `connectionName` for known same-provider destinations; HTTP action with dynamic URI for HTTP-only behavior | Inspect `IsDynamic`, `Microsoft.XLANGs.BaseTypes.Address` / transport assignments, and routing lookups. Read `connections-json-generation-rules` section 2.1. Select predefined connections with an authorized allowlist; arbitrary runtime endpoints/credentials or cross-provider routing require an explicit alternative/gap. |
 
 ### Monitoring & Operations
 
@@ -1415,7 +1415,7 @@ Alphabetical index for fast reference:
 | Binding Files              | `connections.json` + `parameters.json`    |
 | Content-Based Routing      | `Condition` / `Switch`                    |
 | Debatching                 | `SplitOn` on trigger                      |
-| Dynamic Send Port          | HTTP action with dynamic URI              |
+| Dynamic Send Port          | Dynamic `ServiceProvider` connection selection for known same-provider destinations; dynamic URI only for HTTP behavior (see Integration Patterns) |
 | Host / Host Instances      | App Service Plan / Workflow App           |
 | Liquid Templates           | Liquid template action                    |
 | Message Enrichment         | Inline actions + `Compose`                |
