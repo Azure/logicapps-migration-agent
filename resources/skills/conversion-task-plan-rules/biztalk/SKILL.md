@@ -15,7 +15,9 @@ description: Rules for generating ordered conversion task plans. Covers mandator
 
 After reading planning results (`migration_conversion_getPlanningResults`), determine ALL conversion tasks needed based on the specific flow's planned architecture.
 
-If the plan uses dynamic built-in connections, reference `connections-json-generation-rules` section 2.1 in the relevant tasks' `executionPrompt`. Include every candidate connection and its settings, and preserve the planned selector, authorization/rejection behavior, and dynamic `connectionName` expression in Code View.
+Only when the flow needs dynamic connections, include the source routing expression, required connection entries/settings, and routing tests in the relevant tasks' `executionPrompt`, following `connections-json-generation-rules` section 2.1. Leave normal connection generation unchanged.
+
+If routing details are missing, inspect the referenced source artifacts and planning results first. Proceed when the required behavior is clear; report only genuinely unresolved or contradictory requirements. Do not invent routing or silently replace required runtime selection with a fixed destination.
 
 ---
 
