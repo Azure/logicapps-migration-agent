@@ -34,6 +34,7 @@ interface PlanForFlowParams {
     flowName: string;
     flowId: string;
     artifactList: string;
+    reconsiderChoices?: boolean;
 }
 
 interface ConversionForFlowParams {
@@ -137,24 +138,28 @@ export class ChatPrompts {
     static planForFlow(params: PlanForFlowParams): string {
         return (
             `@migration-planner Plan the migration for flow "${params.flowName}" (flowId: "${params.flowId}").\n` +
-            AUTONOMOUS_MODE_SHORT +
+            'DECISION-FIRST PLANNING: Reuse known choices, ask only critical unresolved questions through migration_planning_preflight, then generate ONE selected plan. Make minor behavior-preserving choices yourself. Never generate full alternatives just to compare them. Stop if the user cancels.\n' +
             SKILL_AUTHORITY +
             GLOBAL_LOOKUP_POLICY +
             '\nREQUIRED SKILLS (read ALL before starting):\n' +
+            '- `planning-decision-guidance` — concise preflight, hosting compatibility, modernization consent, and decision handoff\n' +
             '- `logic-apps-planning-rules` — workflow split policy, coverage requirements, planning store sequence\n' +
             '- `dependency-and-decompilation-analysis` — MUST decompile any .dll/.exe whose source is missing before designing workflows\n' +
             '- `source-to-logic-apps-mapping` — component equivalents, service provider IDs, operation names\n' +
             '- `workflow-json-generation-rules` — workflow.json authoring, splitOn, file trigger semantics\n' +
             '- `connections-json-generation-rules` — connections.json format and connector parameters\n' +
             `\n${params.artifactList}\n` +
+            (params.reconsiderChoices
+                ? '\nThe user requested changing planning choices. Use reconsider=true when resolving the deployment target and the relevant critical questions. Preserve existing plan history.\n'
+                : '\nReuse saved preflight answers; do not reopen answered questions unless source or target constraints invalidate them.\n') +
             '\nPROCEDURE:\n' +
             `1. Call migration_detectFlowGroups with groupId="${params.flowId}", then call migration_getDiscoveryAnalysis to get cached analysis.\n` +
             '2. If discovery analysis is available, use it. Otherwise fall back to migration_getArtifactDetails and migration_readSourceFile.\n' +
             '3. If any dependency or detail cannot be resolved from this flow group context, run full-project artifact search and source reads before finalizing the plan.\n' +
-            '4. Design the target architecture per skill `logic-apps-planning-rules`.\n' +
+            '4. Read migration_planning_preflight, resolve hosting first, validate target capabilities, and resolve any critical broker/modernization choices. Follow planning-decision-guidance before designing the selected architecture.\n' +
             '5. Generate Mermaid flowchart TB showing target architecture.\n' +
             '6. Look up every component in skill `source-to-logic-apps-mapping`, then search reference workflows with those names.\n' +
-            '7. Store planning results in the exact order specified by skill `logic-apps-planning-rules` (storeMeta → storeArchitecture → storeWorkflowDefinition per workflow → storeAzureComponents → storeActionMappings → storeGaps → storePatterns → storeArtifactDispositions → finalize).'
+            '7. Store one plan in the order from logic-apps-planning-rules. Call storeMeta with startNew=true and a brief containing scenario, indicative timeline, assumptions, tradeoffs, and evidenced modernization opportunities. Finalize once; history is saved automatically.'
         );
     }
 
@@ -169,6 +174,7 @@ export class ChatPrompts {
         return (
             `@migration-converter Convert the flow "${params.flowName}" (flowId: "${params.flowId}").\n` +
             AUTONOMOUS_MODE_SHORT +
+            'PLANNING HANDOFF: Read finalized preferences and brief from migration_conversion_getPlanningResults. Preserve the selected host, broker, modernization scope, and authentication constraints in every task executionPrompt. Do not substitute defaults or use Azure Workflow Service Plan deployment instructions for hybrid.\n' +
             SKILL_AUTHORITY +
             GLOBAL_LOOKUP_POLICY +
             '\nREQUIRED SKILLS (read ALL before starting):\n' +

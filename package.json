@@ -981,11 +981,92 @@
                 }
             },
             {
+                "name": "migration_planning_preflight",
+                "displayName": "Resolve Planning Choices",
+                "toolReferenceName": "migration_planning_preflight",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Before generating a plan, read saved choices, then resolve the deployment target with questions=[] if unknown. After checking source evidence and capabilities for that host, resolve at most two consequential unanswered choices (e.g. broker or preserve-code versus native-first). Shows short interactive choices one at a time and persists answers and pending questions. Reuses saved answers and rechecks configuration-sourced hosting. If hosting changes, host-dependent questions remain pending until resubmitted after capability verification. Do not ask minor deterministic choices or generate competing full plans. On cancellation or error, stop. When ready=false with pendingQuestions, continue preflight but do not generate artifacts. Set reconsider=true only at the user's request: it reopens supplied questions, or hosting alone when questions=[].",
+                "userDescription": "Choose important migration options before generating a single plan",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "action": {
+                            "type": "string",
+                            "enum": ["read", "resolve"]
+                        },
+                        "reconsider": {
+                            "type": "boolean",
+                            "description": "Only at the user's request: reopen supplied questions, or hosting alone when questions is empty. Does not reopen hosting during a broker/modernization-only review."
+                        },
+                        "deploymentTarget": {
+                            "type": "string",
+                            "enum": ["workflow-service-plan", "hybrid", "ase-v3"],
+                            "description": "Only a hosting target explicitly supplied by the user in their request. Saves that answer without asking again. Never infer from source or use a default."
+                        },
+                        "questions": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "description": "Only critical unresolved choices after hosting is known. Deployment is handled automatically. Usually one broker choice and/or one modernization strategy choice. Use stable IDs.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "description": "Stable decision ID, e.g. messaging or modernization"
+                                    },
+                                    "question": {
+                                        "type": "string",
+                                        "maxLength": 120
+                                    },
+                                    "whyItMatters": {
+                                        "type": "string",
+                                        "maxLength": 240,
+                                        "description": "One sentence of source evidence and material impact"
+                                    },
+                                    "recommendedOptionId": {
+                                        "type": "string"
+                                    },
+                                    "answerFromUser": {
+                                        "type": "string",
+                                        "description": "Only an option ID explicitly chosen in the user's request; persists without asking again. Never supply the agent's own recommendation here."
+                                    },
+                                    "options": {
+                                        "type": "array",
+                                        "minItems": 2,
+                                        "maxItems": 4,
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": { "type": "string" },
+                                                "label": { "type": "string", "maxLength": 80 },
+                                                "description": {
+                                                    "type": "string",
+                                                    "maxLength": 240,
+                                                    "description": "Brief benefit/tradeoff and target support caveat"
+                                                }
+                                            },
+                                            "required": ["id", "label", "description"]
+                                        }
+                                    }
+                                },
+                                "required": ["id", "question", "whyItMatters", "options"]
+                            }
+                        }
+                    },
+                    "required": ["flowId", "action"]
+                }
+            },
+            {
                 "name": "migration_planning_storeMeta",
                 "displayName": "Store Planning Metadata",
                 "toolReferenceName": "migration_planning_storeMeta",
                 "canBeReferencedInPrompt": true,
-                "modelDescription": "Store the planning metadata for a flow. This creates the planning folder and writes plan-meta.json with flowId, flowName, explanation, and summary. Call this FIRST when starting planning for a flow, before storing individual artifact files (architecture, workflow definition, action mappings, gaps, patterns). Each planning artifact is stored as a separate file.",
+                "modelDescription": "After resolving migration_planning_preflight, store metadata and a short stakeholder brief for the ONE selected plan. Saved choices are attached automatically. Call this before storing planning artifacts. Use startNew=true for a full generation to clear draft artifacts only, preserving finalized plans, history, and choices. For incremental edits omit startNew and update the brief and affected artifacts. Timelines are indicative: state assumptions or say not estimated. Record evidenced modernization opportunities, including applied, retained, and deferred changes; never invent source evidence.",
                 "userDescription": "Store planning metadata (flow info, explanation, summary) to disk",
                 "inputSchema": {
                     "type": "object",
@@ -1005,13 +1086,52 @@
                         "summary": {
                             "type": "string",
                             "description": "Brief summary of the migration plan"
+                        },
+                        "startNew": {
+                            "type": "boolean",
+                            "description": "Clear previous draft artifacts for a full generation, preserving history and choices"
+                        },
+                        "brief": {
+                            "type": "object",
+                            "properties": {
+                                "scenarioName": { "type": "string" },
+                                "estimatedTimeline": {
+                                    "type": "string",
+                                    "description": "Indicative elapsed timeline and capacity basis, or Not estimated; do not invent precision"
+                                },
+                                "assumptions": { "type": "array", "items": { "type": "string" } },
+                                "tradeoffs": { "type": "array", "items": { "type": "string" } },
+                                "opportunities": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "component": { "type": "string" },
+                                            "currentApproach": { "type": "string" },
+                                            "proposedApproach": { "type": "string" },
+                                            "disposition": {
+                                                "type": "string",
+                                                "enum": ["applied", "retained", "deferred"]
+                                            },
+                                            "reason": { "type": "string" },
+                                            "evidence": {
+                                                "type": "string",
+                                                "description": "Artifact/method/configuration reference and capability validation; no secret values"
+                                            }
+                                        },
+                                        "required": ["component", "currentApproach", "proposedApproach", "disposition", "reason", "evidence"]
+                                    }
+                                }
+                            },
+                            "required": ["scenarioName", "estimatedTimeline", "assumptions", "tradeoffs", "opportunities"]
                         }
                     },
                     "required": [
                         "flowId",
                         "flowName",
                         "explanation",
-                        "summary"
+                        "summary",
+                        "brief"
                     ]
                 }
             },
@@ -1395,7 +1515,7 @@
                 "displayName": "Finalize Migration Plan",
                 "toolReferenceName": "migration_planning_finalize",
                 "canBeReferencedInPrompt": true,
-                "modelDescription": "Finalize the migration plan for a flow. Validates that all required planning files exist (plan-meta.json, architecture.mmd, workflow-definition.json, action-mappings.json, gaps.json, patterns.json, artifact-dispositions.json), assembles the complete plan, and displays it in the Planning webview. Call this LAST after all individual planning files have been stored using the other migration_planning_store* tools. If any files are missing, an error is returned listing the missing files.",
+                "modelDescription": "Finalize the one selected migration plan. Requires resolved, unchanged preflight choices and a stakeholder brief, validates the required planning files, and persists an immutable version with choices, opportunities, and tradeoffs for history. The Planning view and conversion use the latest finalized plan; saved versions do not change it. Call this LAST after every full generation or incremental update.",
                 "userDescription": "Validate all planning files and display the plan in the Planning webview",
                 "inputSchema": {
                     "type": "object",
@@ -1828,7 +1948,7 @@
                     "enumDescriptions": [
                         "Workflow Service Plan (Supported)",
                         "App Service Environment V3 (TBD)",
-                        "Hybrid (TBD)"
+                        "Hybrid (planning supported; deployment requires target-specific validation)"
                     ],
                     "default": "workflow-service-plan",
                     "markdownDescription": "Target platform deployment model for Logic Apps Standard"
