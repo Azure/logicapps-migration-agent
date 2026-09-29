@@ -35,10 +35,10 @@ const CONVERTER_AGENT_FILENAME = 'migration-converter.agent.md';
 const ANALYSER_AGENT_VERSION = '2.4.0';
 const ANALYSER_VERSION_TAG = `<!-- migration-analyser-agent v${ANALYSER_AGENT_VERSION} -->`;
 
-const PLANNER_AGENT_VERSION = '2.9.0';
+const PLANNER_AGENT_VERSION = '2.10.0';
 const PLANNER_VERSION_TAG = `<!-- migration-planner-agent v${PLANNER_AGENT_VERSION} -->`;
 
-const CONVERTER_AGENT_VERSION = '2.20.0';
+const CONVERTER_AGENT_VERSION = '2.21.0';
 const CONVERTER_VERSION_TAG = `<!-- migration-converter-agent v${CONVERTER_AGENT_VERSION} -->`;
 
 // =============================================================================
@@ -243,7 +243,7 @@ export class AgentFileProvisioner {
     // Skills
     // -------------------------------------------------------------------------
 
-    private static readonly SKILLS_VERSION = '10.24.0';
+    private static readonly SKILLS_VERSION = '10.25.0';
     private static readonly SKILLS_VERSION_TAG = `<!-- skills v${AgentFileProvisioner.SKILLS_VERSION} -->`;
 
     /**
@@ -286,6 +286,10 @@ export class AgentFileProvisioner {
         await fs.promises.mkdir(skillsDir, { recursive: true });
 
         const skills: { folder: string; content: string }[] = [
+            {
+                folder: 'planning-decision-guidance',
+                content: this.buildSkillFromResource('planning-decision-guidance', platformFolder),
+            },
             {
                 folder: 'dotnet-local-functions-logic-apps',
                 content: this.buildCustomCodeSkill(platformFolder),
