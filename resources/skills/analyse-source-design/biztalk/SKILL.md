@@ -15,6 +15,8 @@ description: Rules for analysing a single flow group's architecture. Covers sour
 - Extract ALL configuration details — adapter type, paths, polling intervals, pipeline stages, port names, schema fields, orchestration shapes, map field mappings, retry config.
 - ZERO HALLUCINATION — every value in the architecture diagram MUST come from source files.
 
+- Check port bindings, address/transport assignments, and adapter overrides for runtime connection switching. Follow `connections-json-generation-rules` section 2.1 and the Runtime Destination Selection guidance in `source-to-logic-apps-mapping` only where dynamic connections are needed; otherwise preserve the normal connection approach.
+
 ---
 
 ## 2. Reference Lookup (MANDATORY)

@@ -30,12 +30,12 @@
     "icon": "resources/icons/extension-icon.png",
     "repository": {
         "type": "git",
-        "url": "https://github.com/microsoft/integration-migration-agent"
+        "url": "https://github.com/Azure/logicapps-migration-agent"
     },
     "bugs": {
-        "url": "https://github.com/microsoft/integration-migration-agent/issues"
+        "url": "https://github.com/Azure/logicapps-migration-agent/issues"
     },
-    "homepage": "https://github.com/microsoft/integration-migration-agent#readme",
+    "homepage": "https://github.com/Azure/logicapps-migration-agent#readme",
     "activationEvents": [
         "onStartupFinished",
         "workspaceContains:**/*.btproj",
