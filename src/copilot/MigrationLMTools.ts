@@ -17,6 +17,8 @@
  */
 
 import * as vscode from 'vscode';
+import * as path from 'path';
+import { randomUUID } from 'crypto';
 import { InventoryService } from '../stages/discovery/InventoryService';
 import { ParsedArtifact } from '../stages/discovery/types';
 import { LoggingService } from '../services/LoggingService';
@@ -33,7 +35,7 @@ import { validateWorkflowDefinition } from '../workflowSchema';
 import { ConversionService } from '../stages/conversion/ConversionService';
 import { ConversionFileService } from '../stages/conversion/ConversionFileService';
 import { MermaidValidationService } from '../services/MermaidValidationService';
-import type { ConversionTask, ConversionTaskOutput } from '../stages/conversion/types';
+import type { ConversionTask, ConversionTaskOutput, ConversionTaskPlan } from '../stages/conversion/types';
 
 // ============================================================================
 // Tool Input Types
@@ -4919,6 +4921,123 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
 
 // --------------- migration_conversion_finalize ---------------
 
+/**
+ * Deterministically stamp every generated workflow.json for a flow with a
+ * `definition.metadata.MigrationMetadata` block (correlation id + timestamp).
+ * This is machine-generated data, so finalize writes it itself rather than
+ * relying on the agent — guaranteeing presence with no rejection/retry loop.
+ * An already-valid block is preserved (idempotent on re-finalize).
+ */
+async function applyWorkflowMigrationMetadata(
+    plan: ConversionTaskPlan,
+    logger: LoggingService
+): Promise<number> {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+    const resolveUri = (rel: string): vscode.Uri => {
+        const clean = rel.replace(/\\/g, '/').replace(/^\.\//, '');
+        const abs =
+            path.isAbsolute(clean) || !workspaceRoot ? clean : path.join(workspaceRoot, clean);
+        return vscode.Uri.file(abs);
+    };
+
+    // Collect workflow.json files listed in task outputs, plus the
+    // out/<LogicApp> roots so we can scan for any that weren't listed.
+    const outRoots = new Set<string>();
+    const found = new Map<string, vscode.Uri>();
+    for (const task of plan.tasks) {
+        for (const f of task.output?.generatedFiles ?? []) {
+            const clean = (f || '').replace(/\\/g, '/').replace(/^\.\//, '');
+            if (clean.toLowerCase().endsWith('workflow.json')) {
+                const uri = resolveUri(clean);
+                found.set(uri.fsPath, uri);
+            }
+            const outMatch = clean.match(/^out\/[^/]+/);
+            if (outMatch) {
+                outRoots.add(outMatch[0]);
+            }
+        }
+    }
+
+    const walk = async (dir: vscode.Uri): Promise<void> => {
+        let entries: [string, vscode.FileType][];
+        try {
+            entries = await vscode.workspace.fs.readDirectory(dir);
+        } catch {
+            return;
+        }
+        for (const [name, type] of entries) {
+            const child = vscode.Uri.joinPath(dir, name);
+            if (type === vscode.FileType.Directory) {
+                await walk(child);
+            } else if (name.toLowerCase() === 'workflow.json') {
+                found.set(child.fsPath, child);
+            }
+        }
+    };
+    for (const root of outRoots) {
+        await walk(resolveUri(root));
+    }
+
+    // One correlation id + timestamp for the whole flow's finalize run.
+    const correlationId = randomUUID();
+    const migrationDate = new Date().toISOString().slice(0, 19);
+
+    let stamped = 0;
+    for (const uri of found.values()) {
+        let parsed: Record<string, unknown>;
+        try {
+            const raw = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString('utf-8');
+            parsed = JSON.parse(raw);
+        } catch {
+            continue; // Skip unreadable/invalid JSON.
+        }
+
+        const definition = (
+            parsed.definition && typeof parsed.definition === 'object' ? parsed.definition : parsed
+        ) as Record<string, unknown>;
+
+        const metadata = (
+            definition.metadata && typeof definition.metadata === 'object'
+                ? definition.metadata
+                : {}
+        ) as Record<string, unknown>;
+
+        const existing = metadata.MigrationMetadata as
+            | { MigrationCorrelationId?: unknown; MigrationDate?: unknown }
+            | undefined;
+        const hasValid =
+            !!existing &&
+            typeof existing.MigrationCorrelationId === 'string' &&
+            existing.MigrationCorrelationId.trim().length > 0 &&
+            typeof existing.MigrationDate === 'string' &&
+            existing.MigrationDate.trim().length > 0;
+        if (hasValid) {
+            continue; // Preserve an already-valid block.
+        }
+
+        metadata.MigrationMetadata = {
+            MigrationCorrelationId: correlationId,
+            MigrationDate: migrationDate,
+        };
+        definition.metadata = metadata;
+
+        try {
+            await vscode.workspace.fs.writeFile(
+                uri,
+                Buffer.from(JSON.stringify(parsed, null, 2) + '\n', 'utf-8')
+            );
+            stamped++;
+        } catch (err) {
+            logger.warn(
+                `[LMTool] migration_conversion_finalize: failed to stamp MigrationMetadata into ${uri.fsPath}: ${err instanceof Error ? err.message : String(err)}`
+            );
+        }
+    }
+
+    return stamped;
+}
+
 class ConversionFinalizeTool implements vscode.LanguageModelTool<ConversionFinalizeInput> {
     async invoke(
         options: vscode.LanguageModelToolInvocationOptions<ConversionFinalizeInput>,
@@ -4966,6 +5085,10 @@ class ConversionFinalizeTool implements vscode.LanguageModelTool<ConversionFinal
                 ]);
             }
 
+            // Deterministically stamp MigrationMetadata into every generated workflow.json.
+            // Machine-generated data — no agent involvement, no rejection/retry loop.
+            const stampedCount = await applyWorkflowMigrationMetadata(plan, logger);
+
             // Mark the flow as completed
             const flow = conversionService.getFlows().find((f) => f.id === flowId);
             if (flow) {
@@ -5007,6 +5130,7 @@ class ConversionFinalizeTool implements vscode.LanguageModelTool<ConversionFinal
                         success: true,
                         flowId,
                         totalTasks: plan.tasks.length,
+                        migrationMetadataStamped: stampedCount,
                         message: `Conversion finalized for flow "${flowId}". All ${plan.tasks.length} tasks completed. The Conversion webview has been refreshed.`,
                     })
                 ),

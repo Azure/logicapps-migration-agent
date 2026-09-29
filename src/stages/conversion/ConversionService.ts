@@ -199,7 +199,12 @@ export class ConversionService implements vscode.Disposable {
             const flow = this.state.flows.find((f) => f.id === flowId);
             if (flow) {
                 flow.status = 'tasks-ready';
+                // A freshly generated task plan starts clean — clear any stale
+                // Execute All orchestration state so the first task is actionable
+                // instead of being stuck showing "Executing...".
+                flow.executeAllActive = false;
             }
+            this.executeAllActiveFlows.delete(flowId);
 
             await this.saveStateToStorage();
             this._onStateChange.fire({ type: 'task-plan-generated', flowId });
@@ -361,6 +366,47 @@ export class ConversionService implements vscode.Disposable {
      */
     public isExecuteAllActive(flowId: string): boolean {
         return this.executeAllActiveFlows.has(flowId);
+    }
+
+    /**
+     * Stop a stuck execution for a flow. Resets any in-progress tasks back to
+     * pending and clears Execute All orchestration state. Used when the agent
+     * chat was stopped mid-run, leaving the UI stuck showing "Executing...".
+     */
+    public async stopExecution(flowId: string): Promise<void> {
+        if (!this.state) {
+            return;
+        }
+
+        const plan = this.state.taskPlans[flowId];
+        if (plan) {
+            for (const task of plan.tasks) {
+                if (task.status === 'in-progress') {
+                    (task as { status: string }).status = 'pending';
+                    try {
+                        const { ConversionFileService } = require('./ConversionFileService'); // eslint-disable-line
+                        ConversionFileService.getInstance().updateTaskStatus(
+                            flowId,
+                            task.id,
+                            'pending'
+                        );
+                    } catch {
+                        // Non-critical — disk persistence is best-effort
+                    }
+                }
+            }
+        }
+
+        this.executeAllActiveFlows.delete(flowId);
+        const flow = this.state.flows.find((f) => f.id === flowId);
+        if (flow) {
+            flow.executeAllActive = false;
+            flow.status = 'tasks-ready';
+        }
+        this.state.updatedAt = new Date().toISOString();
+
+        await this.saveStateToStorage();
+        this._onStateChange.fire({ type: 'task-updated', flowId });
     }
 
     /**

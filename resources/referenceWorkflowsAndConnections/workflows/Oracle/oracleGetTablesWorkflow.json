@@ -1,0 +1,45 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Get_tables": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "ownedTables": "OwnedTablesParameter"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "oracledb",
+            "operationId": "getTables",
+            "serviceProviderId": "/serviceProviders/oracledb"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@body('Get_tables')"
+        },
+        "runAfter": {
+          "Get_tables": [
+            "Succeeded",
+            "Failed"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}
