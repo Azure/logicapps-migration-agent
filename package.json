@@ -2,7 +2,7 @@
     "name": "logicapps-migration-agent",
     "displayName": "Logic Apps Migration Agent",
     "description": "Migrate BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard with AI-powered agent",
-    "version": "1.14.0",
+    "version": "1.15.0",
     "aiKey": "setInGitHubBuild",
     "publisher": "ms-azuretools",
     "license": "MIT",
@@ -30,12 +30,12 @@
     "icon": "resources/icons/extension-icon.png",
     "repository": {
         "type": "git",
-        "url": "https://github.com/microsoft/integration-migration-agent"
+        "url": "https://github.com/Azure/logicapps-migration-agent"
     },
     "bugs": {
-        "url": "https://github.com/microsoft/integration-migration-agent/issues"
+        "url": "https://github.com/Azure/logicapps-migration-agent/issues"
     },
-    "homepage": "https://github.com/microsoft/integration-migration-agent#readme",
+    "homepage": "https://github.com/Azure/logicapps-migration-agent#readme",
     "activationEvents": [
         "onStartupFinished",
         "workspaceContains:**/*.btproj",

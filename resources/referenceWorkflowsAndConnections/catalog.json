@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-17T07:07:42.133Z",
-  "totalEntries": 314,
+  "generatedAt": "2026-09-22T08:58:25.908Z",
+  "totalEntries": 316,
   "entries": [
     {
       "id": "workflows/Agent",
@@ -552,6 +552,37 @@
         "compose",
         "csharpscriptcode",
         "response"
+      ]
+    },
+    {
+      "id": "workflows/DynamicConnections",
+      "category": "workflow",
+      "folder": "DynamicConnections",
+      "path": "workflows/DynamicConnections/workflow.json",
+      "kind": "Stateful",
+      "triggerTypes": [
+        "Request"
+      ],
+      "actionTypes": [
+        "ServiceProvider",
+        "Response"
+      ],
+      "serviceProviderIds": [
+        "/serviceProviders/<providerId>"
+      ],
+      "operationIds": [
+        "<operationId>"
+      ],
+      "apiConnectionRefs": [],
+      "hasSplitOn": false,
+      "actionCount": 2,
+      "tags": [
+        "dynamic",
+        "connections",
+        "request",
+        "serviceprovider",
+        "response",
+        "<providerid>"
       ]
     },
     {
@@ -8758,6 +8789,39 @@
         "service-provider",
         "agent",
         "ai"
+      ]
+    },
+    {
+      "id": "connections/DynamicConnections",
+      "category": "connection",
+      "folder": "DynamicConnections",
+      "path": "connections/DynamicConnections/connections.json",
+      "managedApis": [
+        {
+          "name": "managedConnection",
+          "apiType": "<managedApiName>"
+        }
+      ],
+      "serviceProviders": [
+        {
+          "name": "connectionA",
+          "serviceProviderId": "/serviceProviders/<providerId>",
+          "parameterSetName": null
+        },
+        {
+          "name": "connectionB",
+          "serviceProviderId": "/serviceProviders/<providerId>",
+          "parameterSetName": null
+        }
+      ],
+      "hasAgentConnections": false,
+      "tags": [
+        "dynamic",
+        "connections",
+        "<managedapiname>",
+        "managed-api",
+        "<providerid>",
+        "service-provider"
       ]
     },
     {

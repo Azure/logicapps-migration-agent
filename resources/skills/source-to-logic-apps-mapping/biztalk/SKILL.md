@@ -488,18 +488,18 @@ If Integration Account is chosen:
 |                         | BizTalk                                                                                 | Logic Apps Standard      |
 | ----------------------- | --------------------------------------------------------------------------------------- | ------------------------ |
 | **Adapter / Connector** | HTTP, Http, WCF-BasicHttp, WCF-WSHttp, WCF-NetTcp, WCF-Custom, WCF-CustomIsolated, SOAP | **HTTP**                 |
-| **Service Provider**    | —                                                                                       | `/serviceProviders/http` |
+| **Service Provider**    | —                                                                                       | None (native HTTP/Request types) |
 | **Deployment Scope**    | —                                                                                       | Any                      |
 | **Category**            | —                                                                                       | Integration              |
 
-> **Migration Note:** All WCF-based adapters and the SOAP adapter are consolidated into the single HTTP connector. WCF-specific bindings (NetTcp, etc.) are not natively supported — migrate to HTTP/HTTPS REST or SOAP-over-HTTP patterns.
+> **Migration Note:** Map HTTP-compatible behavior to native HTTP/Request operations, preserving SOAP envelopes, headers, authentication, and request/response behavior where applicable. A non-HTTP WCF binding (such as NetTcp) requires an explicit supported alternative or gap, not a silent protocol change. A variable HTTP URI is an action input, not a dynamic connection.
 
 | Type    | Operation                | Description                             |
 | ------- | ------------------------ | --------------------------------------- |
-| Trigger | `manual` _(default)_     | HTTP Request trigger (webhook/callback) |
-| Action  | `invokeHttp` _(default)_ | Make an HTTP request                    |
+| Trigger | `Request` (type)        | HTTP Request trigger (`kind: Http`)     |
+| Action  | `Http` (type)           | Make an HTTP request                    |
 
-**Connection Parameters:** None required (inline configuration)
+**Connection Parameters:** None. Configure URI, headers, body, and authentication as native action inputs; do not emit `serviceProviderConfiguration` or a connection entry. See the [HTTP action schema](https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers#http-action).
 
 ---
 
@@ -542,7 +542,7 @@ If Integration Account is chosen:
 | Action | `AS2Encode` _(default)_ | Encode an AS2 message |
 | Action | `AS2Decode`             | Decode an AS2 message |
 
-**Connection Parameters:** None
+**Connection Parameters:** None for built-in AS2 (v2); a linked Integration Account is required. Partner/agreement identities are action inputs, not per-partner connection entries. Follow the AS2 Dynamic Send Ports and MDNs guidance below.
 
 ---
 
@@ -945,7 +945,7 @@ BizTalk XLANG/s orchestration shapes map to Logic Apps workflow actions and cons
 | 23  | **Start Orchestration**     | HTTP POST to another workflow's trigger URL                | Fire and forget; async invocation.                                                  |
 | 24  | **Direct Binding**          | — (no equivalent)                                          | No MessageBox pub/sub. Use explicit triggers/actions or Service Bus for decoupling. |
 | 25  | **Correlation Set**         | Stateful workflow + `correlationId` / Service Bus sessions | Use tracked properties or Service Bus session IDs for correlation.                  |
-| 26  | **Role Link**               | — (no equivalent)                                          | No equivalent. Use configuration/parameters for dynamic endpoint resolution.        |
+| 26  | **Role Link**               | No direct equivalent; preserve partner-to-port routing     | Inspect the selected party's physical port bindings. Partner selection alone does not justify dynamic connections; follow Runtime Destination Selection below. |
 
 ### Transactions
 
@@ -979,7 +979,19 @@ BizTalk Server engine and platform features mapped to Logic Apps Standard equiva
 | 8   | **Parallel Convoy**   | Stateful workflow + multiple triggers/correlation | Use separate workflows or parallel branches with correlation.     |
 | 9   | **Scatter-Gather**    | `Parallel Branch` with join                       | Fan-out to multiple endpoints in parallel, collect all results.   |
 | 10  | **Aggregation**       | `For Each` + `Append to Array` + `Compose`        | Iterate and build up an aggregated result.                        |
-| 11  | **Dynamic Send Port** | HTTP action with dynamic URI                      | Use expressions for dynamic endpoint: `@{variables('endpoint')}`. |
+| 11  | **Dynamic Send Port** | Connector action / HTTP action | Use dynamic connections only for required runtime connection switching; see below. |
+
+#### Runtime Destination Selection (BizTalk)
+
+- Use dynamic connections only when the source switches between different connection configurations at runtime; otherwise keep normal connections and action inputs. Follow `connections-json-generation-rules` section 2.1.
+- Inspect binding `IsStatic="false"` / object-model `IsDynamic`, `Microsoft.XLANGs.BaseTypes.Address` / `TransportType`, and `BTS.OutboundTransportLocation` assignments. A dynamic-port flag alone is not enough.
+- Check WCF context overrides even on static ports: `BTS.IsDynamicSend` enables configuration overrides, while `WCF.Action` may change without it.
+- Preserve fixed branches, receive locations, and request/response behavior; dynamic send ports do not imply dynamic receive connections. Report genuinely missing or unsupported routing rather than guessing.
+
+#### AS2 Dynamic Send Ports and MDNs
+
+- `EdiIntAS.AS2To` selects the agreement; `BTS.OutboundTransportLocation` supplies the HTTP destination. Use AS2/HTTP action inputs, not per-partner connections. Preserve AS2/EDI processing, agreements, certificates, signing/encryption, and tracking requirements.
+- **MDNs:** synchronous uses the same HTTP response; asynchronous uses a separate callback (`Receipt-Delivery-Option` or agreement override). Preserve the original request/response handling.
 
 ### Monitoring & Operations
 
@@ -1415,7 +1427,7 @@ Alphabetical index for fast reference:
 | Binding Files              | `connections.json` + `parameters.json`    |
 | Content-Based Routing      | `Condition` / `Switch`                    |
 | Debatching                 | `SplitOn` on trigger                      |
-| Dynamic Send Port          | HTTP action with dynamic URI              |
+| Dynamic Send Port          | Connector action / HTTP; dynamic connections only when required |
 | Host / Host Instances      | App Service Plan / Workflow App           |
 | Liquid Templates           | Liquid template action                    |
 | Message Enrichment         | Inline actions + `Compose`                |

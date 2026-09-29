@@ -318,6 +318,10 @@ export class AgentFileProvisioner {
                 ),
             },
             {
+                folder: 'edmx-to-efcore-functions',
+                content: this.buildSkillFromResource('edmx-to-efcore-functions', platformFolder),
+            },
+            {
                 folder: 'logic-apps-planning-rules',
                 content: this.buildSkillFromResource('logic-apps-planning-rules', platformFolder),
             },

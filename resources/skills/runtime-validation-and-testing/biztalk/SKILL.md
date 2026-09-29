@@ -28,6 +28,7 @@ Test ALL workflows end-to-end locally. Run EVERY scenario:
 4. **Timeout/retry path** — if any workflow has timeout or retry logic, test it.
 5. **Resubmission path** — if the flow supports message resubmission, test it.
 6. **SplitOn check** — if any trigger returns an array and uses a `For_each` loop instead of `splitOn`, refactor to use `splitOn` and re-test.
+7. **Dynamic connections (only when used)** - test every planned destination and the source's default/error/access behavior, including missing, unknown, or unauthorized selectors. Verify unrelated connections and flow behavior remain unchanged; never use an invented fallback to make a test pass.
 
 Trigger each workflow based on trigger type:
 
