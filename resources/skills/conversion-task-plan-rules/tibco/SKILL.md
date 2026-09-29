@@ -13,8 +13,6 @@ description: Rules for generating ordered conversion task plans. Covers mandator
 
 ## 1. Task Derivation
 
-Read `planning-decision-guidance`. Carry the finalized preferences and brief into relevant task execution prompts: selected host/broker, accepted modernization, authentication and parity tests. Do not recreate rejected local-function mappings or ask resolved choices again. For hybrid/ASE, replace cloud-hosting assumptions with verified target-specific prerequisites and steps; do not use Workflow Service Plan deployment examples as defaults.
-
 After reading planning results (`migration_conversion_getPlanningResults`), determine ALL conversion tasks needed based on the specific flow's planned architecture.
 
 ---
@@ -143,4 +141,5 @@ Each task needs:
 - Connection generation tasks MUST include: "Search with `category=connection` to find exact `connections.json` format."
 - Local function tasks MUST reference skill `dotnet-local-functions-logic-apps`.
 - ALL code generation tasks MUST follow skill `no-stubs-code-generation`.
+
 

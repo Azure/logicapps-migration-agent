@@ -227,5 +227,6 @@ Before storing workflow definitions, cross-check EVERY action against this table
 | Array trigger debatching    | `splitOn` on trigger                                 | `For_each` loop wrapping all actions                   |
 | File trigger cleanup        | Do nothing (no delete)                               | Delete/archive trigger input file                      |
 | sub-process (via process-call)     | Separate workflow + `Workflow` action                | Merge into parent or local function                    |
-| Custom source code          | Baseline: local function; approved native-first: verified equivalent native operation per `planning-decision-guidance` | Unapproved refactoring or approximated logic |
+| Custom source code          | .NET local function                                  | Expressions or inline approximation                    |
+
 

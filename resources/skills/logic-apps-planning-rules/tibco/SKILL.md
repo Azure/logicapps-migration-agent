@@ -11,10 +11,6 @@ description: Rules for planning the migration of a TIBCO flow to Azure Logic App
 
 ---
 
-## 0. Resolve Critical Choices First
-
-Read and follow `planning-decision-guidance` before architecture generation. Resolve hosting first, validate capabilities, then ask only consequential unresolved choices. Reuse saved answers and generate one selected plan. Approved native-first choices permit equivalent custom-code replacements; they do not permit dropping behavior or changing process boundaries. Discovery mappings are baseline evidence, not final customer decisions.
-
 ## 1. Workflow Split Policy
 
 - **Every discovered flow** (including sub-processes invoked via `process-call`) MUST map to its own separate Logic Apps workflow.
@@ -68,7 +64,7 @@ Do NOT add delete/remove/cleanup actions that remove the trigger input file by d
 ### 3.3 Component Priority Ladder
 
 > **⚠️ MANDATORY OVERRIDE — READ THIS FIRST:**
-> In the baseline/preserve-code scope, source custom code (Java classes, TIBCO modules/connectors, Java-interop XPath expressions, custom processors) maps to .NET local functions, subject to target runtime support. If the user selected native-first during preflight, use verified equivalent native operations where supported and record evidence, rationale, and parity tests. Retain non-equivalent business logic as code. Never approximate source behavior.
+> Source custom code — custom Java classes, custom TIBCO modules/connectors, Java-interop XPath expressions, custom message processors — MUST **ALWAYS** map to **.NET local functions**. Do NOT simplify custom code to expressions, inline code, or any other level. This overrides the ladder below. Translate the real business logic from source code — never approximate with expressions.
 
 For all **other** (non-custom-code) components:
 
@@ -97,8 +93,7 @@ Before generating any workflow definition:
 
 Store planning results in THIS order:
 
-0. `migration_planning_preflight` — resolve critical choices per `planning-decision-guidance` before designing artifacts.
-1. `migration_planning_storeMeta` — flowId, flowName, explanation, summary, brief. Use startNew=true for a full generation, not incremental edits. The tool snapshots resolved preferences.
+1. `migration_planning_storeMeta` — flowId, flowName, explanation, summary.
 2. `migration_planning_storeArchitecture` — flowId and Mermaid `flowchart TB` diagram.
 3. `migration_planning_storeWorkflowDefinition` — call once PER workflow. Each call MUST include `flowId`, `name`, `workflowDefinition` (with `definition.triggers`, `definition.actions` with `runAfter`, `type` for each action), and a `mermaid` field with a `flowchart TB` diagram. The mermaid field is ENFORCED and will be rejected if missing when multiple workflows exist.
 4. `migration_planning_storeAzureComponents` — flowId and components array.
@@ -107,4 +102,5 @@ Store planning results in THIS order:
 7. `migration_planning_storePatterns` — flowId and patterns array (empty if none).
 8. `migration_planning_storeArtifactDispositions` — flowId and dispositions array. ONLY include artifacts that need conversion or upload: Mapper/XSLT scripts (.dwl → Liquid/XSLT), RAML/OAS specs, JSON/XML schemas, custom Java code (.java → local function), certificates. Do NOT include flow XMLs or property files. Each entry needs: artifactName, artifactType, conversionRequired, uploadDestination (integration-account / logic-app-artifact-folder / azure-function / not-applicable), uploadNotes (REQUIRED). When conversionRequired=true, also include conversionFrom, conversionTo, conversionNotes. If the plan uses Integration Account, artifact dispositions must consistently use `integration-account` instead of mixing destinations.
 9. `migration_planning_finalize` — flowId to validate and display the plan.
+
 
