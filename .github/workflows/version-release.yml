@@ -67,6 +67,11 @@ jobs:
               run: |
                   RELEASE_TYPE="${{ github.event.inputs.release_type }}"
                   CURRENT_VERSION=$(node -p "require('./package.json').version")
+                  LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1)
+                  if [ -n "$LATEST_TAG" ]; then
+                    TAG_VERSION="${LATEST_TAG#v}"
+                    CURRENT_VERSION=$(printf '%s\n' "$CURRENT_VERSION" "$TAG_VERSION" | sort -V | tail -n 1)
+                  fi
                   echo "Current version: $CURRENT_VERSION"
 
                   IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
@@ -106,6 +111,7 @@ jobs:
                   git config --global user.email "${{ github.actor }}@users.noreply.github.com"
 
             - name: 'Commit Version Bump'
+              if: github.ref_name != 'main'
               run: |
                   git add package.json
                   git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
@@ -197,6 +203,13 @@ jobs:
               uses: actions/setup-node@v4
               with:
                   node-version: 20
+
+            - name: 'Set package.json version'
+              run: |
+                  CURRENT_VERSION=$(node -p "require('./package.json').version")
+                  if [ "$CURRENT_VERSION" != "${{ needs.create-release.outputs.new_version }}" ]; then
+                    npm version ${{ needs.create-release.outputs.new_version }} --no-git-tag-version
+                  fi
 
             - name: 'Install pnpm'
               run: npm install -g pnpm
