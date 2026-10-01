@@ -205,6 +205,68 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     }
 
     /**
+     * Show an error state in the webview (e.g. when flow group detection
+     * fails or finds no parsed artifacts). Replaces the loading spinner so
+     * the panel never gets stuck showing "Detecting logical groups...".
+     */
+    public static showError(
+        extensionUri: vscode.Uri,
+        message: string,
+        viewColumn: vscode.ViewColumn = vscode.ViewColumn.Active
+    ): void {
+        if (SourceFlowVisualizer.currentPanel) {
+            SourceFlowVisualizer.currentPanel.panel.reveal(viewColumn);
+        } else {
+            const panel = vscode.window.createWebviewPanel(
+                SourceFlowVisualizer.viewType,
+                'Home',
+                viewColumn,
+                {
+                    enableScripts: true,
+                    retainContextWhenHidden: true,
+                    localResourceRoots: [extensionUri],
+                }
+            );
+            SourceFlowVisualizer.currentPanel = new SourceFlowVisualizer(panel, extensionUri);
+        }
+
+        const escaped = message
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+        SourceFlowVisualizer.currentPanel.panel.webview.html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discovery</title>
+    <style>
+        body {
+            font-family: var(--vscode-font-family);
+            color: var(--vscode-foreground);
+            background: var(--vscode-editor-background);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 0 24px;
+            text-align: center;
+        }
+        .icon { font-size: 32px; margin-bottom: 16px; }
+        .message { font-size: 14px; opacity: 0.9; max-width: 560px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div class="icon">⚠️</div>
+    <div class="message">${escaped}</div>
+</body>
+</html>`;
+    }
+
+    /**
      * Show a flow group selector page listing all detected flow groups.
      * The user picks a flow to analyse. If the flow is already discovered
      * (cached), it loads instantly; otherwise it triggers the agent.

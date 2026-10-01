@@ -440,6 +440,44 @@ export class InventoryService implements vscode.Disposable {
     }
 
     /**
+     * Replace the current inventory with a pre-built inventory (e.g. one produced from
+     * live BizTalk environment discovery rather than a local file-system scan), persist it,
+     * and notify listeners (tree views, webviews) so the UI reflects the new artifacts.
+     *
+     * @param irDocuments - Optional IR documents (keyed by item.irId) for items that were
+     * parsed from resolved local source files, so downstream tools (flow-group detection,
+     * dependency graph) can operate on them the same way a normal scan-based inventory would.
+     */
+    public async setInventory(
+        inventory: ArtifactInventory,
+        irDocuments?: Map<string, IRDocument>
+    ): Promise<ArtifactInventory> {
+        const changeType = this.inventory ? 'updated' : 'created';
+        this.inventory = inventory;
+
+        if (irDocuments) {
+            for (const [irId, ir] of irDocuments) {
+                this.irCache.set(irId, ir);
+            }
+        }
+
+        await this.saveToStorage();
+
+        this._onInventoryChanged.fire({
+            inventory: this.inventory,
+            changeType,
+        });
+
+        this.logger.debug('Inventory set from external source', {
+            itemCount: this.inventory.items.length,
+            sourcePath: this.inventory.sourcePath,
+            irDocumentCount: irDocuments?.size ?? 0,
+        });
+
+        return this.inventory;
+    }
+
+    /**
      * Get an item by ID.
      */
     public getItem(id: string): InventoryItem | undefined {
@@ -541,10 +579,17 @@ export class InventoryService implements vscode.Disposable {
             if (item.irId) {
                 const ir = this.irCache.get(item.irId);
                 if (ir) {
-                    // Compute absolute path from inventory source path
-                    const absolutePath = this.inventory.sourcePath
-                        ? path.join(this.inventory.sourcePath, item.sourcePath)
-                        : item.sourcePath;
+                    // Compute absolute path from inventory source path. Environment-discovered
+                    // artifacts (live BizTalk discovery, no local source folder) already carry a
+                    // fully-qualified pseudo-URI in item.sourcePath (e.g. "environment://<env>/<app>/<name>")
+                    // — joining that with inventory.sourcePath (also an "environment://..." URI) would
+                    // produce a nonsense doubled/mangled path. Only join when item.sourcePath is a
+                    // plain relative path under a real on-disk project.
+                    const isPseudoUri = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(item.sourcePath);
+                    const absolutePath =
+                        this.inventory.sourcePath && !isPseudoUri && !path.isAbsolute(item.sourcePath)
+                            ? path.join(this.inventory.sourcePath, item.sourcePath)
+                            : item.sourcePath;
 
                     artifacts.push({
                         id: item.id,

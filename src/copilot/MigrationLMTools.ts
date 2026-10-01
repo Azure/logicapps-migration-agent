@@ -765,6 +765,19 @@ function validateDependencyShape(dep: unknown, index: number): string[] {
 const FLOWCHART_MERMAID_TYPES = ['flowchart', 'flowchart-v2'];
 
 /**
+ * Surfaced to the LLM when a discovery `store*` tool could not persist data
+ * because no VS Code workspace folder is open. Without a workspace folder,
+ * `DiscoveryCacheService` has nowhere on disk to write `.vscode/migration/discovery/**`
+ * files, so the write silently no-ops — the later finalize/assemble step would
+ * then report the data as missing even though this tool call "ran successfully".
+ * A workspace folder here does NOT need to contain BizTalk source; it is only
+ * used to persist migration artifacts (this extension supports pure live
+ * environment discovery with no local source folder).
+ */
+const NO_WORKSPACE_FOLDER_ERROR =
+    'No VS Code workspace folder is open, so this data could not be persisted to disk — the write silently did nothing. Open any folder in VS Code (File > Open Folder; it does not need to contain BizTalk source, it is only used to store migration artifacts) and call this tool again.';
+
+/**
  * migration_listArtifacts — List all discovered artifacts.
  */
 class ListArtifactsTool implements vscode.LanguageModelTool<ListArtifactsInput> {
@@ -776,25 +789,29 @@ class ListArtifactsTool implements vscode.LanguageModelTool<ListArtifactsInput> 
         const { category, limit } = options.input;
 
         const inventoryService = InventoryService.getInstance();
-        let artifacts = await inventoryService.getAllParsedArtifacts();
+        let artifacts = inventoryService.getInventory()?.items ?? [];
 
         if (category) {
-            artifacts = artifacts.filter((a) => a.type.toLowerCase() === category.toLowerCase());
+            artifacts = artifacts.filter((a) => a.category.toLowerCase() === category.toLowerCase());
         }
 
         // Build compact listing
         const listing = artifacts.slice(0, limit || artifacts.length).map((a) => ({
             id: a.id,
             name: a.name,
-            type: a.type,
+            type: a.category,
             sourcePath: a.sourcePath,
-            fileSize: a.fileSize,
+            fileSize: a.metadata.fileSize,
+            status: a.status,
+            note: a.errorMessage,
+            tags: a.tags,
+            deployment: a.metadata.platformSpecific,
         }));
 
         // Also provide category summary
         const categoryCounts: Record<string, number> = {};
         for (const a of artifacts) {
-            categoryCounts[a.type] = (categoryCounts[a.type] || 0) + 1;
+            categoryCounts[a.category] = (categoryCounts[a.category] || 0) + 1;
         }
 
         const result = {
@@ -826,7 +843,15 @@ class GetArtifactDetailsTool implements vscode.LanguageModelTool<GetArtifactDeta
         const idSet = new Set(artifactIds);
 
         const matched = allArtifacts.filter((a) => idSet.has(a.id));
-        const details = matched.map((a) => buildCompactSummary(a));
+        const details = [
+            ...matched.map((a) => buildCompactSummary(a)),
+            ...(inventoryService.getInventory()?.items ?? [])
+                .filter((item) => idSet.has(item.id) && !matched.some((a) => a.id === item.id))
+                .map((item) => ({
+                    ...item, type: item.category, parsedIRAvailable: false,
+                    note: item.errorMessage ?? 'Deployment metadata only; source IR is unavailable.',
+                })),
+        ];
 
         logger.debug(
             `[LMTool] migration_getArtifactDetails: ${artifactIds.length} requested, ${matched.length} found`
@@ -870,6 +895,18 @@ class ReadSourceFileTool implements vscode.LanguageModelTool<ReadSourceFileInput
         const inventoryService = InventoryService.getInstance();
         const allArtifacts = await inventoryService.getAllParsedArtifacts();
         const artifact = allArtifacts.find((a) => a.id === artifactId);
+        const inventoryItem = inventoryService.getInventory()?.items.find((item) => item.id === artifactId);
+        if (inventoryItem && (!artifact || /\.(dll|exe|jar)$/i.test(inventoryItem.sourcePath))) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(JSON.stringify({
+                    ...inventoryItem,
+                    parsedIRAvailable: !!artifact,
+                    note: inventoryItem.metadata.platformSpecific?.binaryAvailable || /\.(dll|exe|jar)$/i.test(inventoryItem.sourcePath)
+                        ? 'Binary file: do not read as UTF-8. Use ILSpy CLI on sourcePath and write decompiled source under out\\__decompiled__ in the migration workspace. A recovered DLL is not reconstructed orchestration source.'
+                        : inventoryItem.errorMessage ?? 'Only deployment metadata is available.',
+                }, null, 2)),
+            ]);
+        }
 
         if (!artifact) {
             logger.warn(`[LMTool] migration_readSourceFile: artifact '${artifactId}' not found`);
@@ -889,6 +926,33 @@ class ReadSourceFileTool implements vscode.LanguageModelTool<ReadSourceFileInput
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
                         error: `No absolute path for artifact '${artifactId}'`,
+                    })
+                ),
+            ]);
+        }
+
+        // Environment-discovered artifacts (live BizTalk discovery, no local source folder)
+        // are not backed by a real on-disk file — their raw content (if any, e.g. reflected
+        // schema/pipeline XmlContent or BTSTask-exported bindings) was already parsed into IR
+        // and the temp file used to do so was deleted immediately after. There is nothing to
+        // read from disk for these, so return the already-parsed IR as the content instead of
+        // attempting (and failing) a filesystem read.
+        if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(filePath)) {
+            const content = JSON.stringify(artifact.ir, null, 2);
+            logger.debug(
+                `[LMTool] migration_readSourceFile: '${artifact.name}' is environment-discovered (no on-disk source); returning parsed IR instead`
+            );
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(
+                    JSON.stringify({
+                        artifactId: artifact.id,
+                        name: artifact.name,
+                        type: artifact.type,
+                        sourcePath: artifact.sourcePath,
+                        note: 'This artifact was discovered from a live BizTalk environment with no local source folder. Raw source is not available on disk; the content below is the already-parsed intermediate representation (IR) instead.',
+                        content:
+                            content.length > charLimit ? content.substring(0, charLimit) : content,
+                        truncated: content.length > charLimit,
                     })
                 ),
             ]);
@@ -1018,7 +1082,14 @@ class SearchArtifactsTool implements vscode.LanguageModelTool<SearchArtifactsInp
             }
         }
 
-        const results = matches.map((a) => buildCompactSummary(a));
+        const parsedIds = new Set(allArtifacts.map((a) => a.id));
+        const results = [
+            ...matches.map((a) => buildCompactSummary(a)),
+            ...(inventoryService.getInventory()?.items ?? [])
+                .filter((item) => !parsedIds.has(item.id) && fields.includes('name') &&
+                    `${item.name} ${item.sourcePath} ${item.metadata.platformSpecific?.assemblyIdentity ?? ''}`.toLowerCase().includes(lowerQuery))
+                .map((item) => ({ ...item, type: item.category, parsedIRAvailable: false })),
+        ];
 
         logger.debug(
             `[LMTool] migration_searchArtifacts: query='${query}', found ${results.length} matches`
@@ -1228,6 +1299,22 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
 
         if (!parsedArtifacts || parsedArtifacts.length === 0) {
             logger.warn('[LMTool] migration_detectFlowGroups: no parsed artifacts found');
+
+            // The webview may be showing the "Detecting logical groups..." spinner
+            // from handleViewFlowVisualization; without this, it would spin forever
+            // since nothing else clears isInitialGenerating on this early-exit path.
+            SourceFlowVisualizer.isInitialGenerating = false;
+            const extensionUri =
+                vscode.extensions.getExtension('logicapps-migration-agent')?.extensionUri ??
+                vscode.Uri.file(__dirname);
+            SourceFlowVisualizer.showError(
+                extensionUri,
+                'No parsed artifacts found. The discovered inventory has items, but none could be ' +
+                    'parsed into source IR (e.g. environment-discovered artifacts whose source files ' +
+                    "weren't resolved). Configure 'logicAppsMigrationAgent.bizTalk.sourcePaths' to point " +
+                    'at the matching BizTalk source, or select a source folder and run discovery again.'
+            );
+
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({ error: 'No parsed artifacts found. Run discovery first.' })
@@ -1352,6 +1439,18 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
                 '[LMTool] migration_detectFlowGroups failed',
                 err instanceof Error ? err : new Error(String(err))
             );
+
+            // Same rationale as the "no parsed artifacts" branch above — clear the
+            // spinner so the webview doesn't get stuck if detection throws.
+            SourceFlowVisualizer.isInitialGenerating = false;
+            const extensionUri =
+                vscode.extensions.getExtension('logicapps-migration-agent')?.extensionUri ??
+                vscode.Uri.file(__dirname);
+            SourceFlowVisualizer.showError(
+                extensionUri,
+                `Flow group detection failed: ${err instanceof Error ? err.message : String(err)}`
+            );
+
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
@@ -1668,12 +1767,19 @@ class DiscoveryStoreMetaTool implements vscode.LanguageModelTool<DiscoveryStoreM
         try {
             const { DiscoveryCacheService } =
                 await import('../stages/discovery/DiscoveryCacheService');
-            DiscoveryCacheService.getInstance().storeMeta(flowId, {
+            const stored = DiscoveryCacheService.getInstance().storeMeta(flowId, {
                 explanation: explanation || '',
                 summary: summary || {},
                 title: title || 'Integration Flow',
                 notes: notes || [],
             });
+            if (!stored) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             logger.debug(`[LMTool] migration_discovery_storeMeta: stored for "${flowId}"`);
             return new vscode.LanguageModelToolResult([
@@ -1749,7 +1855,14 @@ class DiscoveryStoreArchitectureTool implements vscode.LanguageModelTool<Discove
         try {
             const { DiscoveryCacheService } =
                 await import('../stages/discovery/DiscoveryCacheService');
-            DiscoveryCacheService.getInstance().storeArchitecture(flowId, validation.normalized);
+            const stored = DiscoveryCacheService.getInstance().storeArchitecture(flowId, validation.normalized);
+            if (!stored) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             logger.debug(`[LMTool] migration_discovery_storeArchitecture: stored for "${flowId}"`);
             return new vscode.LanguageModelToolResult([
@@ -1814,7 +1927,14 @@ class DiscoveryStoreMessageFlowTool implements vscode.LanguageModelTool<Discover
         try {
             const { DiscoveryCacheService } =
                 await import('../stages/discovery/DiscoveryCacheService');
-            DiscoveryCacheService.getInstance().storeMessageFlow(flowId, messageFlow);
+            const stored = DiscoveryCacheService.getInstance().storeMessageFlow(flowId, messageFlow);
+            if (!stored) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             logger.debug(
                 `[LMTool] migration_discovery_storeMessageFlow: stored ${messageFlow.length} steps for "${flowId}"`
@@ -1882,7 +2002,14 @@ class DiscoveryStoreComponentsTool implements vscode.LanguageModelTool<Discovery
         try {
             const { DiscoveryCacheService } =
                 await import('../stages/discovery/DiscoveryCacheService');
-            DiscoveryCacheService.getInstance().storeComponents(flowId, componentDetails);
+            const stored = DiscoveryCacheService.getInstance().storeComponents(flowId, componentDetails);
+            if (!stored) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             logger.debug(
                 `[LMTool] migration_discovery_storeComponents: stored ${componentDetails.length} components for "${flowId}"`
@@ -1953,7 +2080,14 @@ class DiscoveryStoreGapsTool implements vscode.LanguageModelTool<DiscoveryStoreG
         try {
             const { DiscoveryCacheService } =
                 await import('../stages/discovery/DiscoveryCacheService');
-            DiscoveryCacheService.getInstance().storeGaps(flowId, gaps);
+            const stored = DiscoveryCacheService.getInstance().storeGaps(flowId, gaps);
+            if (!stored) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             logger.debug(
                 `[LMTool] migration_discovery_storeGaps: stored ${(gapAnalysis || []).length} gaps for "${flowId}"`
@@ -2020,7 +2154,14 @@ class DiscoveryStorePatternsTool implements vscode.LanguageModelTool<DiscoverySt
         try {
             const { DiscoveryCacheService } =
                 await import('../stages/discovery/DiscoveryCacheService');
-            DiscoveryCacheService.getInstance().storePatterns(flowId, patterns);
+            const stored = DiscoveryCacheService.getInstance().storePatterns(flowId, patterns);
+            if (!stored) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             logger.debug(
                 `[LMTool] migration_discovery_storePatterns: stored ${(migrationPatterns || []).length} patterns for "${flowId}"`
@@ -2112,7 +2253,14 @@ class DiscoveryStoreDependenciesTool implements vscode.LanguageModelTool<Discove
                 counts: computedCounts,
             };
 
-            DiscoveryCacheService.getInstance().storeDependencies(flowId, dependencyAnalysis);
+            const stored = DiscoveryCacheService.getInstance().storeDependencies(flowId, dependencyAnalysis);
+            if (!stored) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             logger.debug(
                 `[LMTool] migration_discovery_storeDependencies: stored ${deps.length} dependencies for "${flowId}" (${computedCounts.critical} critical, ${computedCounts.warning} warning)`
@@ -2844,6 +2992,13 @@ class PlanningStoreMetaTool implements vscode.LanguageModelTool<PlanningStoreMet
                 generatedAt: now,
                 updatedAt: now,
             });
+            if (!filePath) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             logger.debug(`[LMTool] migration_planning_storeMeta: stored for "${flowId}"`);
             return new vscode.LanguageModelToolResult([
@@ -2920,6 +3075,13 @@ class PlanningStoreArchitectureTool implements vscode.LanguageModelTool<Planning
         try {
             const fileService = PlanningFileService.getInstance();
             const filePath = fileService.storeArchitecture(flowId, validation.normalized);
+            if (!filePath) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             logger.debug(`[LMTool] migration_planning_storeArchitecture: stored for "${flowId}"`);
             return new vscode.LanguageModelToolResult([
@@ -3074,6 +3236,13 @@ class PlanningStoreWorkflowDefinitionTool implements vscode.LanguageModelTool<Pl
                     workflowDefinition as unknown as import('../workflowSchema/types').LogicAppsWorkflowDefinition,
                 ...(normalizedWorkflowMermaid ? { mermaid: normalizedWorkflowMermaid } : {}),
             });
+            if (!filePath) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             const actionCount = def.actions ? Object.keys(def.actions).length : 0;
             const triggerCount = def.triggers ? Object.keys(def.triggers).length : 0;
@@ -3182,6 +3351,13 @@ class PlanningStoreAzureComponentsTool implements vscode.LanguageModelTool<Plann
                     configNotes: c.configNotes,
                 }))
             );
+            if (!filePath) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             logger.debug(
                 `[LMTool] migration_planning_storeAzureComponents: stored ${components.length} components for "${flowId}"`
@@ -3296,6 +3472,13 @@ class PlanningStoreActionMappingsTool implements vscode.LanguageModelTool<Planni
                     workflowName: m.workflowName,
                 }))
             );
+            if (!filePath) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             logger.debug(
                 `[LMTool] migration_planning_storeActionMappings: stored ${mappings.length} mappings for "${flowId}"`
@@ -3396,6 +3579,13 @@ class PlanningStoreGapsTool implements vscode.LanguageModelTool<PlanningStoreGap
                     recommendation: g.recommendation,
                 }))
             );
+            if (!filePath) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             logger.debug(
                 `[LMTool] migration_planning_storeGaps: stored ${gaps.length} gaps for "${flowId}"`
@@ -3499,6 +3689,13 @@ class PlanningStorePatternsTool implements vscode.LanguageModelTool<PlanningStor
                     complexity: p.complexity,
                 }))
             );
+            if (!filePath) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             logger.debug(
                 `[LMTool] migration_planning_storePatterns: stored ${patterns.length} patterns for "${flowId}"`
@@ -3637,6 +3834,13 @@ class PlanningStoreArtifactDispositionsTool implements vscode.LanguageModelTool<
                     uploadNotes: d.uploadNotes,
                 }))
             );
+            if (!filePath) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({ error: NO_WORKSPACE_FOLDER_ERROR })
+                    ),
+                ]);
+            }
 
             const conversionCount = dispositions.filter((d) => d.conversionRequired).length;
             const uploadCounts = {

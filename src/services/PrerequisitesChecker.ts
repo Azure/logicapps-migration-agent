@@ -305,9 +305,9 @@ export class PrerequisitesChecker {
             return {
                 id: 'docker',
                 name: 'Docker Desktop',
-                description: 'Required - used for local test dependencies and emulators',
+                description: 'Optional - used for local test dependencies and emulators',
                 status: 'installed',
-                required: true,
+                required: false,
                 version: match?.[1],
                 helpUrl: installUrl,
             };
@@ -315,9 +315,9 @@ export class PrerequisitesChecker {
             return {
                 id: 'docker',
                 name: 'Docker Desktop',
-                description: 'Required - used for local test dependencies and emulators',
+                description: 'Optional - used for local test dependencies and emulators',
                 status: 'missing',
-                required: true,
+                required: false,
                 helpUrl: installUrl,
                 action: {
                     label: 'Install Docker',

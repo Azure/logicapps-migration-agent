@@ -285,7 +285,7 @@ export class MsiExtractorService implements vscode.Disposable {
 
                     const destPath = path.join(
                         outputDir,
-                        this.deduplicateName(realName, outputDir, extractedFiles)
+                        this.deduplicateName(path.basename(realName), outputDir, extractedFiles)
                     );
                     await fs.promises.copyFile(innerFile, destPath);
                     extractedFiles.push(destPath);

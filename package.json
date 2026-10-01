@@ -1616,6 +1616,11 @@
                 "category": "Logic Apps Migration Agent"
             },
             {
+                "command": "logicAppsMigrationAgent.discoverBizTalkEnvironment",
+                "title": "Discover BizTalk Environment",
+                "category": "Logic Apps Migration Agent"
+            },
+            {
                 "command": "logicAppsMigrationAgent.viewMigrationPlan",
                 "title": "View Migration Plan",
                 "category": "Logic Apps Migration Agent"
@@ -1734,7 +1739,7 @@
         "viewsWelcome": [
             {
                 "view": "logicAppsMigrationAgent.discovery",
-                "contents": "No artifacts discovered yet.\n\n[Select Source Folder](command:logicAppsMigrationAgent.selectSourceFolder)"
+                "contents": "No artifacts discovered yet.\n\n[Select Source Folder](command:logicAppsMigrationAgent.selectSourceFolder)\n\n[Discover BizTalk Environment](command:logicAppsMigrationAgent.discoverBizTalkEnvironment)"
             }
         ],
         "menus": {
@@ -1751,6 +1756,10 @@
                 },
                 {
                     "command": "logicAppsMigrationAgent.selectSourceFolder",
+                    "when": "true"
+                },
+                {
+                    "command": "logicAppsMigrationAgent.discoverBizTalkEnvironment",
                     "when": "true"
                 },
                 {
@@ -1847,6 +1856,86 @@
                     "type": "string",
                     "default": "eastus",
                     "description": "Azure region for provisioning resources"
+                },
+                "logicAppsMigrationAgent.bizTalk.server": {
+                    "type": "string",
+                    "default": "",
+                    "description": "BizTalk SQL Server instance for V1 Windows-authenticated discovery"
+                },
+                "logicAppsMigrationAgent.bizTalk.managementDatabase": {
+                    "type": "string",
+                    "default": "BizTalkMgmtDb",
+                    "description": "BizTalk Management DB name"
+                },
+                "logicAppsMigrationAgent.bizTalk.applicationQuery": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Version-specific read-only SQL projection returning compact JSON applications and artifacts. Use {{BATCH_SIZE}} for a bounded TOP clause; do not use SELECT *."
+                },
+                "logicAppsMigrationAgent.bizTalk.batchSize": {
+                    "type": "number",
+                    "default": 100,
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "description": "Maximum applications returned by the BizTalk discovery projection"
+                },
+                "logicAppsMigrationAgent.bizTalk.timeoutSeconds": {
+                    "type": "number",
+                    "default": 60,
+                    "minimum": 1,
+                    "maximum": 300,
+                    "description": "SQL connection timeout for BizTalk discovery"
+                },
+                "logicAppsMigrationAgent.bizTalk.managementRestApiBaseUrl": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Base URL for the BizTalk Server Management REST API (default http://localhost/BizTalkManagementService), used as a fallback discovery method when SQL is unavailable. Requires Feature Pack 2+ and IIS configured via FeaturePack.ConfigureServices.ps1 -Service management."
+                },
+                "logicAppsMigrationAgent.bizTalk.sourcePaths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Optional local source roots used to resolve deployed BizTalk assemblies; workspace folders are used when empty"
+                },
+                "logicAppsMigrationAgent.validation.enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Opt in to extracting tracked BizTalk messages for migration validation"
+                },
+                "logicAppsMigrationAgent.validation.redactionRules": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Dot-delimited message fields to redact before fixtures are stored or replayed"
+                },
+                "logicAppsMigrationAgent.validation.maxBodyBytes": {
+                    "type": "number",
+                    "default": 4194304,
+                    "minimum": 1024,
+                    "maximum": 33554432,
+                    "description": "Maximum tracked message body size accepted as a validation fixture"
+                },
+                "logicAppsMigrationAgent.validation.localReplayUrl": {
+                    "type": "string",
+                    "default": "http://localhost:7071/api",
+                    "description": "Local Logic Apps Standard workflow HTTP trigger URL used for replay"
+                },
+                "logicAppsMigrationAgent.validation.deployedReplayUrl": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Deployed Logic Apps Standard workflow HTTP trigger URL used for replay"
+                },
+                "logicAppsMigrationAgent.validation.ignorePaths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Wildcard paths ignored when comparing expected and actual outputs"
                 }
             }
         }

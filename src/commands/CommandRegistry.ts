@@ -14,7 +14,16 @@ import { TelemetryService } from '../services/TelemetryService';
 import { StateManager } from '../services/StateManager';
 import { ErrorHandler } from '../errors/ErrorHandler';
 import { MsiExtractorService } from '../services/MsiExtractorService';
-import { DiscoveryService } from '../stages/discovery';
+import {
+    ApplicationMigrationScheduler,
+    BizTalkEnvironmentConnector,
+    EnvironmentInventoryService,
+    DiscoveryService,
+    InventoryService,
+    SourceResolverService,
+} from '../stages/discovery';
+import type { EnvironmentInventory } from '../stages/discovery';
+import { ensureDiscoveryWorkspace } from '../stages/discovery/DiscoveryWorkspace';
 import { PlanningService } from '../stages/planning';
 import { ConversionService } from '../stages/conversion';
 import { AgentFileProvisioner } from '../services/AgentFileProvisioner';
@@ -79,6 +88,11 @@ export class CommandRegistry implements vscode.Disposable {
                 id: 'logicAppsMigrationAgent.selectSourceFolder',
                 handler: this.handleSelectSourceFolder.bind(this),
                 title: 'Select Source Folder',
+            },
+            {
+                id: 'logicAppsMigrationAgent.discoverBizTalkEnvironment',
+                handler: () => this.handleDiscoverBizTalkEnvironment(context),
+                title: 'Discover BizTalk Environment',
             },
             {
                 id: 'logicAppsMigrationAgent.viewMigrationPlan',
@@ -326,6 +340,7 @@ export class CommandRegistry implements vscode.Disposable {
             if (folderUris && folderUris.length > 0) {
                 selectedPath = folderUris[0].fsPath;
             }
+
         }
 
         if (selectedPath) {
@@ -529,6 +544,64 @@ export class CommandRegistry implements vscode.Disposable {
                     }
                 }
             );
+        }
+    }
+
+    /**
+     * Discover deployed BizTalk applications and artifacts through the V1
+     * Windows-authenticated, read-only SQL projection.
+     */
+    private async handleDiscoverBizTalkEnvironment(context: vscode.ExtensionContext): Promise<void> {
+        const workspaceFolder = await ensureDiscoveryWorkspace(context);
+        if (!workspaceFolder) {
+            return;
+        }
+        const configuration = vscode.workspace.getConfiguration('logicAppsMigrationAgent.bizTalk');
+        const server = configuration.get<string>('server', '').trim();
+        const managementDatabase = configuration.get<string>('managementDatabase', '').trim();
+        const applicationQuery = configuration.get<string>('applicationQuery', '').trim();
+
+        const connector = new BizTalkEnvironmentConnector();
+        let inventory: EnvironmentInventory;
+        if (server && managementDatabase && applicationQuery) {
+            inventory = await connector.discover({
+                server,
+                managementDatabase,
+                applicationQuery,
+                batchSize: configuration.get<number>('batchSize', 100),
+                timeoutSeconds: configuration.get<number>('timeoutSeconds', 60),
+            });
+        } else {
+            inventory = await connector.discoverLocal({
+                applicationQueryOverride: applicationQuery || undefined,
+                timeoutSeconds: configuration.get<number>('timeoutSeconds', 60),
+                managementRestApiBaseUrl: configuration.get<string>('managementRestApiBaseUrl', '').trim() || undefined,
+            });
+        }
+        const sourcePaths = configuration.get<string[]>('sourcePaths', [])
+            .map((sourcePath) => sourcePath.trim())
+            .filter(Boolean);
+        const roots = sourcePaths.length > 0
+            ? sourcePaths
+            : (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath);
+        const resolutions = await new SourceResolverService().resolve(inventory, roots);
+        const merged = await new EnvironmentInventoryService().merge(
+            inventory, resolutions, workspaceFolder.uri.fsPath
+        );
+        const schedule = new ApplicationMigrationScheduler().buildSchedule(inventory);
+
+        // Persist the merged environment inventory (plus any IR parsed from resolved local
+        // source files) so the Discovery tree view, home page, and flow visualization pick
+        // it up the same way a file-based scan would.
+        await InventoryService.getInstance().setInventory(merged.inventory, merged.irDocuments);
+
+        const cycleCount = schedule.cycles.length;
+        void vscode.window.showInformationMessage(
+            `Discovered ${inventory.applications.length} BizTalk applications, ${merged.inventory.items.length} artifacts, and ${merged.gaps.length} source gaps from ${inventory.environmentName}. Migration order has ${cycleCount} cycle(s).`
+        );
+
+        if (merged.inventory.items.length > 0) {
+            await this.handleViewFlowVisualization();
         }
     }
 

@@ -408,6 +408,165 @@ export interface InventoryStatistics {
 }
 
 // =============================================================================
+// Live BizTalk Environment Types
+// =============================================================================
+
+/**
+ * Connection settings for live BizTalk discovery.
+ *
+ * V1 intentionally supports Windows Integrated Authentication only.
+ */
+export interface BizTalkEnvironmentConnection {
+    /** SQL Server instance, for example SERVER\INSTANCE */
+    readonly server: string;
+
+    /** BizTalk Management DB name */
+    readonly managementDatabase: string;
+
+    /** Optional timeout in seconds */
+    readonly timeoutSeconds?: number;
+
+    /** Maximum number of applications returned per query */
+    readonly batchSize?: number;
+
+    /** Version-specific, read-only projection returning compact JSON */
+    readonly applicationQuery: string;
+}
+
+/** Locally detected BizTalk configuration. */
+export interface LocalBizTalkConfiguration {
+    readonly server?: string;
+    readonly managementDatabase?: string;
+    readonly source: 'registry' | 'config' | 'powershell';
+}
+
+/**
+ * Application and artifact inventory discovered from a live BizTalk Group.
+ */
+export interface EnvironmentInventory {
+    /** Unique inventory identifier */
+    readonly id: string;
+
+    /** BizTalk Management DB/server identity */
+    readonly environmentName: string;
+
+    /** Explicit export target; never infer a remote Group from a display name. */
+    readonly managementConnection?: {
+        readonly server: string;
+        readonly managementDatabase: string;
+    };
+
+    /** Discovered applications */
+    readonly applications: EnvironmentApplication[];
+
+    /** Discovery timestamp */
+    readonly discoveredAt: string;
+
+    /** Connector/authentication mode */
+    readonly authentication: 'windows-integrated';
+}
+
+/**
+ * A deployed BizTalk application.
+ */
+export interface EnvironmentApplication {
+    /** Stable application identifier from the Management DB */
+    readonly id: string;
+
+    /** Application display name */
+    readonly name: string;
+
+    /** Optional description */
+    readonly description?: string;
+
+    /** Deployed artifacts belonging to the application */
+    readonly artifacts: EnvironmentArtifact[];
+
+    /** IDs of applications referenced by this application */
+    readonly dependencyApplicationIds: string[];
+
+    /**
+     * Full BindingInfo.xml content exported directly from the BizTalk Group
+     * (via `BTSTask.exe ExportBindings`), when available. This is the
+     * authoritative binding configuration for every send/receive port in the
+     * application and lets binding-type artifacts be parsed without any
+     * local source folder.
+     */
+    readonly bindingsXml?: string;
+}
+
+/**
+ * A deployed artifact discovered from the BizTalk environment.
+ */
+export interface EnvironmentArtifact {
+    /** Stable artifact identifier */
+    readonly id: string;
+
+    /** Artifact display name */
+    readonly name: string;
+
+    /** Deployed artifact type */
+    readonly type: ArtifactCategory;
+
+    /** Assembly identity, when available */
+    readonly assemblyIdentity?: string;
+
+    /** Optional deployment metadata, with secrets already redacted */
+    readonly metadata?: Record<string, string | number | boolean>;
+
+    /**
+     * Raw configuration XML fetched from the environment, including schema
+     * and pipeline XmlContent recovered from deployed assemblies. Saved under
+     * the workspace before parsing, even when parsing fails.
+     */
+    readonly content?: string;
+}
+
+/** Candidate source project for a deployed BizTalk artifact. */
+export interface SourceResolution {
+    readonly environmentArtifactId: string;
+    readonly assemblyIdentity?: string;
+    readonly status: 'resolved' | 'unresolved' | 'ambiguous';
+    readonly projectPath?: string;
+    readonly candidatePaths: string[];
+    readonly matchedFiles: string[];
+    readonly reason?: string;
+}
+
+/** Result of resolving all deployed artifacts to source files. */
+export interface SourceResolutionResult {
+    readonly rootPaths: string[];
+    readonly resolutions: SourceResolution[];
+}
+
+/** A gap caused by a deployed artifact without available source. */
+export interface EnvironmentGap {
+    readonly applicationId: string;
+    readonly applicationName: string;
+    readonly artifactId: string;
+    readonly artifactName: string;
+    readonly severity: 'high' | 'medium' | 'low';
+    readonly gap: string;
+    readonly resolution: string;
+}
+
+/** One application in dependency-aware migration order. */
+export interface ApplicationMigrationStep {
+    readonly applicationId: string;
+    readonly applicationName: string;
+    readonly dependencyApplicationIds: string[];
+    readonly order: number;
+    readonly status: 'ready' | 'blocked' | 'cycle';
+}
+
+/** Dependency-aware migration schedule. */
+export interface ApplicationMigrationSchedule {
+    readonly steps: ApplicationMigrationStep[];
+    readonly cycles: string[][];
+    readonly blockedApplicationIds: string[];
+}
+
+// =============================================================================
 // Dependency Graph Types
 // =============================================================================
 

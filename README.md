@@ -43,6 +43,8 @@ This is an open-source project — contributions are welcome! To add support for
 | 📊 **Flow Visualization**     | Interactive architecture diagrams, message flows, gap analysis, and dependency tracking               |
 | 🤖 **AI Agents**              | Three specialized Copilot agents: `@migration-analyser`, `@migration-planner`, `@migration-converter` |
 | ☁️ **Azure Deployment**       | Direct deployment configuration via Azure settings                                                    |
+| 🏢 **Live BizTalk Discovery** | Read-only discovery of deployed applications and artifacts from the BizTalk Management DB using Windows Integrated Auth |
+| ✅ **Traffic-Based Validation** | Optional replay of tracked BizTalk input/output fixtures against local or deployed Logic Apps Standard workflows |
 
 ## Migration Stages
 
@@ -54,10 +56,10 @@ Discovery → Planning → Conversion → Validation → Deployment
 
 | #   | Stage          | Description                                                                                                                                                                                  |
 | --- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Discovery**  | Find and catalog all integration artifacts from the source platform. Auto-detects platform, scans files, builds artifact inventory and dependency graph.                                     |
+| 1   | **Discovery**  | Find and catalog source artifacts or deployed BizTalk applications/artifacts. Live discovery uses a bounded, minimal-column SQL projection and builds an application dependency graph. |
 | 2   | **Planning**   | Analyze complexity, plan the migration roadmap, and map source patterns to Logic Apps patterns. Generates per-flow migration plans with action mappings, gap analysis, and effort estimates. |
 | 3   | **Conversion** | Transform source artifacts into Logic Apps Standard workflows, connections, and supporting files. Executes task plans generated during planning.                                             |
-| 4   | **Validation** | Test generated workflows and validate behavior against source specifications.                                                                                                                |
+| 4   | **Validation** | Optionally extract tracked BizTalk input/output pairs, replay them against Logic Apps Standard, and compare normalized outputs with structured diffs. |
 | 5   | **Deployment** | Deploy generated Logic Apps artifacts to Azure.                                                                                                                                              |
 
 ## Quick Start
@@ -67,6 +69,44 @@ Discovery → Planning → Conversion → Validation → Deployment
 3. Click the **Logic Apps Migration Agent** icon in the Activity Bar
 4. Select your source folder when prompted (or use the command palette: `Logic Apps Migration Agent: Select Source Folder`)
 5. Follow the guided 5-stage workflow
+
+### Live BizTalk environment discovery
+
+On a Windows machine with BizTalk installed, use **Logic Apps Migration Agent:
+Discover BizTalk Environment**. The command first reads the local BizTalk
+registry/configuration and uses the installed BizTalk PowerShell provider to
+discover deployed applications without requiring manual SQL settings.
+
+For remote environments, or when the local BizTalk provider is unavailable,
+configure the read-only SQL projection under `logicAppsMigrationAgent.bizTalk`:
+
+1. Set `server` to the BizTalk SQL Server instance.
+2. Set `managementDatabase` (normally `BizTalkMgmtDb`).
+3. Set `applicationQuery` to a version-specific query that returns compact JSON
+   application rows and artifacts. Use `{{BATCH_SIZE}}` in a bounded `TOP`
+   clause and never use `SELECT *`.
+4. Optionally set `sourcePaths`; workspace folders are used when it is empty.
+
+V1 uses Windows Integrated Authentication through the current Windows identity
+and read-only access. SQL authentication is deferred to a later version. The
+discovery result resolves deployed artifacts to local source where possible,
+flags source-unavailable artifacts as migration gaps, and schedules applications
+with no dependencies before dependent applications. Cycles require manual
+sequencing.
+
+### Validation with BizTalk tracking data
+
+Validation is opt-in because tracked bodies can contain production data. Set
+`logicAppsMigrationAgent.validation.enabled` to `true`, configure the
+version-specific read-only tracking projection, and define redaction paths in
+`validation.redactionRules`. The validation layer supports:
+
+- `BizTalkDTADb` as the primary durable source.
+- `BizTalkMsgBoxDb` for opportunistic recent messages.
+- Local Logic Apps replay through `validation.localReplayUrl`.
+- Deployed Logic Apps replay through `validation.deployedReplayUrl`.
+- Output normalization for timestamps, GUIDs, and correlation identifiers.
+- Wildcard ignored paths through `validation.ignorePaths`.
 
 ## Requirements
 
@@ -90,6 +130,17 @@ Configure via `Settings > Extensions > Logic Apps Migration Agent`:
 | `logicAppsMigrationAgent.azure.subscriptionId` | Azure subscription ID for deployment              | (empty)                              |
 | `logicAppsMigrationAgent.azure.resourceGroup`  | Azure resource group for provisioning and testing | `integration-migration-tool-test-rg` |
 | `logicAppsMigrationAgent.azure.location`       | Azure region for provisioning resources           | `eastus`                             |
+| `logicAppsMigrationAgent.bizTalk.server` | BizTalk SQL Server instance for V1 discovery | (empty) |
+| `logicAppsMigrationAgent.bizTalk.managementDatabase` | BizTalk Management DB name | `BizTalkMgmtDb` |
+| `logicAppsMigrationAgent.bizTalk.applicationQuery` | Version-specific compact JSON application/artifact projection | (empty) |
+| `logicAppsMigrationAgent.bizTalk.batchSize` | Maximum applications returned per query | `100` |
+| `logicAppsMigrationAgent.bizTalk.sourcePaths` | Optional source roots for assembly resolution | `[]` |
+| `logicAppsMigrationAgent.validation.enabled` | Opt in to tracked-message validation | `false` |
+| `logicAppsMigrationAgent.validation.redactionRules` | Message paths redacted before fixture use | `[]` |
+| `logicAppsMigrationAgent.validation.maxBodyBytes` | Maximum tracked body size | `4194304` |
+| `logicAppsMigrationAgent.validation.localReplayUrl` | Local Logic Apps HTTP trigger | `http://localhost:7071/api` |
+| `logicAppsMigrationAgent.validation.deployedReplayUrl` | Deployed Logic Apps HTTP trigger | (empty) |
+| `logicAppsMigrationAgent.validation.ignorePaths` | Output paths ignored during diff | `[]` |
 
 ## Command Palette
 
@@ -98,6 +149,7 @@ Configure via `Settings > Extensions > Logic Apps Migration Agent`:
 | `Logic Apps Migration Agent: Select Source Folder` | Start migration by selecting a source project folder |
 | `Logic Apps Migration Agent: Reset Migration`      | Reset all migration state and start over             |
 | `Logic Apps Migration Agent: Show Extension Logs`  | Open the extension output channel for debugging      |
+| `Logic Apps Migration Agent: Discover BizTalk Environment` | Discover deployed BizTalk applications and artifacts |
 
 ## Architecture
 

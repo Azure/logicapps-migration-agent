@@ -21,6 +21,7 @@ import { ToolRegistry } from './services/tools';
 
 // Discovery Stage Services (Phase 6)
 import { DiscoveryService, SourceFolderService } from './stages/discovery';
+import { resumePendingBizTalkDiscovery } from './stages/discovery/DiscoveryWorkspace';
 import { registerDiscoveryTreeProvider } from './views/discovery';
 
 // Planning Stage Services
@@ -194,6 +195,14 @@ export async function activate(
         const pluginLoader = ParserPluginLoader.getInstance();
         await pluginLoader.initialize();
         disposables.push(pluginLoader);
+
+        void resumePendingBizTalkDiscovery(context).catch((error: unknown) => {
+            LoggingService.getInstance().error(
+                'Failed to resume BizTalk discovery in the created workspace',
+                error instanceof Error ? error : new Error(String(error))
+            );
+            void vscode.window.showErrorMessage('Could not resume BizTalk discovery. Run Discover BizTalk Environment again in this workspace.');
+        });
 
         // Auto-open the flow group selector (main page) on startup
         // if flow groups have been detected previously or a migration is in progress

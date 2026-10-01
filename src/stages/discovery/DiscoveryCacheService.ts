@@ -356,11 +356,18 @@ export class DiscoveryCacheService {
 
     /**
      * Write a partial file for a flow (meta, messageFlow, components, gaps, patterns).
+     * Returns false (without writing anything) when no VS Code workspace folder is
+     * open — callers MUST check this and surface a real error instead of assuming
+     * the write succeeded, otherwise the data silently never reaches disk and the
+     * later finalizer will report it as missing.
      */
-    public storePartial(flowId: string, filename: string, data: unknown): void {
+    public storePartial(flowId: string, filename: string, data: unknown): boolean {
         const dir = this.getDiscoveryDir();
         if (!dir) {
-            return;
+            this.logger.warn(
+                `[DiscoveryCache] Cannot store ${filename} for flow "${flowId}": no workspace folder is open`
+            );
+            return false;
         }
         const flowDir = path.join(dir, this.sanitizeId(flowId));
         if (!fs.existsSync(flowDir)) {
@@ -369,6 +376,7 @@ export class DiscoveryCacheService {
         const filePath = path.join(flowDir, filename);
         fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
         this.logger.debug(`[DiscoveryCache] Stored partial ${filename} for flow "${flowId}"`);
+        return true;
     }
 
     /**
@@ -390,9 +398,9 @@ export class DiscoveryCacheService {
         return undefined;
     }
 
-    /** Store discovery meta (explanation, summary, title). */
-    public storeMeta(flowId: string, meta: Record<string, unknown>): void {
-        this.storePartial(flowId, META_FILENAME, meta);
+    /** Store discovery meta (explanation, summary, title). Returns false if no workspace folder is open. */
+    public storeMeta(flowId: string, meta: Record<string, unknown>): boolean {
+        return this.storePartial(flowId, META_FILENAME, meta);
     }
 
     /** Read discovery meta. */
@@ -400,11 +408,14 @@ export class DiscoveryCacheService {
         return this.readPartial(flowId, META_FILENAME);
     }
 
-    /** Store architecture Mermaid diagram as raw .mmd file. */
-    public storeArchitecture(flowId: string, mermaid: string): void {
+    /** Store architecture Mermaid diagram as raw .mmd file. Returns false if no workspace folder is open. */
+    public storeArchitecture(flowId: string, mermaid: string): boolean {
         const dir = this.getDiscoveryDir();
         if (!dir) {
-            return;
+            this.logger.warn(
+                `[DiscoveryCache] Cannot store architecture.mmd for flow "${flowId}": no workspace folder is open`
+            );
+            return false;
         }
         const flowDir = path.join(dir, this.sanitizeId(flowId));
         if (!fs.existsSync(flowDir)) {
@@ -413,6 +424,7 @@ export class DiscoveryCacheService {
         const filePath = path.join(flowDir, ARCHITECTURE_FILENAME);
         fs.writeFileSync(filePath, mermaid, 'utf-8');
         this.logger.debug(`[DiscoveryCache] Stored architecture.mmd for flow "${flowId}"`);
+        return true;
     }
 
     /** Read architecture Mermaid diagram from .mmd file. */
@@ -432,9 +444,9 @@ export class DiscoveryCacheService {
         return undefined;
     }
 
-    /** Store message flow steps. */
-    public storeMessageFlow(flowId: string, messageFlow: unknown[]): void {
-        this.storePartial(flowId, MESSAGE_FLOW_FILENAME, messageFlow);
+    /** Store message flow steps. Returns false if no workspace folder is open. */
+    public storeMessageFlow(flowId: string, messageFlow: unknown[]): boolean {
+        return this.storePartial(flowId, MESSAGE_FLOW_FILENAME, messageFlow);
     }
 
     /** Read message flow steps. */
@@ -442,9 +454,9 @@ export class DiscoveryCacheService {
         return this.readPartial(flowId, MESSAGE_FLOW_FILENAME);
     }
 
-    /** Store component details. */
-    public storeComponents(flowId: string, components: unknown[]): void {
-        this.storePartial(flowId, COMPONENTS_FILENAME, components);
+    /** Store component details. Returns false if no workspace folder is open. */
+    public storeComponents(flowId: string, components: unknown[]): boolean {
+        return this.storePartial(flowId, COMPONENTS_FILENAME, components);
     }
 
     /** Read component details. */
@@ -452,9 +464,9 @@ export class DiscoveryCacheService {
         return this.readPartial(flowId, COMPONENTS_FILENAME);
     }
 
-    /** Store gap analysis. */
-    public storeGaps(flowId: string, gaps: unknown[]): void {
-        this.storePartial(flowId, GAPS_FILENAME, gaps);
+    /** Store gap analysis. Returns false if no workspace folder is open. */
+    public storeGaps(flowId: string, gaps: unknown[]): boolean {
+        return this.storePartial(flowId, GAPS_FILENAME, gaps);
     }
 
     /** Read gap analysis. */
@@ -462,9 +474,9 @@ export class DiscoveryCacheService {
         return this.readPartial(flowId, GAPS_FILENAME);
     }
 
-    /** Store migration patterns. */
-    public storePatterns(flowId: string, patterns: unknown[]): void {
-        this.storePartial(flowId, PATTERNS_FILENAME, patterns);
+    /** Store migration patterns. Returns false if no workspace folder is open. */
+    public storePatterns(flowId: string, patterns: unknown[]): boolean {
+        return this.storePartial(flowId, PATTERNS_FILENAME, patterns);
     }
 
     /** Read migration patterns. */
@@ -472,9 +484,9 @@ export class DiscoveryCacheService {
         return this.readPartial(flowId, PATTERNS_FILENAME);
     }
 
-    /** Store dependency analysis (missing dependencies that block implementation). */
-    public storeDependencies(flowId: string, dependencyAnalysis: Record<string, unknown>): void {
-        this.storePartial(flowId, DEPENDENCIES_FILENAME, dependencyAnalysis);
+    /** Store dependency analysis (missing dependencies that block implementation). Returns false if no workspace folder is open. */
+    public storeDependencies(flowId: string, dependencyAnalysis: Record<string, unknown>): boolean {
+        return this.storePartial(flowId, DEPENDENCIES_FILENAME, dependencyAnalysis);
     }
 
     /** Read dependency analysis. */
