@@ -381,7 +381,8 @@ Sequence diagrams are stored separately from the architecture diagram in `sequen
 - ✅ Mini-map for navigation
 
 ### Export & Documentation
-- ✅ Export as PNG/SVG
+- ✅ Export analysis reports as DOCX or publish them to Confluence
+- ✅ Include rendered architecture and sequence diagrams in reports
 - ✅ Print-friendly view
 - ✅ Include in assessment reports
 

@@ -1167,7 +1167,10 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                         'logicAppsMigrationAgent.exportAnalysisReport',
                         this.currentGroupId,
                         this.currentTitle || 'Integration Flow',
-                        this.currentLLMResult
+                        this.currentLLMResult,
+                        message.data && typeof message.data === 'object'
+                            ? message.data
+                            : undefined
                     );
                 } else {
                     vscode.window.showWarningMessage('No analysis data available to export.');
@@ -3549,7 +3552,11 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 </div>
             </div>
             <button class="btn btn-outline" onclick="regenerate()">↻ Regenerate Analysis</button>
-            <button class="btn btn-outline" onclick="exportReport()" title="Export this analysis as a DOCX report">📄 Export Report</button>
+            <select id="analysisExportDestination" class="export-destination" aria-label="Analysis report export destination">
+                <option value="docx">DOCX</option>
+                <option value="confluence">Confluence</option>
+            </select>
+            <button class="btn btn-outline" onclick="exportReport()" title="Export this analysis report">📄 Export Report</button>
         </div>
     </div>
     
@@ -4611,7 +4618,11 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         }
 
         function exportReport() {
-            vscode.postMessage({ command: 'exportAnalysisReport' });
+            const destination = document.getElementById('analysisExportDestination').value;
+            vscode.postMessage({
+                command: 'exportAnalysisReport',
+                data: { destination: destination }
+            });
         }
 
         function backToFlowGroups() {

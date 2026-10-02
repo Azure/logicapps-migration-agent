@@ -1750,6 +1750,18 @@
                 "title": "Export Planning Report",
                 "category": "Logic Apps Migration Agent",
                 "icon": "$(file-text)"
+            },
+            {
+                "command": "logicAppsMigrationAgent.retryConfluenceExport",
+                "title": "Retry Confluence Export",
+                "category": "Logic Apps Migration Agent",
+                "icon": "$(sync)"
+            },
+            {
+                "command": "logicAppsMigrationAgent.clearConfluenceLink",
+                "title": "Clear Confluence Link",
+                "category": "Logic Apps Migration Agent",
+                "icon": "$(link)"
             }
         ],
         "viewsContainers": {
@@ -1858,6 +1870,14 @@
                 {
                     "command": "logicAppsMigrationAgent.exportPlanReport",
                     "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAgent.retryConfluenceExport",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAgent.clearConfluenceLink",
+                    "when": "false"
                 }
             ]
         },
@@ -1907,6 +1927,7 @@
         "format": "prettier --write \"src/**/*.ts\"",
         "format:check": "prettier --check \"src/**/*.ts\"",
         "test": "pnpm run compile && pnpm run test:unit && pnpm run test:integration",
+        "test:confluence": "node --test test/confluence-publishing-contract.test.js",
         "test:unit": "node ./out/test/runTest.js unit",
         "test:integration": "node ./out/test/runTest.js integration",
         "package": "vsce package",

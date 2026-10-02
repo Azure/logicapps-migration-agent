@@ -114,6 +114,14 @@ interface OpenFlowChatParams {
     userQuery: string;
 }
 
+interface ConfluencePublishingParams {
+    bundlePath: string;
+    reportType: 'analysis' | 'planning';
+    flowId: string;
+    flowName: string;
+    existingPage: string;
+}
+
 export class ChatPrompts {
     // ========================================================================
     // Flow Group Detection (Discovery)
@@ -336,6 +344,23 @@ export class ChatPrompts {
             '',
             params.userQuery,
         ].join('\n');
+    }
+
+    // ========================================================================
+    // Confluence Publishing
+    // ========================================================================
+
+    static publishConfluenceReport(params: ConfluencePublishingParams): string {
+        return (
+            `@confluence-publisher Publish the prepared ${params.reportType} report for "${params.flowName}" (flowId: "${params.flowId}").\n` +
+            SKILL_AUTHORITY +
+            '\nREQUIRED SKILL: Read `confluence-publishing` before doing anything else. The skill is authoritative for the Atlassian Rovo MCP workflow, confirmation, page replacement, attachment upload, conflict handling, and receipt schema.\n' +
+            `\nBUNDLE DIRECTORY: "${params.bundlePath}"\n` +
+            `REPORT TYPE: ${params.reportType}\n` +
+            `EXISTING PAGE MAPPING: ${params.existingPage}\n` +
+            '\nUse only the official Atlassian Rovo MCP Server configured for this workspace at https://mcp.atlassian.com/v2/mcp. Discover the available resource and tool schemas at runtime; do not invent tool names or parameter names. Do not use any other Confluence API, third-party integration, or destructive operation.\n' +
+            '\nPublish the complete report transaction (page content plus all ready PNG attachments) only after one explicit user confirmation. Preserve the mapped site, space, and parent page on updates. Write a validated publish-receipt.json into the bundle directory for every terminal outcome. Keep the bundle for failed, partial, or cancelled outcomes; the extension will remove it only after validating a successful receipt.'
+        );
     }
 
     // ========================================================================
