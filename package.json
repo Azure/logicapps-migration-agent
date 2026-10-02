@@ -353,6 +353,52 @@
                 }
             },
             {
+                "name": "migration_discovery_storeSequenceDiagrams",
+                "displayName": "Store Discovery Sequence Diagrams",
+                "toolReferenceName": "migration_discovery_storeSequenceDiagrams",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Stores one Mermaid sequence diagram for each inbound receive location or equivalent entry point in a flow. Submit an empty array only when the flow has no inbound entry points. Each receiveLocation must be unique and each mermaid value must be a valid sequenceDiagram with at least one business message.",
+                "userDescription": "Store receive-location sequence diagrams for a flow",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "flowId": {
+                            "type": "string",
+                            "description": "Flow group ID"
+                        },
+                        "sequenceDiagrams": {
+                            "type": "array",
+                            "description": "One business-readable sequence diagram per inbound receive location, in source discovery order",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "receiveLocation": {
+                                        "type": "string",
+                                        "description": "Exact receive-location or equivalent inbound entry-point name from source"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "Optional plain-language explanation of the message journey"
+                                    },
+                                    "mermaid": {
+                                        "type": "string",
+                                        "description": "Mermaid sequenceDiagram text"
+                                    }
+                                },
+                                "required": [
+                                    "receiveLocation",
+                                    "mermaid"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "flowId",
+                        "sequenceDiagrams"
+                    ]
+                }
+            },
+            {
                 "name": "migration_discovery_storeMessageFlow",
                 "displayName": "Store Discovery Message Flow",
                 "toolReferenceName": "migration_discovery_storeMessageFlow",
@@ -1704,6 +1750,18 @@
                 "title": "Export Planning Report",
                 "category": "Logic Apps Migration Agent",
                 "icon": "$(file-text)"
+            },
+            {
+                "command": "logicAppsMigrationAgent.retryConfluenceExport",
+                "title": "Retry Confluence Export",
+                "category": "Logic Apps Migration Agent",
+                "icon": "$(sync)"
+            },
+            {
+                "command": "logicAppsMigrationAgent.clearConfluenceLink",
+                "title": "Clear Confluence Link",
+                "category": "Logic Apps Migration Agent",
+                "icon": "$(link)"
             }
         ],
         "viewsContainers": {
@@ -1812,6 +1870,14 @@
                 {
                     "command": "logicAppsMigrationAgent.exportPlanReport",
                     "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAgent.retryConfluenceExport",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAgent.clearConfluenceLink",
+                    "when": "false"
                 }
             ]
         },
@@ -1861,6 +1927,7 @@
         "format": "prettier --write \"src/**/*.ts\"",
         "format:check": "prettier --check \"src/**/*.ts\"",
         "test": "pnpm run compile && pnpm run test:unit && pnpm run test:integration",
+        "test:confluence": "node --test test/confluence-publishing-contract.test.js",
         "test:unit": "node ./out/test/runTest.js unit",
         "test:integration": "node ./out/test/runTest.js integration",
         "package": "vsce package",

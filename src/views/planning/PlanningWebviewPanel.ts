@@ -275,14 +275,23 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             }
 
             case 'exportPlanReport': {
-                const flowId = message.data as string;
+                const exportData =
+                    message.data && typeof message.data === 'object'
+                        ? (message.data as { flowId?: string; destination?: 'docx' | 'confluence' })
+                        : undefined;
+                const flowId =
+                    exportData?.flowId ??
+                    (typeof message.data === 'string' ? message.data : undefined);
                 if (flowId) {
                     this.logger.debug(
                         `[PlanningWebview] Export report requested for flow: ${flowId}`
                     );
                     void vscode.commands.executeCommand(
                         'logicAppsMigrationAgent.exportPlanReport',
-                        flowId
+                        flowId,
+                        exportData?.destination
+                            ? { destination: exportData.destination }
+                            : undefined
                     );
                 }
                 break;
@@ -1602,7 +1611,11 @@ export class PlanningWebviewPanel implements vscode.Disposable {
 
         function exportPlanReport(flowId) {
             window._dbgLog('info', 'exportPlanReport: ' + flowId);
-            vscode.postMessage({ command: 'exportPlanReport', data: flowId });
+            const destination = document.getElementById('planningExportDestination').value;
+            vscode.postMessage({
+                command: 'exportPlanReport',
+                data: { flowId: flowId, destination: destination }
+            });
         }
 
         function refresh() {
@@ -2178,7 +2191,11 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                                 </div>
                             </div>
                             <button class="btn btn-sm btn-outline" onclick="replanFlow('${this.escapeHtml(result.flowId)}')" title="Clear and regenerate the plan">↻ Regenerate Plan</button>
-                            <button class="btn btn-sm btn-outline" onclick="exportPlanReport('${this.escapeHtml(result.flowId)}')" title="Export planning report as DOCX">📄 Export Report</button>
+                            <select id="planningExportDestination" class="export-destination" aria-label="Planning report export destination">
+                                <option value="docx">DOCX</option>
+                                <option value="confluence">Confluence</option>
+                            </select>
+                            <button class="btn btn-sm btn-outline" onclick="exportPlanReport('${this.escapeHtml(result.flowId)}')" title="Export this planning report">📄 Export Report</button>
                         </div>
                     </div>
                 </div>
@@ -2250,7 +2267,11 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                             </div>
                         </div>
                         <button class="btn btn-sm btn-outline" onclick="replanFlow('${this.escapeHtml(result.flowId)}')" title="Clear and regenerate the plan">↻ Regenerate Plan</button>
-                        <button class="btn btn-sm btn-outline" onclick="exportPlanReport('${this.escapeHtml(result.flowId)}')" title="Export planning report as DOCX">📄 Export Report</button>
+                        <select id="planningExportDestination" class="export-destination" aria-label="Planning report export destination">
+                            <option value="docx">DOCX</option>
+                            <option value="confluence">Confluence</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline" onclick="exportPlanReport('${this.escapeHtml(result.flowId)}')" title="Export this planning report">📄 Export Report</button>
                     </div>
                 </div>
                 <div class="plan-tabs" style="margin-top: 12px;">

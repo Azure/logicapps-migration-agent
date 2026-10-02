@@ -37,3 +37,5 @@ yarn-error.log*
 
 # Misc
 .migration/
+.vscode/migration/confluence-publishing.json
+.vscode/migration/confluence-exports/

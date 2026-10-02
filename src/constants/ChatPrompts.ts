@@ -114,6 +114,14 @@ interface OpenFlowChatParams {
     userQuery: string;
 }
 
+interface ConfluencePublishingParams {
+    bundlePath: string;
+    reportType: 'analysis' | 'planning';
+    flowId: string;
+    flowName: string;
+    existingPage: string;
+}
+
 export class ChatPrompts {
     // ========================================================================
     // Flow Group Detection (Discovery)
@@ -269,6 +277,7 @@ export class ChatPrompts {
             GLOBAL_LOOKUP_POLICY +
             '\nREQUIRED SKILLS (read ALL before starting):\n' +
             '- `analyse-source-design` — source reading depth, Mermaid diagram rules, MessageBox modeling, orchestration shapes, component mapping priority ladder, store tool sequence\n' +
+            '- `sequence-diagram-generation` — one business-readable sequence diagram per receive location and the required storage contract\n' +
             '- `dependency-and-decompilation-analysis` — DLL decompilation, missing dependency classification\n' +
             '- `source-to-logic-apps-mapping` — component equivalents, service provider IDs, operation names\n' +
             `\nPROCEDURE:\n` +
@@ -277,8 +286,8 @@ export class ChatPrompts {
             '3. If any required dependency/detail is unresolved, expand to full-project lookup (all artifacts), then continue analysis.\n' +
             '4. Perform dependency analysis per skill `dependency-and-decompilation-analysis` (decompile DLLs/JARs, classify missing deps).\n' +
             '5. Look up every component in skill `source-to-logic-apps-mapping`, then search reference docs with those names.\n' +
-            '6. Generate Mermaid architecture diagram per skill `analyse-source-design` rules.\n' +
-            `7. Store discovery results in the exact order specified by skill \`analyse-source-design\` (storeMeta → storeArchitecture → storeComponents → storeMessageFlow → storeGaps → storePatterns → storeDependencies → finalize), all with flowId="${params.flowId}".`
+            '6. Generate the Mermaid architecture flowchart per skill `analyse-source-design` and exactly one Mermaid sequence diagram per receive location per skill `sequence-diagram-generation`.\n' +
+            `7. Store discovery results in the exact order specified by the skills (storeMeta → storeArchitecture → storeSequenceDiagrams → storeComponents → storeMessageFlow → storeGaps → storePatterns → storeDependencies → finalize), all with flowId="${params.flowId}".`
         );
     }
 
@@ -335,6 +344,23 @@ export class ChatPrompts {
             '',
             params.userQuery,
         ].join('\n');
+    }
+
+    // ========================================================================
+    // Confluence Publishing
+    // ========================================================================
+
+    static publishConfluenceReport(params: ConfluencePublishingParams): string {
+        return (
+            `@confluence-publisher Publish the prepared ${params.reportType} report for "${params.flowName}" (flowId: "${params.flowId}").\n` +
+            SKILL_AUTHORITY +
+            '\nREQUIRED SKILL: Read `confluence-publishing` before doing anything else. The skill is authoritative for the Atlassian Rovo MCP workflow, confirmation, page replacement, attachment upload, conflict handling, and receipt schema.\n' +
+            `\nBUNDLE DIRECTORY: "${params.bundlePath}"\n` +
+            `REPORT TYPE: ${params.reportType}\n` +
+            `EXISTING PAGE MAPPING: ${params.existingPage}\n` +
+            '\nUse only the official Atlassian Rovo MCP Server configured for this workspace at https://mcp.atlassian.com/v2/mcp. Discover the available resource and tool schemas at runtime; do not invent tool names or parameter names. Do not use any other Confluence API, third-party integration, or destructive operation.\n' +
+            '\nPublish the complete report transaction (page content plus all ready PNG attachments) only after one explicit user confirmation. Preserve the mapped site, space, and parent page on updates. Write a validated publish-receipt.json into the bundle directory for every terminal outcome. Keep the bundle for failed, partial, or cancelled outcomes; the extension will remove it only after validating a successful receipt.'
+        );
     }
 
     // ========================================================================

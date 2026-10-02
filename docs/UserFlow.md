@@ -1281,7 +1281,7 @@ When user clicks **View Flow** on an artifact or right-clicks → "Visualize Flo
 
 **User Actions:**
 - 🔍 **Zoom** - Pan and zoom the diagram
-- 📤 **Export** - Export as PNG, SVG, or Mermaid
+- 📤 **Export** - Export the analysis or planning report as DOCX (default) or publish it to Confluence
 - ⚙ **Settings** - Toggle labels, show/hide ports
 - **Click shape** - View shape details in bottom panel
 - **Double-click** - Open source file at shape definition
@@ -1684,7 +1684,7 @@ When user clicks "Proceed to Assessment" or "Begin Assessment Stage":
 │  │                                                                                 │   │
 │  │  ═════════════════════════════════════════════════════════════════════════════  │   │
 │  │                                                                                 │   │
-│  │  [📥 Export Report]   [🔍 View Full IR]   [▶️ Proceed to Planning]              │   │
+│  │  [📥 Export Report: DOCX / Confluence]  [🔍 View Full IR]  [▶️ Proceed to Planning] │
 │  │                                                                                 │   │
 │  └─────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                         │
@@ -2457,7 +2457,7 @@ When user clicks "Proceed to Planning":
 │  │                                                                                 │   │
 │  │  ═════════════════════════════════════════════════════════════════════════════  │   │
 │  │                                                                                 │   │
-│  │  [📥 Export Plan]   [← Edit Plan]   [▶️ Proceed to Design]                      │   │
+│  │  [📥 Export Plan: DOCX / Confluence]  [← Edit Plan]  [▶️ Proceed to Design]      │   │
 │  │                                                                                 │   │
 │  └─────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                         │
@@ -4654,4 +4654,3 @@ When user clicks "Authorize in Portal":
 ---
 
 **End of User Flow Documentation**
-

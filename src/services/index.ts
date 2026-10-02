@@ -71,6 +71,16 @@ export type {
 // Report Export
 export { ReportExporterService } from './ReportExporterService';
 export { MermaidImageRenderer } from './MermaidImageRenderer';
+export { ConfluenceExportService } from './ConfluenceExportService';
+export type {
+    ConfluenceReportType,
+    ConfluenceAttachmentManifest,
+    ConfluenceBundleManifest,
+    ConfluencePageMapping,
+    ConfluencePublishReceipt,
+    ConfluenceBundle,
+    ConfluenceReceiptResult,
+} from './ConfluenceExportService';
 
 // Tool services
 export * from './tools';

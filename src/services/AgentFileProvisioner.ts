@@ -27,12 +27,13 @@ const AGENT_DIR = '.github/agents';
 const AGENT_FILENAME = 'migration-analyser.agent.md';
 const PLANNER_AGENT_FILENAME = 'migration-planner.agent.md';
 const CONVERTER_AGENT_FILENAME = 'migration-converter.agent.md';
+const CONFLUENCE_PUBLISHER_AGENT_FILENAME = 'confluence-publisher.agent.md';
 
 /**
  * A version stamp embedded as an HTML comment at the top of the generated file.
  * Bump this when the prompt content changes so existing files get updated.
  */
-const ANALYSER_AGENT_VERSION = '2.4.0';
+const ANALYSER_AGENT_VERSION = '2.5.0';
 const ANALYSER_VERSION_TAG = `<!-- migration-analyser-agent v${ANALYSER_AGENT_VERSION} -->`;
 
 const PLANNER_AGENT_VERSION = '2.9.0';
@@ -40,6 +41,9 @@ const PLANNER_VERSION_TAG = `<!-- migration-planner-agent v${PLANNER_AGENT_VERSI
 
 const CONVERTER_AGENT_VERSION = '2.20.0';
 const CONVERTER_VERSION_TAG = `<!-- migration-converter-agent v${CONVERTER_AGENT_VERSION} -->`;
+
+const CONFLUENCE_PUBLISHER_AGENT_VERSION = '1.0.0';
+const CONFLUENCE_PUBLISHER_VERSION_TAG = `<!-- confluence-publisher-agent v${CONFLUENCE_PUBLISHER_AGENT_VERSION} -->`;
 
 // =============================================================================
 // Agent File Provisioner
@@ -87,6 +91,7 @@ export class AgentFileProvisioner {
                 // Still provision the planner and converter agents (may be missing)
                 await this.provisionPlannerAgent(agentDir);
                 await this.provisionConverterAgent(agentDir);
+                await this.provisionConfluencePublisherAgent(agentDir);
                 await this.provisionSkills(agentDir);
                 return false;
             }
@@ -105,6 +110,7 @@ export class AgentFileProvisioner {
         // Also provision the migration-planner and migration-converter agents
         await this.provisionPlannerAgent(agentDir);
         await this.provisionConverterAgent(agentDir);
+        await this.provisionConfluencePublisherAgent(agentDir);
 
         // Provision skill files
         await this.provisionSkills(agentDir);
@@ -163,6 +169,16 @@ export class AgentFileProvisioner {
             await fs.promises.unlink(converterFile);
             this.logger.debug(`[AgentFileProvisioner] Removed ${converterFile}`);
         }
+
+        const confluencePublisherFile = path.join(
+            rootDir,
+            AGENT_DIR,
+            CONFLUENCE_PUBLISHER_AGENT_FILENAME
+        );
+        if (fs.existsSync(confluencePublisherFile)) {
+            await fs.promises.unlink(confluencePublisherFile);
+            this.logger.debug(`[AgentFileProvisioner] Removed ${confluencePublisherFile}`);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -214,6 +230,13 @@ export class AgentFileProvisioner {
         return this.readAgentPrompt('migration-converter.md', CONVERTER_VERSION_TAG);
     }
 
+    private buildConfluencePublisherAgentContent(): string {
+        return this.readAgentPrompt(
+            'confluence-publisher.md',
+            CONFLUENCE_PUBLISHER_VERSION_TAG
+        );
+    }
+
     /**
      * Provision the `@migration-converter` agent file.
      */
@@ -239,11 +262,38 @@ export class AgentFileProvisioner {
         );
     }
 
+    /**
+     * Provision the `@confluence-publisher` agent file.
+     */
+    private async provisionConfluencePublisherAgent(agentDir: string): Promise<void> {
+        const publisherFile = path.join(agentDir, CONFLUENCE_PUBLISHER_AGENT_FILENAME);
+
+        if (fs.existsSync(publisherFile)) {
+            const existing = fs.readFileSync(publisherFile, 'utf-8');
+            if (existing.includes(CONFLUENCE_PUBLISHER_VERSION_TAG)) {
+                this.logger.debug(
+                    `[AgentFileProvisioner] Confluence publisher already at v${CONFLUENCE_PUBLISHER_AGENT_VERSION} — skipping`
+                );
+                return;
+            }
+            this.logger.debug(
+                '[AgentFileProvisioner] Updating Confluence publisher agent file to new version'
+            );
+        }
+
+        await fs.promises.mkdir(agentDir, { recursive: true });
+        const content = this.buildConfluencePublisherAgentContent();
+        await fs.promises.writeFile(publisherFile, content, 'utf-8');
+        this.logger.debug(
+            `[AgentFileProvisioner] Provisioned ${CONFLUENCE_PUBLISHER_AGENT_FILENAME} → ${publisherFile}`
+        );
+    }
+
     // -------------------------------------------------------------------------
     // Skills
     // -------------------------------------------------------------------------
 
-    private static readonly SKILLS_VERSION = '10.25.0';
+    private static readonly SKILLS_VERSION = '10.26.0';
     private static readonly SKILLS_VERSION_TAG = `<!-- skills v${AgentFileProvisioner.SKILLS_VERSION} -->`;
 
     /**
@@ -307,6 +357,10 @@ export class AgentFileProvisioner {
                 content: this.buildSkillFromResource('analyse-source-design', platformFolder),
             },
             {
+                folder: 'sequence-diagram-generation',
+                content: this.buildSkillFromResource('sequence-diagram-generation', platformFolder),
+            },
+            {
                 folder: 'dependency-and-decompilation-analysis',
                 content: this.buildSkillFromResource(
                     'dependency-and-decompilation-analysis',
@@ -356,6 +410,10 @@ export class AgentFileProvisioner {
                     'cloud-deployment-and-testing',
                     platformFolder
                 ),
+            },
+            {
+                folder: 'confluence-publishing',
+                content: this.buildSkillFromResource('confluence-publishing'),
             },
         ];
 
