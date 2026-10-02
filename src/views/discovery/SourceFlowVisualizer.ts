@@ -2074,6 +2074,10 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         const mermaidCode = result.mermaid.replace(/`/g, '\\`');
         const componentDetailsJson = JSON.stringify(result.componentDetails || []);
         const messageFlowJson = JSON.stringify(result.messageFlow || []);
+        const sequenceDiagramsJson = JSON.stringify(result.sequenceDiagrams || [])
+            .replace(/</g, '\\u003c')
+            .replace(/>/g, '\\u003e')
+            .replace(/&/g, '\\u0026');
         const dependencyAnalysisJson = JSON.stringify(result.dependencyAnalysis || null);
         const gapAnalysisJson = JSON.stringify(result.gapAnalysis || []);
         const migrationPatternsJson = JSON.stringify(result.migrationPatterns || []);
@@ -2487,6 +2491,51 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         .diagram-container svg {
             max-width: none;
             height: auto;
+        }
+
+        /* Sequence diagrams */
+        .sequence-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 12px;
+            background: var(--vscode-sideBar-background);
+            border: 1px solid var(--border-color);
+            border-radius: 8px 8px 0 0;
+        }
+
+        .sequence-controls label {
+            font-weight: 600;
+        }
+
+        .sequence-select {
+            min-width: 280px;
+            max-width: 100%;
+            padding: 6px 8px;
+            background: var(--vscode-dropdown-background);
+            color: var(--vscode-dropdown-foreground);
+            border: 1px solid var(--vscode-dropdown-border);
+            border-radius: 4px;
+            font: inherit;
+        }
+
+        .sequence-description {
+            margin: 12px 0;
+            padding: 10px 12px;
+            border-left: 3px solid var(--accent-color);
+            background: var(--card-bg);
+            opacity: 0.9;
+        }
+
+        .sequence-diagram-container {
+            min-height: 460px;
+        }
+
+        .sequence-empty {
+            padding: 48px 24px;
+            text-align: center;
+            opacity: 0.75;
         }
         
         /* Message Flow Timeline */
@@ -3473,6 +3522,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             border-radius: 3px;
             border: 1px solid var(--border-color);
         }
+        ${SourceFlowVisualizer.getMigrationBannerCss()}
     </style>
 </head>
 <body>
@@ -3505,6 +3555,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     
     <div class="tabs">
         <button class="tab active" onclick="showTab('diagram')">Architecture Diagram</button>
+        <button class="tab" onclick="showTab('sequence')">Sequence Diagrams (${(result.sequenceDiagrams || []).length})</button>
         <button class="tab" onclick="showTab('flow')">Message Flow</button>
         <button class="tab" onclick="showTab('components')">Components</button>
         <button class="tab" onclick="showTab('dependencies')">Missing Dependencies ${depTabBadge}</button>
@@ -3562,6 +3613,28 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             </div>`
                     : ''
             }
+        </div>
+    </div>
+
+    <!-- Sequence Diagrams Tab -->
+    <div id="tab-sequence" class="tab-content">
+        <h2 style="margin-bottom: 8px;">Business Message Journeys</h2>
+        <p style="margin-bottom: 16px; opacity: 0.8;">Each diagram shows the message journey for one inbound receive location or equivalent entry point.</p>
+        <div class="sequence-controls">
+            <label for="sequenceDiagramSelect">Receive location</label>
+            <select id="sequenceDiagramSelect" class="sequence-select" onchange="renderSequenceDiagram()"></select>
+            <button class="zoom-btn" onclick="sequenceZoomOut()" title="Zoom Out">−</button>
+            <span class="zoom-level" id="sequenceZoomLevel">100%</span>
+            <button class="zoom-btn" onclick="sequenceZoomIn()" title="Zoom In">+</button>
+            <button class="zoom-btn zoom-btn-text" onclick="sequenceZoomReset()" title="Reset to 100%">Reset</button>
+            <button class="zoom-btn zoom-btn-text" onclick="sequenceZoomFit()" title="Fit to View">Fit</button>
+        </div>
+        <div id="sequenceDescription" class="sequence-description" hidden></div>
+        <div class="diagram-container sequence-diagram-container" id="sequenceDiagramContainer">
+            <div class="diagram-inner" id="sequenceDiagramInner"></div>
+        </div>
+        <div id="sequenceEmpty" class="sequence-empty" hidden>
+            No inbound receive locations were found for this flow, so there are no sequence diagrams to display.
         </div>
     </div>
     
@@ -3806,11 +3879,14 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         const vscode = acquireVsCodeApi();
         const componentDetails = ${componentDetailsJson};
         const messageFlow = ${messageFlowJson};
+        const sequenceDiagrams = ${sequenceDiagramsJson};
         const componentExplanations = ${explanationsJson};
         const dependencyAnalysis = ${dependencyAnalysisJson};
         const gapAnalysis = ${gapAnalysisJson};
         const migrationPatterns = ${migrationPatternsJson};
         const sourcePlatformName = '${sourcePlatform === 'tibco' ? 'TIBCO' : sourcePlatform === 'mulesoft' ? 'MuleSoft' : 'BizTalk'}';
+        let sequenceZoom = 1;
+        let selectedSequenceDiagramIndex = 0;
         
         // ── Zoom State (per flow group) ──
         const ZOOM_STEP = 0.1;
@@ -3946,6 +4022,125 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 vscode.postMessage({ 
                     command: 'mermaidError', 
                     data: { error: errorMsg, code: mermaidCode }
+                });
+            }
+        }
+
+        function setSequenceZoom(z, animate) {
+            sequenceZoom = Math.round(Math.max(0.2, Math.min(10, z)) * 100) / 100;
+            const inner = document.getElementById('sequenceDiagramInner');
+            const label = document.getElementById('sequenceZoomLevel');
+            if (!inner || !label) return;
+            if (!animate) inner.classList.add('no-transition');
+            else inner.classList.remove('no-transition');
+            inner.style.transform = 'scale(' + sequenceZoom + ')';
+            label.textContent = Math.round(sequenceZoom * 100) + '%';
+            if (!animate) requestAnimationFrame(() => inner.classList.remove('no-transition'));
+        }
+        function sequenceZoomIn() { setSequenceZoom(sequenceZoom + 0.1, true); }
+        function sequenceZoomOut() { setSequenceZoom(sequenceZoom - 0.1, true); }
+        function sequenceZoomReset() { setSequenceZoom(1, true); }
+        function sequenceZoomFit() {
+            const container = document.getElementById('sequenceDiagramContainer');
+            const inner = document.getElementById('sequenceDiagramInner');
+            if (!container || !inner) return;
+            inner.classList.add('no-transition');
+            inner.style.transform = 'scale(1)';
+            requestAnimationFrame(() => {
+                const width = inner.scrollWidth;
+                const height = inner.scrollHeight;
+                if (width > 0 && height > 0) {
+                    const fitScale = Math.min(
+                        container.clientWidth / width,
+                        container.clientHeight / height,
+                        10
+                    );
+                    setSequenceZoom(Math.max(fitScale, 0.2), false);
+                } else {
+                    inner.classList.remove('no-transition');
+                }
+            });
+        }
+
+        function populateSequenceDiagramSelector() {
+            const select = document.getElementById('sequenceDiagramSelect');
+            const empty = document.getElementById('sequenceEmpty');
+            const container = document.getElementById('sequenceDiagramContainer');
+            if (!select || !empty || !container) return;
+
+            select.replaceChildren();
+            if (!Array.isArray(sequenceDiagrams) || sequenceDiagrams.length === 0) {
+                select.disabled = true;
+                empty.hidden = false;
+                container.style.display = 'none';
+                return;
+            }
+
+            sequenceDiagrams.forEach((diagram, index) => {
+                const option = document.createElement('option');
+                option.value = String(index);
+                option.textContent = diagram.receiveLocation;
+                select.appendChild(option);
+            });
+            select.disabled = false;
+            select.value = String(selectedSequenceDiagramIndex);
+            empty.hidden = true;
+            container.style.display = '';
+        }
+
+        async function renderSequenceDiagram() {
+            const select = document.getElementById('sequenceDiagramSelect');
+            const description = document.getElementById('sequenceDescription');
+            const inner = document.getElementById('sequenceDiagramInner');
+            if (!select || !description || !inner || !Array.isArray(sequenceDiagrams)) return;
+
+            if (sequenceDiagrams.length === 0) {
+                description.hidden = true;
+                return;
+            }
+
+            selectedSequenceDiagramIndex = Math.max(
+                0,
+                Math.min(sequenceDiagrams.length - 1, Number(select.value) || 0)
+            );
+            select.value = String(selectedSequenceDiagramIndex);
+            const diagram = sequenceDiagrams[selectedSequenceDiagramIndex];
+            description.textContent = diagram.description || 'Message journey from this inbound entry point through the integration flow.';
+            description.hidden = false;
+            inner.textContent = '';
+            sequenceZoom = 1;
+
+            try {
+                await mermaid.parse(diagram.mermaid);
+                const rendered = await mermaid.render(
+                    'sequence-mermaid-' + Date.now(),
+                    diagram.mermaid
+                );
+                inner.innerHTML = rendered.svg;
+                setSequenceZoom(1, false);
+            } catch (error) {
+                const errorMessage = error && error.message ? error.message : String(error);
+                const panel = document.createElement('div');
+                panel.style.padding = '20px';
+                panel.style.color = 'var(--vscode-errorForeground)';
+                const heading = document.createElement('h3');
+                heading.textContent = 'Sequence Diagram Rendering Error';
+                const message = document.createElement('p');
+                message.textContent = errorMessage;
+                const details = document.createElement('details');
+                const summary = document.createElement('summary');
+                summary.textContent = 'Show Mermaid Code';
+                const code = document.createElement('pre');
+                code.textContent = diagram.mermaid;
+                details.appendChild(summary);
+                details.appendChild(code);
+                panel.appendChild(heading);
+                panel.appendChild(message);
+                panel.appendChild(details);
+                inner.appendChild(panel);
+                vscode.postMessage({
+                    command: 'mermaidError',
+                    data: { error: errorMessage, code: diagram.mermaid, receiveLocation: diagram.receiveLocation }
                 });
             }
         }
@@ -4705,7 +4900,8 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         }
         
         // Initialize
-        renderMermaid();
+        populateSequenceDiagramSelector();
+        renderMermaid().then(renderSequenceDiagram);
         renderMessageFlow();
         renderComponents();
         renderDependencies();
