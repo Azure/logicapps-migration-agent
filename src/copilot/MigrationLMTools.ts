@@ -36,6 +36,8 @@ import { ConversionService } from '../stages/conversion/ConversionService';
 import { ConversionFileService } from '../stages/conversion/ConversionFileService';
 import { MermaidValidationService } from '../services/MermaidValidationService';
 import type { ConversionTask, ConversionTaskOutput, ConversionTaskPlan } from '../stages/conversion/types';
+import { PlanningPreflightTool } from './PlanningPreflightTool';
+import { PlanningBrief, validatePlanningBrief } from '../stages/planning/PlanningDecisions';
 
 // ============================================================================
 // Tool Input Types
@@ -196,6 +198,8 @@ interface PlanningStoreMetaInput {
     flowName: string;
     explanation: string;
     summary: string;
+    brief: PlanningBrief;
+    startNew?: boolean;
 }
 
 interface PlanningStoreArchitectureInput {
@@ -2823,7 +2827,7 @@ class PlanningStoreMetaTool implements vscode.LanguageModelTool<PlanningStoreMet
         _token: vscode.CancellationToken
     ): Promise<vscode.LanguageModelToolResult> {
         const logger = LoggingService.getInstance();
-        const { flowId, flowName, explanation, summary } = options.input;
+        const { flowId, flowName, explanation, summary, brief, startNew } = options.input;
 
         if (!flowId || !flowName) {
             return new vscode.LanguageModelToolResult([
@@ -2835,6 +2839,14 @@ class PlanningStoreMetaTool implements vscode.LanguageModelTool<PlanningStoreMet
 
         try {
             const fileService = PlanningFileService.getInstance();
+            validatePlanningBrief(brief);
+            const preferences = fileService.readPreferences(flowId);
+            if (preferences?.status !== 'ready') {
+                throw new Error('Resolve planning choices with migration_planning_preflight before generating a plan.');
+            }
+            if (startNew) {
+                fileService.clearDraft(flowId);
+            }
             const now = new Date().toISOString();
             const filePath = fileService.storeMeta(flowId, {
                 flowId,
@@ -2843,7 +2855,12 @@ class PlanningStoreMetaTool implements vscode.LanguageModelTool<PlanningStoreMet
                 summary: summary || '',
                 generatedAt: now,
                 updatedAt: now,
+                preferences,
+                brief,
             });
+            if (!filePath) {
+                throw new Error('Open a workspace before storing plan metadata.');
+            }
 
             logger.debug(`[LMTool] migration_planning_storeMeta: stored for "${flowId}"`);
             return new vscode.LanguageModelToolResult([
@@ -3749,6 +3766,11 @@ class PlanningFinalizeTool implements vscode.LanguageModelTool<PlanningFinalizeI
                     ),
                 ]);
             }
+            const preferences = fileService.readPreferences(flowId);
+            if (preferences?.status !== 'ready' || meta.preferences?.revision !== preferences.revision) {
+                throw new Error('Planning choices are unresolved or changed. Resolve preflight and update the plan metadata and affected artifacts before finalizing.');
+            }
+            validatePlanningBrief(meta.brief);
             const workflowDefs = fileService.readAllWorkflowDefinitions(flowId);
             const azureComponents = fileService.readAzureComponents(flowId) ?? [];
             const actionMappings = fileService.readActionMappings(flowId) ?? [];
@@ -3950,18 +3972,20 @@ class PlanningFinalizeTool implements vscode.LanguageModelTool<PlanningFinalizeI
                     uploadNotes: d.uploadNotes,
                 })),
                 summary: meta.summary,
+                preferences: meta.preferences,
+                brief: meta.brief,
             };
 
             // Step 3: Store in PlanningCacheService
             const cacheService = PlanningCacheService.getInstance();
-            await cacheService.store(result);
+            const finalized = await cacheService.store(result);
 
             // Step 4: Store FlowMigrationPlan in PlanningService
             const planningService = PlanningService.getInstance();
             await planningService.storePlan(flowId, {
                 flowId,
                 flowName: resolvedName,
-                generatedAt: meta.generatedAt,
+                generatedAt: finalized.generatedAt,
                 complexity: { score: 50, level: 'medium', factors: [] },
                 patterns: patterns.map((p) => ({
                     name: p.name,
@@ -4060,6 +4084,7 @@ class PlanningFinalizeTool implements vscode.LanguageModelTool<PlanningFinalizeI
                         success: true,
                         flowId,
                         flowName: resolvedName,
+                        planId: finalized.planId,
                         workflows: result.workflows.length,
                         azureComponents: azureComponents.length,
                         actionMappings: actionMappings.length,
@@ -5254,6 +5279,9 @@ export function registerMigrationLMTools(context: vscode.ExtensionContext): vsco
 
     // Planning file tools (multi-file architecture)
     disposables.push(
+        vscode.lm.registerTool('migration_planning_preflight', new PlanningPreflightTool())
+    );
+    disposables.push(
         vscode.lm.registerTool('migration_planning_storeMeta', new PlanningStoreMetaTool())
     );
     disposables.push(
@@ -5324,6 +5352,6 @@ export function registerMigrationLMTools(context: vscode.ExtensionContext): vsco
         context.subscriptions.push(d);
     }
 
-    logger.debug('[LMTools] Registered 25 migration language model tools');
+    logger.debug(`[LMTools] Registered ${disposables.length} migration language model tools`);
     return disposables;
 }

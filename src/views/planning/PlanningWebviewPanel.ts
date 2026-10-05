@@ -17,7 +17,7 @@ import {
     PlanningCacheService,
     FlowPlanningResult,
 } from '../../stages/planning/PlanningCacheService';
-import { PlanningFileService } from '../../stages/planning/PlanningFileService';
+import { selectedChoiceLabel } from '../../stages/planning/PlanningDecisions';
 import { SourceFlowVisualizer } from '../discovery/SourceFlowVisualizer';
 import { UserPrompts } from '../../constants/UserMessages';
 
@@ -135,6 +135,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             this.logger.error(
                 `[PlanningWebview] update error: ${err instanceof Error ? err.message : String(err)}`
             );
+            void vscode.window.showErrorMessage(UserPrompts.failedToLoadPlanningView(err));
         } finally {
             this.updating = false;
         }
@@ -185,50 +186,15 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                 const flowId = message.data as string;
                 if (flowId) {
                     this.logger.debug(`Replan requested for flow: ${flowId}`);
-                    // Remove cached plan from disk and memory
-                    PlanningCacheService.getInstance()
-                        .remove(flowId)
-                        .then(() => {
-                            // Also remove planning files (new multi-file structure)
-                            PlanningFileService.getInstance().removeFlow(flowId);
-
-                            // Reset flow status to not-started so storePlan can set it again
-                            const state = this.planningService.getState();
-                            const flow = state?.flows.find((f) => f.id === flowId);
-                            if (flow) {
-                                flow.status = 'not-started';
-                            }
-                            // Also remove the in-memory plan
-                            if (state?.plans[flowId]) {
-                                delete state.plans[flowId];
-                            }
-                            // Trigger plan generation via command (same as startPlanning)
-                            void this.planningService.selectFlow(flowId);
-                            this.update();
-                            vscode.commands
-                                .executeCommand(
-                                    'logicAppsMigrationAgent.generatePlanForFlow',
-                                    flowId,
-                                    'replan'
-                                )
-                                .then(
-                                    () =>
-                                        this.logger.debug(
-                                            `Replan command completed for flow: ${flowId}`
-                                        ),
-                                    (err) => {
-                                        this.logger.error(
-                                            `Replan command failed for flow: ${flowId} — ${err}`
-                                        );
-                                        vscode.window.showErrorMessage(
-                                            UserPrompts.failedToReplan(err)
-                                        );
-                                    }
-                                );
-                        })
-                        .catch((err) => {
-                            this.logger.error(`Failed to clear plan for replan: ${err}`);
-                            vscode.window.showErrorMessage(UserPrompts.failedToClearPlan(err));
+                    void vscode.commands
+                        .executeCommand(
+                            'logicAppsMigrationAgent.generatePlanForFlow',
+                            flowId,
+                            'replan'
+                        )
+                        .then(undefined, (err) => {
+                            this.logger.error(`Replan command failed for flow: ${flowId} - ${err}`);
+                            void vscode.window.showErrorMessage(UserPrompts.failedToReplan(err));
                         });
                 }
                 break;
@@ -259,7 +225,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                         message: userMsg.trim().slice(0, 1000),
                         messageLength: userMsg.trim().length,
                     });
-                    const prompt = `@migration-planner\nRespond for below, Strictly follow your \`Incremental Updates\` instruction. Re-plan and update the results, then finalize.\n\nFlow ID: ${flowId}\n\n${userMsg}`;
+                    const prompt = `@migration-planner\nFollow your Incremental Updates instructions. Read saved preflight choices first. Resolve only critical choices affected by this request before updating metadata and affected artifacts, then finalize a new history version. Do not regenerate unaffected artifacts or alternatives.\n\nFlow ID: ${flowId}\n\n${userMsg}`;
                     void vscode.commands
                         .executeCommand('workbench.action.chat.open', {
                             mode: 'agent',
@@ -353,7 +319,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                             Start Planning
                         </button>`
                         }
-                        ${flow.status === 'planned' || flow.status === 'approved' || (flow.status === 'in-progress' && this.planningService.getPlan(flow.id)) ? `<button class="btn btn-sm btn-outline" onclick="replanFlow('${this.escapeHtml(flow.id)}')" title="Clear existing plan and re-generate">Replan</button>` : ''}
+                        ${flow.status === 'planned' || flow.status === 'approved' || (flow.status === 'in-progress' && this.planningService.getPlan(flow.id)) ? `<button class="btn btn-sm btn-outline" onclick="replanFlow('${this.escapeHtml(flow.id)}')" title="Generate a new version using saved choices; keep plan history">Replan</button>` : ''}
                     </td>
                 </tr>`;
             })
@@ -762,6 +728,34 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             opacity: 0;
             margin: 0;
             padding: 0;
+        }
+
+        .planning-summary-content {
+            display: grid;
+            gap: 12px;
+            font-size: 13px;
+        }
+
+        .planning-summary-content p {
+            margin: 0;
+        }
+
+        .planning-summary-content summary {
+            cursor: pointer;
+        }
+
+        .planning-summary-content details[open] > summary {
+            margin-bottom: 8px;
+        }
+
+        .planning-summary-content .planning-table-scroll {
+            overflow-x: auto;
+            min-width: 0;
+        }
+
+        .planning-summary-content .flow-table td {
+            vertical-align: top;
+            overflow-wrap: anywhere;
         }
 
         .plan-card h4 .section-count {
@@ -2156,7 +2150,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                     </div>
                 </div>
                 ${patternsHtml}
-                ${result.summary ? `<div class="plan-card"><h4 onclick="toggleSection(this)"><span class="collapse-icon">▼</span> 📝 Summary</h4><div class="plan-card-body"><p style="margin: 0; font-size: 13px;">${this.escapeHtml(result.summary)}</p></div></div>` : ''}
+                ${this.getPlanningSummaryHtml(result)}
             </div>`;
 
         // ── Single workflow: no tabs needed ──
@@ -2177,7 +2171,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                                     </div>
                                 </div>
                             </div>
-                            <button class="btn btn-sm btn-outline" onclick="replanFlow('${this.escapeHtml(result.flowId)}')" title="Clear and regenerate the plan">↻ Regenerate Plan</button>
+                            <button class="btn btn-sm btn-outline" title="Generate a new version; preserve history" onclick="replanFlow('${this.escapeHtml(result.flowId)}')">↻ Regenerate Plan</button>
                             <button class="btn btn-sm btn-outline" onclick="exportPlanReport('${this.escapeHtml(result.flowId)}')" title="Export planning report as DOCX">📄 Export Report</button>
                         </div>
                     </div>
@@ -2249,7 +2243,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                                 </div>
                             </div>
                         </div>
-                        <button class="btn btn-sm btn-outline" onclick="replanFlow('${this.escapeHtml(result.flowId)}')" title="Clear and regenerate the plan">↻ Regenerate Plan</button>
+                        <button class="btn btn-sm btn-outline" title="Generate a new version; preserve history" onclick="replanFlow('${this.escapeHtml(result.flowId)}')">↻ Regenerate Plan</button>
                         <button class="btn btn-sm btn-outline" onclick="exportPlanReport('${this.escapeHtml(result.flowId)}')" title="Export planning report as DOCX">📄 Export Report</button>
                     </div>
                 </div>
@@ -2267,6 +2261,85 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             <p style="font-size: 11px; color: var(--vscode-descriptionForeground); text-align: center; margin-top: 8px;">
                 Generated: ${new Date(result.generatedAt).toLocaleString()}
             </p>
+        </div>`;
+    }
+
+    private getPlanningSummaryHtml(result: FlowPlanningResult): string {
+        const escape = (value: string) => this.escapeHtml(value);
+        const list = (values: string[]) =>
+            values.length
+                ? `<ul>${values.map((value) => `<li>${escape(value)}</li>`).join('')}</ul>`
+                : '<p>Not recorded</p>';
+        const decisionLabels = new Map([
+            ['deployment-target', 'Hosting'],
+            ['messaging', 'Messaging'],
+            ['modernization', 'Modernization'],
+        ]);
+        const describeChoice = (id: string, label: string) =>
+            `${decisionLabels.get(id) ?? id.replace(/[-_]+/g, ' ').replace(/^./, (char) => char.toUpperCase())}: ${label}`;
+        const decisionSummary = result.preferences?.decisions
+            .map((decision) => escape(describeChoice(decision.id, selectedChoiceLabel(decision))))
+            .join(' &middot; ');
+        const choiceDetails =
+            result.preferences?.decisions
+                .map(
+                    (decision) =>
+                        `<li><strong>${escape(decision.question)}</strong> ${escape(selectedChoiceLabel(decision))}
+                <p>${escape(decision.whyItMatters)}</p>
+                ${list(decision.options.map((option) => `${option.label}: ${option.description}`))}
+                <p>Selected via ${escape(decision.source)} on ${escape(new Date(decision.decidedAt).toLocaleString())}.</p>
+                </li>`
+                )
+                .join('') ?? '';
+        const opportunities =
+            result.brief?.opportunities
+                .map(
+                    (opportunity) => `<tr>
+            <td>${escape(opportunity.component)}</td>
+            <td>${escape(opportunity.proposedApproach)}</td><td>${escape(opportunity.disposition)}</td>
+        </tr>`
+                )
+                .join('') ?? '';
+        const opportunityDetails =
+            result.brief?.opportunities
+                .map(
+                    (opportunity) => `
+            <li><strong>${escape(opportunity.component)}</strong>
+                <p>Source: ${escape(opportunity.currentApproach)}</p>
+                <p>${escape(opportunity.reason)}</p>
+                <p>Evidence: ${escape(opportunity.evidence)}</p>
+            </li>`
+                )
+                .join('') ?? '';
+        return `<div class="plan-card" id="planning-summary">
+            <h4 onclick="toggleSection(this)"><span class="collapse-icon">▼</span> 📝 Summary</h4>
+            <div class="plan-card-body planning-summary-content">
+            ${result.summary ? `<p>${escape(result.summary)}</p>` : ''}
+            ${decisionSummary ? `<p><strong>Decisions:</strong> ${decisionSummary}</p>` : ''}
+            ${
+                opportunities
+                    ? `<div class="planning-table-scroll"><table class="flow-table" aria-label="Modernization decisions">
+                <thead><tr><th>Component</th><th>Target / option</th><th>Decision</th></tr></thead>
+                <tbody>${opportunities}</tbody></table></div>`
+                    : ''
+            }
+            ${
+                result.brief || choiceDetails
+                    ? `<details><summary>Planning details</summary>
+                ${
+                    result.brief
+                        ? `<p><strong>Scenario:</strong> ${escape(result.brief.scenarioName)}</p>
+                <p><strong>Indicative timeline:</strong> ${escape(result.brief.estimatedTimeline)}</p>
+                <h5>Assumptions</h5>${list(result.brief.assumptions)}
+                <h5>Tradeoffs</h5>${list(result.brief.tradeoffs)}`
+                        : ''
+                }
+                ${choiceDetails ? `<h5>Options and rationale</h5><ul>${choiceDetails}</ul>` : ''}
+                ${opportunityDetails ? `<h5>Modernization rationale</h5><ul>${opportunityDetails}</ul>` : ''}
+            </details>`
+                    : ''
+            }
+            </div>
         </div>`;
     }
 

@@ -21,6 +21,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { LoggingService } from '../../services/LoggingService';
 import type { LogicAppsWorkflowDefinition } from '../../workflowSchema';
+import {
+    PlanningBrief,
+    PlanningPreferences,
+    validatePlanningPreferences,
+} from './PlanningDecisions';
+import { writePlanningJson } from './PlanningStorage';
 
 // =============================================================================
 // File Names
@@ -62,6 +68,8 @@ export interface PlanMeta {
     summary: string;
     generatedAt: string;
     updatedAt: string;
+    preferences?: PlanningPreferences;
+    brief?: PlanningBrief;
 }
 
 /** workflow-definition.json / workflow-{name}.json shape */
@@ -325,6 +333,48 @@ export class PlanningFileService {
         fs.writeFileSync(filePath, JSON.stringify(meta, null, 2), 'utf-8');
         this.logger.debug(`[PlanningFiles] Stored plan-meta.json for "${flowId}"`);
         return filePath;
+    }
+
+    public readPreferences(flowId: string): PlanningPreferences | undefined {
+        const dir = this.getFlowDir(flowId);
+        const filePath = dir && path.join(dir, 'planning-preferences.json');
+        if (!filePath || !fs.existsSync(filePath)) {
+            return undefined;
+        }
+        const data: unknown = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        validatePlanningPreferences(data);
+        if (data.flowId !== flowId) {
+            throw new Error('The saved planning choices belong to a different flow.');
+        }
+        return data;
+    }
+
+    public storePreferences(preferences: PlanningPreferences): void {
+        validatePlanningPreferences(preferences);
+        const dir = this.ensureFlowDir(preferences.flowId);
+        if (!dir) {
+            throw new Error('Open a workspace before saving planning choices.');
+        }
+        writePlanningJson(path.join(dir, 'planning-preferences.json'), preferences);
+    }
+
+    /** Start a new draft without deleting the last finalized plan, choices, or history. */
+    public clearDraft(flowId: string): void {
+        const dir = this.getFlowDir(flowId);
+        if (!dir || !fs.existsSync(dir)) {
+            return;
+        }
+        const draftFiles = new Set<string>(Object.values(PLANNING_FILES));
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (
+                entry.isFile() &&
+                (draftFiles.has(entry.name) ||
+                    (entry.name.startsWith(PLANNING_FILES.WORKFLOW_PREFIX) &&
+                        entry.name.endsWith('.json')))
+            ) {
+                fs.unlinkSync(path.join(dir, entry.name));
+            }
+        }
     }
 
     // =========================================================================

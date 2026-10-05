@@ -34,6 +34,20 @@ function format(template: string, ...args: (string | number)[]): string {
 // ============================================================================
 
 export class UserPrompts {
+    static planningChoiceTitle(flowId: string): string {
+        return format('Planning choices: {0}', flowId);
+    }
+
+    static readonly PLANNING_CHOICES_PAUSED =
+        'Planning paused. Your answered choices are saved; resume planning when ready.';
+
+    static failedToLoadPlanningView(error: unknown): string {
+        return format(
+            'Unable to load planning data: {0}',
+            error instanceof Error ? error.message : String(error)
+        );
+    }
+
     // ========================================================================
     // Common Button Labels
     // ========================================================================
