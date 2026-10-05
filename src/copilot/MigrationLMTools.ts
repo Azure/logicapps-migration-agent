@@ -26,6 +26,7 @@ import { TelemetryService } from '../services/TelemetryService';
 import { ContextBuilder, ContextScope } from './ContextBuilder';
 import { SourceFlowVisualizer } from '../views/discovery/SourceFlowVisualizer';
 import { GeneratedFlowResult, LLMFlowGenerator, FlowGroup } from '../services/LLMFlowGenerator';
+import type { SequenceDiagram } from '../services/LLMFlowGenerator';
 import { ReferenceDocRegistry } from '../services/ReferenceDocRegistry';
 import { ReferenceWorkflowRegistry } from '../services/ReferenceWorkflowRegistry';
 import { PlanningCacheService, FlowPlanningResult } from '../stages/planning/PlanningCacheService';
@@ -97,7 +98,14 @@ interface GetDiscoveryAnalysisInput {
     /** The flow group ID to retrieve discovery analysis for */
     groupId: string;
     /** Which aspects of the analysis to return. Defaults to all. */
-    aspects?: ('architecture' | 'messageFlow' | 'components' | 'gaps' | 'patterns')[];
+    aspects?: (
+        | 'architecture'
+        | 'sequenceDiagrams'
+        | 'messageFlow'
+        | 'components'
+        | 'gaps'
+        | 'patterns'
+    )[];
 }
 
 interface StoreFlowGroupsInput {
@@ -139,6 +147,17 @@ interface DiscoveryStoreArchitectureInput {
     flowId: string;
     /** Mermaid flowchart TB diagram string */
     mermaid: string;
+}
+
+interface DiscoveryStoreSequenceDiagramsInput {
+    /** Flow group ID */
+    flowId: string;
+    /** One diagram for each inbound receive location or equivalent entry point */
+    sequenceDiagrams: {
+        receiveLocation: string;
+        description?: string;
+        mermaid: string;
+    }[];
 }
 
 interface DiscoveryStoreMessageFlowInput {
@@ -763,6 +782,7 @@ function validateDependencyShape(dep: unknown, index: number): string[] {
 // ============================================================================
 
 const FLOWCHART_MERMAID_TYPES = ['flowchart', 'flowchart-v2'];
+const SEQUENCE_DIAGRAM_MERMAID_TYPES = ['sequenceDiagram'];
 
 /**
  * migration_listArtifacts — List all discovered artifacts.
@@ -1778,6 +1798,138 @@ class DiscoveryStoreArchitectureTool implements vscode.LanguageModelTool<Discove
 }
 
 /**
+ * migration_discovery_storeSequenceDiagrams — Stores one sequence diagram per
+ * inbound receive location for a flow.
+ */
+class DiscoveryStoreSequenceDiagramsTool
+    implements vscode.LanguageModelTool<DiscoveryStoreSequenceDiagramsInput>
+{
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<DiscoveryStoreSequenceDiagramsInput>,
+        _token: vscode.CancellationToken
+    ): Promise<vscode.LanguageModelToolResult> {
+        const logger = LoggingService.getInstance();
+        const { flowId, sequenceDiagrams } = options.input;
+
+        if (!flowId || !Array.isArray(sequenceDiagrams)) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(
+                    JSON.stringify({
+                        error: 'flowId and sequenceDiagrams array are required',
+                    })
+                ),
+            ]);
+        }
+
+        const seenReceiveLocations = new Set<string>();
+        const normalizedDiagrams: SequenceDiagram[] = [];
+
+        for (let index = 0; index < sequenceDiagrams.length; index++) {
+            const diagram = sequenceDiagrams[index];
+            const receiveLocation = diagram?.receiveLocation?.trim();
+            if (!receiveLocation) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({
+                            error: `sequenceDiagrams[${index}].receiveLocation must be a non-empty source name`,
+                        })
+                    ),
+                ]);
+            }
+
+            const receiveLocationKey = receiveLocation.toLowerCase();
+            if (seenReceiveLocations.has(receiveLocationKey)) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({
+                            error: `Duplicate sequence diagram for receive location "${receiveLocation}". Submit exactly one diagram per receive location.`,
+                        })
+                    ),
+                ]);
+            }
+            seenReceiveLocations.add(receiveLocationKey);
+
+            if (!diagram?.mermaid?.trim()) {
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({
+                            error: `sequenceDiagrams[${index}].mermaid must be a non-empty Mermaid sequenceDiagram`,
+                        })
+                    ),
+                ]);
+            }
+
+            const validation = await MermaidValidationService.getInstance().validate(
+                diagram.mermaid,
+                { expectedDiagramTypes: SEQUENCE_DIAGRAM_MERMAID_TYPES }
+            );
+            if (!validation.valid) {
+                logger.warn(
+                    `[LMTool] migration_discovery_storeSequenceDiagrams: validation failed for "${flowId}" receive location "${receiveLocation}" — ${validation.error}`
+                );
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({
+                            error: `Invalid Mermaid sequence diagram for receive location "${receiveLocation}". Fix the parser error and call this tool again.`,
+                            index,
+                            receiveLocation,
+                            parserError: validation.error,
+                            diagramType: validation.diagramType,
+                            hint: 'Use sequenceDiagram syntax with at least one participant message. Do not submit a flowchart.',
+                        })
+                    ),
+                ]);
+            }
+
+            normalizedDiagrams.push({
+                receiveLocation,
+                ...(diagram.description?.trim()
+                    ? { description: diagram.description.trim() }
+                    : {}),
+                mermaid: validation.normalized,
+            });
+        }
+
+        try {
+            const { DiscoveryCacheService } =
+                await import('../stages/discovery/DiscoveryCacheService');
+            DiscoveryCacheService.getInstance().storeSequenceDiagrams(
+                flowId,
+                normalizedDiagrams
+            );
+
+            logger.debug(
+                `[LMTool] migration_discovery_storeSequenceDiagrams: stored ${normalizedDiagrams.length} diagram(s) for "${flowId}"`
+            );
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(
+                    JSON.stringify({
+                        success: true,
+                        flowId,
+                        sequenceDiagramCount: normalizedDiagrams.length,
+                        receiveLocations: normalizedDiagrams.map(
+                            (diagram) => diagram.receiveLocation
+                        ),
+                    })
+                ),
+            ]);
+        } catch (err) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(
+                    JSON.stringify({
+                        error: `Failed: ${err instanceof Error ? err.message : String(err)}`,
+                    })
+                ),
+            ]);
+        }
+    }
+
+    async prepareInvocation(): Promise<vscode.PreparedToolInvocation | undefined> {
+        return { invocationMessage: 'Storing receive-location sequence diagrams...' };
+    }
+}
+
+/**
  * migration_discovery_storeMessageFlow — Stores the message flow steps for a flow.
  */
 class DiscoveryStoreMessageFlowTool implements vscode.LanguageModelTool<DiscoveryStoreMessageFlowInput> {
@@ -2743,8 +2895,21 @@ class GetDiscoveryAnalysisTool implements vscode.LanguageModelTool<GetDiscoveryA
         }
 
         // Determine which aspects to include
-        const allAspects: ('architecture' | 'messageFlow' | 'components' | 'gaps' | 'patterns')[] =
-            ['architecture', 'messageFlow', 'components', 'gaps', 'patterns'];
+        const allAspects: (
+            | 'architecture'
+            | 'sequenceDiagrams'
+            | 'messageFlow'
+            | 'components'
+            | 'gaps'
+            | 'patterns'
+        )[] = [
+            'architecture',
+            'sequenceDiagrams',
+            'messageFlow',
+            'components',
+            'gaps',
+            'patterns',
+        ];
         const requestedAspects = aspects && aspects.length > 0 ? aspects : allAspects;
 
         const result: Record<string, unknown> = {
@@ -2758,6 +2923,10 @@ class GetDiscoveryAnalysisTool implements vscode.LanguageModelTool<GetDiscoveryA
                 explanation: cachedResult.explanation,
                 summary: cachedResult.summary,
             };
+        }
+
+        if (requestedAspects.includes('sequenceDiagrams')) {
+            result.sequenceDiagrams = cachedResult.sequenceDiagrams ?? [];
         }
 
         if (requestedAspects.includes('messageFlow')) {
@@ -5204,6 +5373,12 @@ export function registerMigrationLMTools(context: vscode.ExtensionContext): vsco
         vscode.lm.registerTool(
             'migration_discovery_storeArchitecture',
             new DiscoveryStoreArchitectureTool()
+        )
+    );
+    disposables.push(
+        vscode.lm.registerTool(
+            'migration_discovery_storeSequenceDiagrams',
+            new DiscoveryStoreSequenceDiagramsTool()
         )
     );
     disposables.push(

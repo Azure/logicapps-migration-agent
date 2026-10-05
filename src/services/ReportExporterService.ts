@@ -85,9 +85,23 @@ export class ReportExporterService {
                 try {
                     progress.report({ message: 'Rendering diagrams…', increment: 10 });
                     const archImage = await this.mermaidRenderer.renderToBuffer(result.mermaid);
+                    const sequenceImages = new Map<string, Buffer>();
+                    for (const sequenceDiagram of result.sequenceDiagrams || []) {
+                        const image = await this.mermaidRenderer.renderToBuffer(
+                            sequenceDiagram.mermaid
+                        );
+                        if (image) {
+                            sequenceImages.set(sequenceDiagram.receiveLocation, image);
+                        }
+                    }
 
                     progress.report({ message: 'Building document…', increment: 40 });
-                    const sections = await this.buildAnalysisSections(flowName, result, archImage);
+                    const sections = await this.buildAnalysisSections(
+                        flowName,
+                        result,
+                        archImage,
+                        sequenceImages
+                    );
 
                     const doc = this.createDocument(flowName, 'Analysis Report', sections);
 
@@ -182,7 +196,8 @@ export class ReportExporterService {
     private async buildAnalysisSections(
         flowName: string,
         result: GeneratedFlowResult,
-        archImage: Buffer | undefined
+        archImage: Buffer | undefined,
+        sequenceImages: Map<string, Buffer>
     ): Promise<SectionChild[]> {
         const children: SectionChild[] = [];
 
@@ -208,6 +223,39 @@ export class ReportExporterService {
                 )
             );
             children.push(...this.codeBlock(result.mermaid));
+        }
+
+        // ── Sequence Diagrams ──
+        if (result.sequenceDiagrams && result.sequenceDiagrams.length > 0) {
+            children.push(this.pageBreakParagraph());
+            children.push(this.heading1('Message Journey Sequence Diagrams'));
+            children.push(
+                this.bodyText(
+                    'Each diagram shows the business message journey for one inbound receive location or equivalent entry point.'
+                )
+            );
+            for (const sequenceDiagram of result.sequenceDiagrams) {
+                children.push(this.heading2(sequenceDiagram.receiveLocation));
+                if (sequenceDiagram.description) {
+                    children.push(this.bodyText(sequenceDiagram.description));
+                }
+                const image = sequenceImages.get(sequenceDiagram.receiveLocation);
+                if (image) {
+                    children.push(this.imageParagraph(image, 600, 400));
+                    children.push(
+                        this.caption(
+                            `Sequence diagram for ${sequenceDiagram.receiveLocation}`
+                        )
+                    );
+                } else {
+                    children.push(
+                        this.bodyText(
+                            'The sequence diagram could not be rendered as an image. The Mermaid source code is included below.'
+                        )
+                    );
+                    children.push(...this.codeBlock(sequenceDiagram.mermaid));
+                }
+            }
         }
 
         // ── Component Inventory ──

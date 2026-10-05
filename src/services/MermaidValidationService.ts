@@ -81,7 +81,7 @@ export class MermaidValidationService {
                 return {
                     valid: false,
                     normalized,
-                    error: 'Only Mermaid flowchart diagrams are supported, and the first diagram line must start with "flowchart" or "graph".',
+                    error: 'Supported Mermaid diagrams are flowcharts and sequence diagrams. The first diagram line must start with "flowchart", "graph", or "sequenceDiagram".',
                 };
             }
 
@@ -102,7 +102,11 @@ export class MermaidValidationService {
                 };
             }
 
-            this.validateFlowchartSyntax(normalized);
+            if (diagramType === 'sequenceDiagram') {
+                this.validateSequenceDiagramSyntax(normalized);
+            } else {
+                this.validateFlowchartSyntax(normalized);
+            }
 
             this.logger.debug(
                 `[MermaidValidationService] Mermaid validation succeeded (${diagramType ?? 'unknown'})`
@@ -147,6 +151,94 @@ export class MermaidValidationService {
         }
     }
 
+    /**
+     * Validate the common Mermaid sequence-diagram grammar without depending on
+     * Mermaid's browser-oriented renderer. Rendering in the discovery webview
+     * remains the final parser check for the complete Mermaid feature set.
+     */
+    private validateSequenceDiagramSyntax(code: string): void {
+        const lines = code.split('\n');
+        const blocks: string[] = [];
+        let participantCount = 0;
+        let messageCount = 0;
+
+        for (const rawLine of lines.slice(1)) {
+            const line = rawLine.trim();
+            if (!line || line.startsWith('%%')) {
+                continue;
+            }
+
+            if (/^(participant|actor)\s+\S/i.test(line)) {
+                participantCount++;
+                continue;
+            }
+
+            if (
+                /^(autonumber|title|activate|deactivate|create|destroy|hide|show|links?)\b/i.test(
+                    line
+                )
+            ) {
+                continue;
+            }
+
+            if (/^(loop|alt|opt|par|critical|break|rect)\b/i.test(line)) {
+                blocks.push(line.split(/\s+/, 1)[0].toLowerCase());
+                continue;
+            }
+
+            if (/^(else|and|option)\b/i.test(line)) {
+                if (blocks.length === 0) {
+                    throw new Error(`Sequence diagram branch "${line}" has no open block.`);
+                }
+                continue;
+            }
+
+            if (/^end$/i.test(line)) {
+                if (blocks.length === 0) {
+                    throw new Error('Sequence diagram contains an unmatched "end".');
+                }
+                blocks.pop();
+                continue;
+            }
+
+            if (
+                /^Note\s+(over|left of|right of)\s+\S+(?:\s*,\s*\S+)?\s*:\s*\S/i.test(
+                    line
+                )
+            ) {
+                continue;
+            }
+
+            // Mermaid sequence arrows. A message label is required so that the
+            // diagram conveys a business interaction rather than bare wiring.
+            const messageMatch = line.match(
+                /^(.+?)(-->>|->>|-->|->|-x|--x|-\)|--\))\s*(.+?)\s*:\s*(\S.*)$/i
+            );
+            if (messageMatch) {
+                const [, sender, , receiver] = messageMatch;
+                if (!sender.trim() || !receiver.trim()) {
+                    throw new Error(`Sequence diagram message has an empty participant: "${line}".`);
+                }
+                messageCount++;
+                continue;
+            }
+
+            throw new Error(`Unsupported sequence diagram statement: "${line}".`);
+        }
+
+        if (blocks.length > 0) {
+            throw new Error(
+                `Sequence diagram block "${blocks[blocks.length - 1]}" is not closed with "end".`
+            );
+        }
+        if (participantCount === 0 && messageCount === 0) {
+            throw new Error('Sequence diagram must declare at least one participant or message.');
+        }
+        if (messageCount === 0) {
+            throw new Error('Sequence diagram must contain at least one message.');
+        }
+    }
+
     private detectDiagramType(code: string): string | undefined {
         for (const rawLine of code.split('\n')) {
             const line = rawLine.trim();
@@ -161,6 +253,10 @@ export class MermaidValidationService {
 
             if (keyword === 'graph') {
                 return 'flowchart';
+            }
+
+            if (keyword === 'sequencediagram') {
+                return 'sequenceDiagram';
             }
 
             return undefined;
