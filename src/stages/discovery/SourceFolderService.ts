@@ -437,8 +437,7 @@ export class SourceFolderService implements vscode.Disposable {
         const selection = await vscode.window.showWarningMessage(
             UserPrompts.CHANGE_FOLDER_CONFIRM,
             { modal: true },
-            UserPrompts.BUTTON_YES_CHANGE_FOLDER,
-            UserPrompts.BUTTON_CANCEL
+            UserPrompts.BUTTON_YES_CHANGE_FOLDER
         );
 
         return selection === UserPrompts.BUTTON_YES_CHANGE_FOLDER;
