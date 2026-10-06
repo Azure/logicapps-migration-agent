@@ -24,6 +24,18 @@ import { ConversionWebviewPanel } from '../views/conversion';
 import { UserPrompts } from '../constants/UserMessages';
 import { ChatPrompts } from '../constants/ChatPrompts';
 import type { GeneratedFlowResult } from '../services/LLMFlowGenerator';
+import {
+    ConfluenceExportService,
+    ConfluenceBundle,
+    ConfluencePageMapping,
+    ConfluenceReportType,
+} from '../services/ConfluenceExportService';
+
+type ReportExportDestination = 'docx' | 'confluence';
+
+interface ReportExportOptions {
+    destination?: ReportExportDestination;
+}
 
 /**
  * Command handler function type
@@ -168,6 +180,16 @@ export class CommandRegistry implements vscode.Disposable {
                 id: 'logicAppsMigrationAgent.exportPlanReport',
                 handler: this.handleExportPlanReport.bind(this),
                 title: 'Export Planning Report',
+            },
+            {
+                id: 'logicAppsMigrationAgent.retryConfluenceExport',
+                handler: this.handleRetryConfluenceExport.bind(this),
+                title: 'Retry Confluence Export',
+            },
+            {
+                id: 'logicAppsMigrationAgent.clearConfluenceLink',
+                handler: this.handleClearConfluenceLink.bind(this),
+                title: 'Clear Confluence Link',
             },
         ];
 
@@ -1624,12 +1646,18 @@ export class CommandRegistry implements vscode.Disposable {
     private async handleExportAnalysisReport(
         flowId?: string,
         flowName?: string,
-        analysisResult?: GeneratedFlowResult
+        analysisResult?: GeneratedFlowResult,
+        options?: ReportExportOptions | ReportExportDestination
     ): Promise<void> {
         const logger = LoggingService.getInstance();
 
         if (!flowId || !analysisResult) {
             vscode.window.showWarningMessage('No analysis data available to export.');
+            return;
+        }
+
+        if (this.getReportExportDestination(options) === 'confluence') {
+            await this.startConfluenceAnalysisExport(flowId, flowName || flowId, analysisResult);
             return;
         }
 
@@ -1667,11 +1695,19 @@ export class CommandRegistry implements vscode.Disposable {
     /**
      * Export planning report as DOCX
      */
-    private async handleExportPlanReport(flowId?: string): Promise<void> {
+    private async handleExportPlanReport(
+        flowId?: string,
+        options?: ReportExportOptions | ReportExportDestination
+    ): Promise<void> {
         const logger = LoggingService.getInstance();
 
         if (!flowId) {
             vscode.window.showWarningMessage('No flow specified for report export.');
+            return;
+        }
+
+        if (this.getReportExportDestination(options) === 'confluence') {
+            await this.startConfluencePlanningExport(flowId);
             return;
         }
 
@@ -1698,6 +1734,239 @@ export class CommandRegistry implements vscode.Disposable {
                 const folderPath = (await import('path')).dirname(filePath);
                 await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(folderPath));
             }
+        }
+    }
+
+    private getReportExportDestination(
+        options?: ReportExportOptions | ReportExportDestination
+    ): ReportExportDestination {
+        if (
+            options === 'confluence' ||
+            (typeof options === 'object' && options.destination === 'confluence')
+        ) {
+            return 'confluence';
+        }
+        return 'docx';
+    }
+
+    private async startConfluenceAnalysisExport(
+        flowId: string,
+        flowName: string,
+        analysisResult: GeneratedFlowResult
+    ): Promise<void> {
+        const service = ConfluenceExportService.getInstance();
+        try {
+            const bundle = await service.createAnalysisBundle(flowId, flowName, analysisResult);
+            await this.launchConfluencePublisher(bundle);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            LoggingService.getInstance().error(`[ConfluenceExport] Failed to prepare analysis: ${message}`);
+            vscode.window.showErrorMessage(`Failed to prepare Confluence export: ${message}`);
+        }
+    }
+
+    private async startConfluencePlanningExport(flowId: string): Promise<void> {
+        const service = ConfluenceExportService.getInstance();
+        try {
+            const bundle = await service.createPlanningBundle(flowId);
+            if (!bundle) {
+                vscode.window.showWarningMessage(
+                    'No finalized planning data is available to export for this flow.'
+                );
+                return;
+            }
+            await this.launchConfluencePublisher(bundle);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            LoggingService.getInstance().error(`[ConfluenceExport] Failed to prepare planning: ${message}`);
+            vscode.window.showErrorMessage(`Failed to prepare Confluence export: ${message}`);
+        }
+    }
+
+    private async launchConfluencePublisher(bundle: ConfluenceBundle): Promise<void> {
+        const service = ConfluenceExportService.getInstance();
+        const state = StateManager.getInstance().getState();
+        const projectPath =
+            state.projectPath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+        if (!projectPath) {
+            await this.writeConfluenceFailure(
+                bundle,
+                'A workspace folder is required to provision the Confluence publisher.'
+            );
+            vscode.window.showErrorMessage(
+                'Failed to start Confluence export: no workspace folder is open.'
+            );
+            return;
+        }
+
+        await AgentFileProvisioner.getInstance().provision(projectPath);
+        const mapping = service.getMapping(bundle.manifest.reportType, bundle.manifest.flowId);
+        const existingPage = mapping
+            ? JSON.stringify(mapping)
+            : 'none — this is a new page; choose the site, space, and optional parent page.';
+        const query = ChatPrompts.publishConfluenceReport({
+            bundlePath: bundle.bundlePath,
+            reportType: bundle.manifest.reportType,
+            flowId: bundle.manifest.flowId,
+            flowName: bundle.manifest.flowName,
+            existingPage,
+        });
+
+        try {
+            await vscode.commands.executeCommand('workbench.action.chat.open', {
+                mode: 'agent',
+                query,
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            await this.writeConfluenceFailure(bundle, `Unable to open publisher agent chat: ${message}`);
+            vscode.window.showErrorMessage(`Failed to open Confluence publisher: ${message}`);
+            return;
+        }
+
+        vscode.window.showInformationMessage(
+            `Confluence export prepared for "${bundle.manifest.flowName}". Confirm the page and attachment publication in Agent Chat.`
+        );
+        void this.monitorConfluenceBundle(bundle).catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+            LoggingService.getInstance().error(
+                `[ConfluenceExport] Receipt monitoring failed: ${message}`
+            );
+            vscode.window.showErrorMessage(`Confluence publication could not be finalized: ${message}`);
+        });
+    }
+
+    private async monitorConfluenceBundle(bundle: ConfluenceBundle): Promise<void> {
+        const service = ConfluenceExportService.getInstance();
+        const result = await service.waitForReceipt(bundle);
+        if (!result) {
+            vscode.window.showWarningMessage(
+                `Confluence publication is still pending. The export bundle is retained for retry.`
+            );
+            return;
+        }
+
+        if (result.receipt.status === 'published' && result.mapping) {
+            const action = await vscode.window.showInformationMessage(
+                `Confluence report published: ${result.mapping.pageTitle}`,
+                'Open Page'
+            );
+            if (action === 'Open Page') {
+                await vscode.env.openExternal(vscode.Uri.parse(result.mapping.pageUrl));
+            }
+            return;
+        }
+
+        vscode.window.showWarningMessage(
+            `Confluence publication ${result.receipt.status}: ${result.receipt.error || 'see the retained export bundle for details.'}`
+        );
+    }
+
+    private async writeConfluenceFailure(
+        bundle: ConfluenceBundle,
+        error: string
+    ): Promise<void> {
+        try {
+            await ConfluenceExportService.getInstance().writeReceipt(bundle, {
+                schemaVersion: 1,
+                bundleId: bundle.manifest.bundleId,
+                reportType: bundle.manifest.reportType,
+                flowId: bundle.manifest.flowId,
+                flowName: bundle.manifest.flowName,
+                status: 'failed',
+                error,
+            });
+        } catch (receiptError) {
+            LoggingService.getInstance().error(
+                `[ConfluenceExport] Failed to write failure receipt: ${
+                    receiptError instanceof Error ? receiptError.message : String(receiptError)
+                }`
+            );
+        }
+    }
+
+    private async handleRetryConfluenceExport(bundlePath?: string): Promise<void> {
+        const service = ConfluenceExportService.getInstance();
+        let bundle = bundlePath ? await service.findBundle(bundlePath) : undefined;
+
+        if (bundlePath && !bundle) {
+            vscode.window.showWarningMessage('The selected Confluence export bundle is no longer available.');
+            return;
+        }
+
+        if (!bundle) {
+            const pending = await service.listPendingBundles();
+            if (pending.length === 0) {
+                vscode.window.showInformationMessage('No pending Confluence export bundles were found.');
+                return;
+            }
+            const selected = await vscode.window.showQuickPick(
+                pending.map((candidate) => ({
+                    label: `${candidate.manifest.flowName} — ${candidate.manifest.reportType}`,
+                    description: candidate.manifest.pageTitle,
+                    detail: candidate.bundlePath,
+                    bundle: candidate,
+                })),
+                { placeHolder: 'Select a Confluence export to retry' }
+            );
+            bundle = selected?.bundle;
+        }
+
+        if (!bundle) {
+            return;
+        }
+
+        await service.clearReceipt(bundle);
+        await this.launchConfluencePublisher(bundle);
+    }
+
+    private async handleClearConfluenceLink(
+        reportType?: ConfluenceReportType,
+        flowId?: string
+    ): Promise<void> {
+        const service = ConfluenceExportService.getInstance();
+        let selected: ConfluencePageMapping | undefined;
+
+        if (reportType && flowId) {
+            selected = service.getMapping(reportType, flowId);
+        } else {
+            const mappings = service.listMappings();
+            if (mappings.length === 0) {
+                vscode.window.showInformationMessage('No Confluence page links were found.');
+                return;
+            }
+            const choice = await vscode.window.showQuickPick(
+                mappings.map((mapping) => ({
+                    label: `${mapping.flowName} — ${mapping.reportType}`,
+                    description: mapping.pageTitle,
+                    detail: mapping.pageUrl,
+                    mapping,
+                })),
+                { placeHolder: 'Select the Confluence page link to clear' }
+            );
+            selected = choice?.mapping;
+        }
+
+        if (!selected) {
+            vscode.window.showWarningMessage('The requested Confluence page link was not found.');
+            return;
+        }
+
+        const confirmation = await vscode.window.showWarningMessage(
+            `Clear the saved Confluence link for "${selected.pageTitle}"? The Confluence page will not be deleted.`,
+            { modal: true },
+            'Clear Link'
+        );
+        if (confirmation !== 'Clear Link') {
+            return;
+        }
+
+        const cleared = await service.clearLink(selected.reportType, selected.flowId);
+        if (cleared) {
+            vscode.window.showInformationMessage(
+                `Cleared the Confluence link for "${selected.pageTitle}".`
+            );
         }
     }
 

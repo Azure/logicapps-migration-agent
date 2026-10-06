@@ -283,6 +283,8 @@ interface DependencyAnalysisResult {
 export interface GeneratedFlowResult {
     /** Mermaid diagram syntax */
     mermaid: string;
+    /** One business-readable sequence diagram for each inbound receive location */
+    sequenceDiagrams?: SequenceDiagram[];
     /** Human-readable explanation */
     explanation: string;
     /** Artifact summary */
@@ -324,6 +326,16 @@ export interface GeneratedFlowResult {
         logicAppsApproach: string;
         components: string[];
     }[];
+}
+
+/** A Mermaid sequence diagram tied to one inbound receive location. */
+export interface SequenceDiagram {
+    /** Exact receive-location or equivalent inbound entry-point name from source */
+    receiveLocation: string;
+    /** Optional business-facing explanation of the message journey */
+    description?: string;
+    /** Mermaid sequenceDiagram syntax */
+    mermaid: string;
 }
 
 /**

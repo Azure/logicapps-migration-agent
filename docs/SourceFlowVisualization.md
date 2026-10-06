@@ -354,6 +354,14 @@ This shows **Content-Based Routing (CBR)** - messages flow through ports without
 
 ---
 
+## Business-Readable Sequence Diagrams
+
+The discovery analysis includes a **Sequence Diagrams** tab in addition to the architecture flowchart. New analyses produce exactly one Mermaid `sequenceDiagram` for each inbound receive location or equivalent entry point (for example, a Mule source or TIBCO starter). The tab provides a receive-location selector, the optional business explanation for the selected journey, and zoom controls so business stakeholders can follow message interactions without reading the architecture graph.
+
+Sequence diagrams are stored separately from the architecture diagram in `sequenceDiagrams.json` and are included in exported analysis reports. A flow with no inbound entry points stores an empty collection and displays an explanatory empty state. Existing cached analyses without sequence diagrams remain readable.
+
+---
+
 ## Features Summary
 
 ### Core Visualization
@@ -373,7 +381,8 @@ This shows **Content-Based Routing (CBR)** - messages flow through ports without
 - ✅ Mini-map for navigation
 
 ### Export & Documentation
-- ✅ Export as PNG/SVG
+- ✅ Export analysis reports as DOCX or publish them to Confluence
+- ✅ Include rendered architecture and sequence diagrams in reports
 - ✅ Print-friendly view
 - ✅ Include in assessment reports
 
