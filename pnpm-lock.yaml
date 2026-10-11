@@ -15,92 +15,92 @@ importers:
         specifier: ^7.0.0
         version: 7.0.0
       '@azure/identity':
-        specifier: ^4.0.1
+        specifier: ^4.13.1
         version: 4.13.1
       '@microsoft/applicationinsights-common':
         specifier: ^3.4.1
         version: 3.4.1(tslib@2.8.1)
       '@vscode/extension-telemetry':
-        specifier: ^1.0.0
+        specifier: ^1.5.1
         version: 1.5.1(tslib@2.8.1)
       '@xmldom/xmldom':
-        specifier: ^0.8.11
+        specifier: ^0.8.12
         version: 0.8.12
       docx:
         specifier: ^9.6.1
         version: 9.6.1
       fast-xml-parser:
-        specifier: ^5.3.4
+        specifier: ^5.6.0
         version: 5.6.0
       immer:
-        specifier: ^11.0.0
+        specifier: ^11.1.4
         version: 11.1.4
       mermaid:
-        specifier: ^11.13.0
+        specifier: ^11.14.0
         version: 11.14.0
       xstate:
-        specifier: ^5.5.0
+        specifier: ^5.30.0
         version: 5.30.0
     devDependencies:
       '@eslint/js':
-        specifier: ^9.0.0
+        specifier: ^9.39.4
         version: 9.39.4
       '@types/glob':
         specifier: ^8.1.0
         version: 8.1.0
       '@types/mocha':
-        specifier: ^10.0.6
+        specifier: ^10.0.10
         version: 10.0.10
       '@types/node':
-        specifier: ^22.0.0
+        specifier: ^22.19.17
         version: 22.19.17
       '@types/uuid':
         specifier: ^10.0.0
         version: 10.0.0
       '@types/vscode':
-        specifier: ^1.85.0
+        specifier: ^1.116.0
         version: 1.116.0
       '@typescript-eslint/eslint-plugin':
-        specifier: ^8.0.0
+        specifier: ^8.58.2
         version: 8.58.2(@typescript-eslint/parser@8.58.2(eslint@9.39.4)(typescript@5.9.3))(eslint@9.39.4)(typescript@5.9.3)
       '@typescript-eslint/parser':
-        specifier: ^8.0.0
+        specifier: ^8.58.2
         version: 8.58.2(eslint@9.39.4)(typescript@5.9.3)
       '@vscode/test-electron':
-        specifier: ^2.3.8
+        specifier: ^2.5.2
         version: 2.5.2
       '@vscode/vsce':
-        specifier: ^3.0.0
+        specifier: ^3.8.1
         version: 3.8.1
       esbuild:
-        specifier: ^0.27.0
+        specifier: ^0.27.7
         version: 0.27.7
       eslint:
-        specifier: ^9.0.0
+        specifier: ^9.39.4
         version: 9.39.4
       glob:
-        specifier: ^13.0.0
+        specifier: ^13.0.6
         version: 13.0.6
       husky:
-        specifier: ^9.0.0
+        specifier: ^9.1.7
         version: 9.1.7
       lint-staged:
-        specifier: ^16.0.0
+        specifier: ^16.4.0
         version: 16.4.0
       mocha:
-        specifier: ^11.0.0
+        specifier: ^11.7.5
         version: 11.7.5
       prettier:
-        specifier: ^3.2.4
+        specifier: ^3.8.3
         version: 3.8.3
       ts-unused-exports:
         specifier: ^11.0.1
         version: 11.0.1(typescript@5.9.3)
       typescript:
-        specifier: ^5.3.3
+        specifier: ^5.9.3
         version: 5.9.3
       typescript-eslint:
-        specifier: ^8.54.0
+        specifier: ^8.58.2
         version: 8.58.2(eslint@9.39.4)(typescript@5.9.3)
 
 packages:
@@ -466,8 +466,8 @@ packages:
   '@nevware21/ts-async@0.5.5':
     resolution: {integrity: sha512-vwqaL05iJPjLeh5igPi8MeeAu10i+Aq7xko1fbo9F5Si6MnVN5505qaV7AhSdk5MCBJVT/UYMk3kgInNjDb4Ig==}
 
-  '@nevware21/ts-utils@0.13.0':
-    resolution: {integrity: sha512-F3mD+DsUn9OiZmZc5tg0oKqrJCtiCstwx+wE+DNzFYh2cCRUuzTYdK9zGGP/au2BWvbOQ6Tqlbjr2+dT1P3AlQ==}
+  '@nevware21/ts-utils@0.14.0':
+    resolution: {integrity: sha512-WoeqTIXQ8WPhl+lD2NbMHoAQ4sJl0n7EoRoDmVJui//Usg512enl9q1fdbVobuZt3omnxnmVsDrNIvPBvFgddQ==}
 
   '@nodable/entities@1.1.0':
     resolution: {integrity: sha512-bidpxmTBP0pOsxULw6XlxzQpTgrAGLDHGBK/JuWhPDL6ZV0GZ/PmN9CA9do6e+A9lYI6qx6ikJUtJYRxup141g==}
@@ -817,6 +817,7 @@ packages:
   '@xmldom/xmldom@0.8.12':
     resolution: {integrity: sha512-9k/gHF6n/pAi/9tqr3m3aqkuiNosYTurLLUtc7xQ9sxB/wm7WPygCv8GYa6mS0fLJEHhqMC1ATYhz++U/lRHqg==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   acorn-jsx@5.3.2:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
@@ -2506,6 +2507,7 @@ packages:
 
   uuid@8.3.2:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   validate-npm-package-license@3.0.4:
@@ -2954,7 +2956,7 @@ snapshots:
       '@microsoft/applicationinsights-shims': 3.0.1
       '@microsoft/dynamicproto-js': 2.0.3
       '@nevware21/ts-async': 0.5.5
-      '@nevware21/ts-utils': 0.13.0
+      '@nevware21/ts-utils': 0.14.0
     transitivePeerDependencies:
       - tslib
 
@@ -2964,7 +2966,7 @@ snapshots:
       '@microsoft/applicationinsights-shims': 3.0.1
       '@microsoft/dynamicproto-js': 2.0.3
       '@nevware21/ts-async': 0.5.5
-      '@nevware21/ts-utils': 0.13.0
+      '@nevware21/ts-utils': 0.14.0
     transitivePeerDependencies:
       - tslib
 
@@ -2974,7 +2976,7 @@ snapshots:
       '@microsoft/applicationinsights-shims': 3.0.1
       '@microsoft/dynamicproto-js': 2.0.3
       '@nevware21/ts-async': 0.5.5
-      '@nevware21/ts-utils': 0.13.0
+      '@nevware21/ts-utils': 0.14.0
       tslib: 2.8.1
 
   '@microsoft/applicationinsights-common@3.4.1(tslib@2.8.1)':
@@ -2982,7 +2984,7 @@ snapshots:
       '@microsoft/applicationinsights-core-js': 3.4.1(tslib@2.8.1)
       '@microsoft/applicationinsights-shims': 3.0.1
       '@microsoft/dynamicproto-js': 2.0.3
-      '@nevware21/ts-utils': 0.13.0
+      '@nevware21/ts-utils': 0.14.0
       tslib: 2.8.1
 
   '@microsoft/applicationinsights-core-js@3.4.1(tslib@2.8.1)':
@@ -2990,12 +2992,12 @@ snapshots:
       '@microsoft/applicationinsights-shims': 3.0.1
       '@microsoft/dynamicproto-js': 2.0.3
       '@nevware21/ts-async': 0.5.5
-      '@nevware21/ts-utils': 0.13.0
+      '@nevware21/ts-utils': 0.14.0
       tslib: 2.8.1
 
   '@microsoft/applicationinsights-shims@3.0.1':
     dependencies:
-      '@nevware21/ts-utils': 0.13.0
+      '@nevware21/ts-utils': 0.14.0
 
   '@microsoft/applicationinsights-web-basic@3.4.1(tslib@2.8.1)':
     dependencies:
@@ -3004,18 +3006,18 @@ snapshots:
       '@microsoft/applicationinsights-shims': 3.0.1
       '@microsoft/dynamicproto-js': 2.0.3
       '@nevware21/ts-async': 0.5.5
-      '@nevware21/ts-utils': 0.13.0
+      '@nevware21/ts-utils': 0.14.0
       tslib: 2.8.1
 
   '@microsoft/dynamicproto-js@2.0.3':
     dependencies:
-      '@nevware21/ts-utils': 0.13.0
+      '@nevware21/ts-utils': 0.14.0
 
   '@nevware21/ts-async@0.5.5':
     dependencies:
-      '@nevware21/ts-utils': 0.13.0
+      '@nevware21/ts-utils': 0.14.0
 
-  '@nevware21/ts-utils@0.13.0': {}
+  '@nevware21/ts-utils@0.14.0': {}
 
   '@nodable/entities@1.1.0': {}
 
