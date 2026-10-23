@@ -269,6 +269,7 @@ export class ChatPrompts {
             GLOBAL_LOOKUP_POLICY +
             '\nREQUIRED SKILLS (read ALL before starting):\n' +
             '- `analyse-source-design` — source reading depth, Mermaid diagram rules, MessageBox modeling, orchestration shapes, component mapping priority ladder, store tool sequence\n' +
+            '- `sequence-diagram-generation` — one business-readable sequence diagram per receive location and the required storage contract\n' +
             '- `dependency-and-decompilation-analysis` — DLL decompilation, missing dependency classification\n' +
             '- `source-to-logic-apps-mapping` — component equivalents, service provider IDs, operation names\n' +
             `\nPROCEDURE:\n` +
@@ -277,8 +278,8 @@ export class ChatPrompts {
             '3. If any required dependency/detail is unresolved, expand to full-project lookup (all artifacts), then continue analysis.\n' +
             '4. Perform dependency analysis per skill `dependency-and-decompilation-analysis` (decompile DLLs/JARs, classify missing deps).\n' +
             '5. Look up every component in skill `source-to-logic-apps-mapping`, then search reference docs with those names.\n' +
-            '6. Generate Mermaid architecture diagram per skill `analyse-source-design` rules.\n' +
-            `7. Store discovery results in the exact order specified by skill \`analyse-source-design\` (storeMeta → storeArchitecture → storeComponents → storeMessageFlow → storeGaps → storePatterns → storeDependencies → finalize), all with flowId="${params.flowId}".`
+            '6. Generate the Mermaid architecture flowchart per skill `analyse-source-design` and exactly one Mermaid sequence diagram per receive location per skill `sequence-diagram-generation`.\n' +
+            `7. Store discovery results in the exact order specified by the skills (storeMeta → storeArchitecture → storeSequenceDiagrams → storeComponents → storeMessageFlow → storeGaps → storePatterns → storeDependencies → finalize), all with flowId="${params.flowId}".`
         );
     }
 

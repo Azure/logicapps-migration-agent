@@ -138,11 +138,12 @@ Store discovery results in THIS order:
 
 1. `migration_discovery_storeMeta` — explanation, summary (with flows, subFlows, globalConfigs, connectors, dataweaveFiles, errorHandlers arrays), title.
 2. `migration_discovery_storeArchitecture` — complete Mermaid diagram string.
-3. `migration_discovery_storeComponents` — componentDetails array (id, name, type, description, purpose, connectedTo, properties, azureEquivalent, isLogicAppsNative).
-4. `migration_discovery_storeMessageFlow` — messageFlow array (step, component, componentType, action, messageType, description, pipelineComponents, properties, subscriptionFilter, additionalDetails). `additionalDetails` is MANDATORY and MUST be an object of named fields, never a raw string. If there is only one free-text note, put it in `description` or use `additionalDetails: { note: "..." }`. If there are no extra structured details, send `additionalDetails: {}`.
-5. `migration_discovery_storeGaps` — gapAnalysis array (component, componentType, gap, severity, options, recommendation).
-6. `migration_discovery_storePatterns` — migrationPatterns array (pattern, description, complexity, mulesoftApproach, logicAppsApproach, components).
-7. `migration_discovery_storeDependencies` — missingDependencies array + summary + allCriticalResolved + counts.
-8. `migration_discovery_finalize` — assemble all files and open visualization.
+3. `migration_discovery_storeSequenceDiagrams` — exactly one business-readable `sequenceDiagram` for each inbound source or listener, using the exact source name; send an empty array only when no inbound entry point exists.
+4. `migration_discovery_storeComponents` — componentDetails array (id, name, type, description, purpose, connectedTo, properties, azureEquivalent, isLogicAppsNative).
+5. `migration_discovery_storeMessageFlow` — messageFlow array (step, component, componentType, action, messageType, description, pipelineComponents, properties, subscriptionFilter, additionalDetails). `additionalDetails` is MANDATORY and MUST be an object of named fields, never a raw string. If there is only one free-text note, put it in `description` or use `additionalDetails: { note: "..." }`. If there are no extra structured details, send `additionalDetails: {}`.
+6. `migration_discovery_storeGaps` — gapAnalysis array (component, componentType, gap, severity, options, recommendation).
+7. `migration_discovery_storePatterns` — migrationPatterns array (pattern, description, complexity, mulesoftApproach, logicAppsApproach, components).
+8. `migration_discovery_storeDependencies` — missingDependencies array + summary + allCriticalResolved + counts.
+9. `migration_discovery_finalize` — assemble all files and open visualization.
 
 Do NOT call `migration_discovery_storeAnalysis` — use the individual tools above.

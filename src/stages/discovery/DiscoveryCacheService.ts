@@ -14,7 +14,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { LoggingService } from '../../services/LoggingService';
-import { FlowGroupsResult, FlowGroup } from '../../services/LLMFlowGenerator';
+import { FlowGroupsResult, FlowGroup, SequenceDiagram } from '../../services/LLMFlowGenerator';
 import { PlanningCacheService } from '../planning/PlanningCacheService';
 import { ConversionFileService } from '../conversion/ConversionFileService';
 
@@ -62,6 +62,7 @@ const ANALYSIS_FILENAME = 'analysis.json';
 // Partial file names for multi-step discovery storage
 const META_FILENAME = 'meta.json';
 const ARCHITECTURE_FILENAME = 'architecture.mmd';
+const SEQUENCE_DIAGRAMS_FILENAME = 'sequenceDiagrams.json';
 const MESSAGE_FLOW_FILENAME = 'messageFlow.json';
 const COMPONENTS_FILENAME = 'components.json';
 const GAPS_FILENAME = 'gaps.json';
@@ -421,6 +422,7 @@ export class DiscoveryCacheService {
         if (!dir) {
             return undefined;
         }
+
         const filePath = path.join(dir, this.sanitizeId(flowId), ARCHITECTURE_FILENAME);
         try {
             if (fs.existsSync(filePath)) {
@@ -430,6 +432,27 @@ export class DiscoveryCacheService {
             // ignore
         }
         return undefined;
+    }
+
+    /** Store the receive-location sequence diagrams as a JSON collection. */
+    public storeSequenceDiagrams(flowId: string, sequenceDiagrams: SequenceDiagram[]): void {
+        this.storePartial(flowId, SEQUENCE_DIAGRAMS_FILENAME, sequenceDiagrams);
+    }
+
+    /** Read the receive-location sequence diagrams. */
+    public readSequenceDiagrams(flowId: string): SequenceDiagram[] | undefined {
+        const diagrams = this.readPartial<unknown>(flowId, SEQUENCE_DIAGRAMS_FILENAME);
+        if (!Array.isArray(diagrams)) {
+            return undefined;
+        }
+
+        return diagrams.filter(
+            (diagram): diagram is SequenceDiagram =>
+                typeof diagram === 'object' &&
+                diagram !== null &&
+                typeof (diagram as Record<string, unknown>).receiveLocation === 'string' &&
+                typeof (diagram as Record<string, unknown>).mermaid === 'string'
+        );
     }
 
     /** Store message flow steps. */
@@ -518,6 +541,7 @@ export class DiscoveryCacheService {
 
         const meta = this.readMeta(flowId) || {};
         const mermaid = this.readArchitecture(flowId) || '';
+        const sequenceDiagrams = this.readSequenceDiagrams(flowId) || [];
         const rawMessageFlow = (this.readMessageFlow(flowId) || []) as Record<string, unknown>[];
         const rawComponents = (this.readComponents(flowId) || []) as Record<string, unknown>[];
         const rawGaps = (this.readGaps(flowId) || []) as Record<string, unknown>[];
@@ -657,6 +681,7 @@ export class DiscoveryCacheService {
 
         const result: DiscoveryAnalysisResult = {
             mermaid,
+            sequenceDiagrams,
             explanation: (meta.explanation as string) || '',
             summary,
             componentDetails,
