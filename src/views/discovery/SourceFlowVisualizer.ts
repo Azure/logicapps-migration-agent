@@ -2490,31 +2490,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         }
         
         /* Message Flow Timeline */
-        .migration-banner {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 16px;
-            padding: 12px 20px;
-            margin-bottom: 20px;
-            background: var(--vscode-editor-inactiveSelectionBackground);
-            border: 1px solid var(--vscode-panel-border);
-            border-radius: 8px;
-        }
-        .migration-platform {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .migration-label {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--vscode-foreground);
-        }
-        .migration-arrow {
-            display: flex;
-            align-items: center;
-        }
+        ${SourceFlowVisualizer.getMigrationBannerCss()}
 
         .flow-timeline {
             position: relative;
