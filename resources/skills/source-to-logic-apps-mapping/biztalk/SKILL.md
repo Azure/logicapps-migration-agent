@@ -228,16 +228,32 @@ If Integration Account is chosen:
 
 ### Messaging & Eventing
 
+#### Microsoft Message Queuing (MSMQ)
+
+|                         | BizTalk       | Logic Apps Standard      |
+| ----------------------- | ------------- | ------------------------ |
+| **Adapter / Connector** | MSMQ, NetMsmq | **MSMQ**                 |
+| **Service Provider**    | —             | `/serviceProviders/msmq` |
+| **Deployment Scope**    | —             | VNet + Windows broker VM |
+| **Category**            | —             | Messaging                |
+
+> **Migration Note:** Read skill `msmq-built-in-connector` before analysing, planning, or generating this connector. MSMQ requires the Microsoft MSMQ Broker on a customer-managed Windows VM. Use Azure Service Bus only for an explicitly approved messaging-platform modernization.
+
+| Type    | Operation                                    | Description                            |
+| ------- | -------------------------------------------- | -------------------------------------- |
+| Trigger | When a message is available in an MSMQ queue | Receive one message through the broker |
+| Action  | `sendMsmqMessage`                            | Send a message through the broker      |
+
+**Connection Parameters:** Server name (required), Port (optional; default `5050`)
+
 #### Azure Service Bus
 
-|                         | BizTalk                       | Logic Apps Standard            |
-| ----------------------- | ----------------------------- | ------------------------------ |
-| **Adapter / Connector** | ServiceBus, MSMQ, NetMsmq, SB | **Azure Service Bus**          |
-| **Service Provider**    | —                             | `/serviceProviders/serviceBus` |
-| **Deployment Scope**    | —                             | Cloud Only                     |
-| **Category**            | —                             | Messaging                      |
-
-> **Migration Note:** BizTalk MSMQ and NetMsmq adapters have no direct cloud equivalent. Azure Service Bus is the recommended replacement for all on-premises queuing patterns.
+|                         | BizTalk        | Logic Apps Standard            |
+| ----------------------- | -------------- | ------------------------------ |
+| **Adapter / Connector** | ServiceBus, SB | **Azure Service Bus**          |
+| **Service Provider**    | —              | `/serviceProviders/serviceBus` |
+| **Deployment Scope**    | —              | Cloud Only                     |
+| **Category**            | —              | Messaging                      |
 
 | Type    | Operation                            | Description                        |
 | ------- | ------------------------------------ | ---------------------------------- |
@@ -483,21 +499,38 @@ If Integration Account is chosen:
 
 ### HTTP & Web Services
 
+#### SOAP
+
+|                         | BizTalk                         | Logic Apps Standard      |
+| ----------------------- | ------------------------------- | ------------------------ |
+| **Adapter / Connector** | SOAP, WCF-BasicHttp, WCF-WSHttp | **SOAP**                 |
+| **Service Provider**    | —                               | `/serviceProviders/soap` |
+| **Deployment Scope**    | —                               | Any                      |
+| **Category**            | —                               | Integration              |
+
+> **Migration Note:** Read skill `soap-built-in-connector` before analysing, planning, or generating this connector. Use the WSDL-driven built-in SOAP connector when its bindings, authentication, and WS-\* support satisfy the source contract.
+
+| Type   | Operation         | Description                       |
+| ------ | ----------------- | --------------------------------- |
+| Action | `invokeOperation` | Invoke an imported WSDL operation |
+
+**Connection Parameters:** WSDL source and URL/content, endpoint URL, authentication type, plus authentication-specific values.
+
 #### HTTP
 
-|                         | BizTalk                                                                                 | Logic Apps Standard      |
-| ----------------------- | --------------------------------------------------------------------------------------- | ------------------------ |
-| **Adapter / Connector** | HTTP, Http, WCF-BasicHttp, WCF-WSHttp, WCF-NetTcp, WCF-Custom, WCF-CustomIsolated, SOAP | **HTTP**                 |
-| **Service Provider**    | —                                                                                       | None (native HTTP/Request types) |
-| **Deployment Scope**    | —                                                                                       | Any                      |
-| **Category**            | —                                                                                       | Integration              |
+|                         | BizTalk                                                | Logic Apps Standard              |
+| ----------------------- | ------------------------------------------------------ | -------------------------------- |
+| **Adapter / Connector** | HTTP, Http, WCF-NetTcp, WCF-Custom, WCF-CustomIsolated | **HTTP**                         |
+| **Service Provider**    | —                                                      | None (native HTTP/Request types) |
+| **Deployment Scope**    | —                                                      | Any                              |
+| **Category**            | —                                                      | Integration                      |
 
-> **Migration Note:** Map HTTP-compatible behavior to native HTTP/Request operations, preserving SOAP envelopes, headers, authentication, and request/response behavior where applicable. A non-HTTP WCF binding (such as NetTcp) requires an explicit supported alternative or gap, not a silent protocol change. A variable HTTP URI is an action input, not a dynamic connection.
+> **Migration Note:** Use HTTP for REST and for SOAP/WCF cases unsupported by the built-in SOAP connector. Preserve SOAP envelopes, headers, authentication, and request/response behavior where applicable. A non-HTTP WCF binding such as NetTcp requires an explicit supported alternative or gap, not a silent protocol change. A variable HTTP URI is an action input, not a dynamic connection.
 
-| Type    | Operation                | Description                             |
-| ------- | ------------------------ | --------------------------------------- |
-| Trigger | `Request` (type)        | HTTP Request trigger (`kind: Http`)     |
-| Action  | `Http` (type)           | Make an HTTP request                    |
+| Type    | Operation        | Description                         |
+| ------- | ---------------- | ----------------------------------- |
+| Trigger | `Request` (type) | HTTP Request trigger (`kind: Http`) |
+| Action  | `Http` (type)    | Make an HTTP request                |
 
 **Connection Parameters:** None. Configure URI, headers, body, and authentication as native action inputs; do not emit `serviceProviderConfiguration` or a connection entry. See the [HTTP action schema](https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers#http-action).
 
@@ -939,12 +972,12 @@ BizTalk XLANG/s orchestration shapes map to Logic Apps workflow actions and cons
 
 ### Inter-Orchestration Communication
 
-| #   | BizTalk Orchestration Shape | Logic Apps Equivalent                                      | Notes                                                                               |
-| --- | --------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 22  | **Call Orchestration**      | Invoke nested workflow (synchronous)                       | Use the built-in "Invoke Workflow" action.                                          |
-| 23  | **Start Orchestration**     | HTTP POST to another workflow's trigger URL                | Fire and forget; async invocation.                                                  |
-| 24  | **Direct Binding**          | — (no equivalent)                                          | No MessageBox pub/sub. Use explicit triggers/actions or Service Bus for decoupling. |
-| 25  | **Correlation Set**         | Stateful workflow + `correlationId` / Service Bus sessions | Use tracked properties or Service Bus session IDs for correlation.                  |
+| #   | BizTalk Orchestration Shape | Logic Apps Equivalent                                      | Notes                                                                                                                                                          |
+| --- | --------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 22  | **Call Orchestration**      | Invoke nested workflow (synchronous)                       | Use the built-in "Invoke Workflow" action.                                                                                                                     |
+| 23  | **Start Orchestration**     | HTTP POST to another workflow's trigger URL                | Fire and forget; async invocation.                                                                                                                             |
+| 24  | **Direct Binding**          | — (no equivalent)                                          | No MessageBox pub/sub. Use explicit triggers/actions or Service Bus for decoupling.                                                                            |
+| 25  | **Correlation Set**         | Stateful workflow + `correlationId` / Service Bus sessions | Use tracked properties or Service Bus session IDs for correlation.                                                                                             |
 | 26  | **Role Link**               | No direct equivalent; preserve partner-to-port routing     | Inspect the selected party's physical port bindings. Partner selection alone does not justify dynamic connections; follow Runtime Destination Selection below. |
 
 ### Transactions
@@ -973,13 +1006,13 @@ BizTalk Server engine and platform features mapped to Logic Apps Standard equiva
 
 ### Integration Patterns
 
-| #   | BizTalk Feature       | Logic Apps Equivalent                             | Notes                                                             |
-| --- | --------------------- | ------------------------------------------------- | ----------------------------------------------------------------- |
-| 7   | **Sequential Convoy** | Stateful workflow + Service Bus sessions          | Correlate related messages in order using session-enabled queues. |
-| 8   | **Parallel Convoy**   | Stateful workflow + multiple triggers/correlation | Use separate workflows or parallel branches with correlation.     |
-| 9   | **Scatter-Gather**    | `Parallel Branch` with join                       | Fan-out to multiple endpoints in parallel, collect all results.   |
-| 10  | **Aggregation**       | `For Each` + `Append to Array` + `Compose`        | Iterate and build up an aggregated result.                        |
-| 11  | **Dynamic Send Port** | Connector action / HTTP action | Use dynamic connections only for required runtime connection switching; see below. |
+| #   | BizTalk Feature       | Logic Apps Equivalent                             | Notes                                                                              |
+| --- | --------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 7   | **Sequential Convoy** | Stateful workflow + Service Bus sessions          | Correlate related messages in order using session-enabled queues.                  |
+| 8   | **Parallel Convoy**   | Stateful workflow + multiple triggers/correlation | Use separate workflows or parallel branches with correlation.                      |
+| 9   | **Scatter-Gather**    | `Parallel Branch` with join                       | Fan-out to multiple endpoints in parallel, collect all results.                    |
+| 10  | **Aggregation**       | `For Each` + `Append to Array` + `Compose`        | Iterate and build up an aggregated result.                                         |
+| 11  | **Dynamic Send Port** | Connector action / HTTP action                    | Use dynamic connections only for required runtime connection switching; see below. |
 
 #### Runtime Destination Selection (BizTalk)
 
@@ -1312,48 +1345,48 @@ public class MessageHelper
 
 Alphabetical index for fast reference:
 
-| BizTalk Adapter                     | Logic Apps Connector       |
-| ----------------------------------- | -------------------------- |
-| AS2                                 | AS2                        |
-| AzureBlob / AzureBlobStorage        | Azure Blob Storage         |
-| AzureEventHub / EventHub            | Azure Event Hub            |
-| AzureTable / AzureTableStorage      | Azure Table Storage        |
-| BAPI / SAPERP / SapErp              | SAP ERP                    |
-| HostApps (CICS)                     | IBM CICS                   |
-| CosmosDb / CosmosDB / AzureCosmosDB | Azure Cosmos DB            |
-| DB2 / Db2                           | IBM Db2                    |
-| EDIFACT                             | EDIFACT                    |
-| ExchangeOnlineEmail                 | SMTP                       |
-| FILE / FileSystem                   | File System                |
-| FTP / Ftp                           | FTP                        |
-| GmailEmail                          | SMTP                       |
-| HL7 (transport)                     | MLLP (HL7)                 |
-| HostFiles                           | IBM Host File              |
-| HTTP / Http                         | HTTP                       |
-| HostApps (IMS)                      | IBM IMS                    |
-| Informix                            | IBM Informix               |
-| Kafka / ConfluentKafka              | Confluent Kafka            |
-| KeyVault / AzureKeyVault            | Azure Key Vault            |
-| MLLP / Mllp                         | MLLP (HL7)                 |
-| MQ / IbmMq / MQSeries               | IBM MQ                     |
-| MSMQ / NetMsmq                      | Azure Service Bus/RabbitMQ |
-| ODP.NET / OracleDb / OracleDatabase | Oracle Database            |
-| OutlookEmail                        | SMTP                       |
-| SAP / WCF-SAP                       | SAP                        |
-| SB / ServiceBus                     | Azure Service Bus          |
-| SFTP / Sftp                         | SFTP                       |
-| SMTP / Smtp                         | SMTP                       |
-| SOAP                                | HTTP                       |
-| SQL / Sql                           | SQL Server                 |
-| SWIFT                               | SWIFT                      |
-| VSAM / Vsam                         | IBM Host File              |
-| WCF-BasicHttp                       | HTTP                       |
-| WCF-Custom                          | HTTP                       |
-| WCF-CustomIsolated                  | HTTP                       |
-| WCF-NetTcp                          | HTTP                       |
-| WCF-SQL                             | SQL Server                 |
-| WCF-WSHttp                          | HTTP                       |
-| X12                                 | X12                        |
+| BizTalk Adapter                     | Logic Apps Connector |
+| ----------------------------------- | -------------------- |
+| AS2                                 | AS2                  |
+| AzureBlob / AzureBlobStorage        | Azure Blob Storage   |
+| AzureEventHub / EventHub            | Azure Event Hub      |
+| AzureTable / AzureTableStorage      | Azure Table Storage  |
+| BAPI / SAPERP / SapErp              | SAP ERP              |
+| HostApps (CICS)                     | IBM CICS             |
+| CosmosDb / CosmosDB / AzureCosmosDB | Azure Cosmos DB      |
+| DB2 / Db2                           | IBM Db2              |
+| EDIFACT                             | EDIFACT              |
+| ExchangeOnlineEmail                 | SMTP                 |
+| FILE / FileSystem                   | File System          |
+| FTP / Ftp                           | FTP                  |
+| GmailEmail                          | SMTP                 |
+| HL7 (transport)                     | MLLP (HL7)           |
+| HostFiles                           | IBM Host File        |
+| HTTP / Http                         | HTTP                 |
+| HostApps (IMS)                      | IBM IMS              |
+| Informix                            | IBM Informix         |
+| Kafka / ConfluentKafka              | Confluent Kafka      |
+| KeyVault / AzureKeyVault            | Azure Key Vault      |
+| MLLP / Mllp                         | MLLP (HL7)           |
+| MQ / IbmMq / MQSeries               | IBM MQ               |
+| MSMQ / NetMsmq                      | MSMQ                 |
+| ODP.NET / OracleDb / OracleDatabase | Oracle Database      |
+| OutlookEmail                        | SMTP                 |
+| SAP / WCF-SAP                       | SAP                  |
+| SB / ServiceBus                     | Azure Service Bus    |
+| SFTP / Sftp                         | SFTP                 |
+| SMTP / Smtp                         | SMTP                 |
+| SOAP                                | SOAP                 |
+| SQL / Sql                           | SQL Server           |
+| SWIFT                               | SWIFT                |
+| VSAM / Vsam                         | IBM Host File        |
+| WCF-BasicHttp                       | SOAP                 |
+| WCF-Custom                          | HTTP                 |
+| WCF-CustomIsolated                  | HTTP                 |
+| WCF-NetTcp                          | HTTP                 |
+| WCF-SQL                             | SQL Server           |
+| WCF-WSHttp                          | SOAP when supported  |
+| X12                                 | X12                  |
 
 ### Additional Adapters (Not in Registry)
 
@@ -1418,27 +1451,27 @@ Alphabetical index for fast reference:
 
 ### Engine & Platform Features
 
-| BizTalk Feature            | Logic Apps Equivalent                     |
-| -------------------------- | ----------------------------------------- |
-| Aggregation                | `For Each` + `Append to Array`            |
-| BAM                        | Application Insights / Azure Monitor      |
-| BizTalk Admin Console      | Azure Portal / VS Code                    |
-| BizTalk Mapper (Functoids) | Data Mapper / XSLT / expressions          |
-| Binding Files              | `connections.json` + `parameters.json`    |
-| Content-Based Routing      | `Condition` / `Switch`                    |
-| Debatching                 | `SplitOn` on trigger                      |
+| BizTalk Feature            | Logic Apps Equivalent                                           |
+| -------------------------- | --------------------------------------------------------------- |
+| Aggregation                | `For Each` + `Append to Array`                                  |
+| BAM                        | Application Insights / Azure Monitor                            |
+| BizTalk Admin Console      | Azure Portal / VS Code                                          |
+| BizTalk Mapper (Functoids) | Data Mapper / XSLT / expressions                                |
+| Binding Files              | `connections.json` + `parameters.json`                          |
+| Content-Based Routing      | `Condition` / `Switch`                                          |
+| Debatching                 | `SplitOn` on trigger                                            |
 | Dynamic Send Port          | Connector action / HTTP; dynamic connections only when required |
-| Host / Host Instances      | App Service Plan / Workflow App           |
-| Liquid Templates           | Liquid template action                    |
-| Message Enrichment         | Inline actions + `Compose`                |
-| MessageBox (Pub/Sub)       | Trigger + Condition / Service Bus topics  |
-| Ordered Delivery           | Service Bus sessions / `concurrency: 1`   |
-| Parallel Convoy            | Stateful workflow + correlation           |
-| Retry / Resubmit           | Built-in retry policies + portal resubmit |
-| Scatter-Gather             | `Parallel Branch` + join                  |
-| Sequential Convoy          | Stateful workflow + Service Bus sessions  |
-| SSO                        | Azure Key Vault + Managed Identity        |
-| Tracking / HAT             | Run History + Tracked Properties          |
+| Host / Host Instances      | App Service Plan / Workflow App                                 |
+| Liquid Templates           | Liquid template action                                          |
+| Message Enrichment         | Inline actions + `Compose`                                      |
+| MessageBox (Pub/Sub)       | Trigger + Condition / Service Bus topics                        |
+| Ordered Delivery           | Service Bus sessions / `concurrency: 1`                         |
+| Parallel Convoy            | Stateful workflow + correlation                                 |
+| Retry / Resubmit           | Built-in retry policies + portal resubmit                       |
+| Scatter-Gather             | `Parallel Branch` + join                                        |
+| Sequential Convoy          | Stateful workflow + Service Bus sessions                        |
+| SSO                        | Azure Key Vault + Managed Identity                              |
+| Tracking / HAT             | Run History + Tracked Properties                                |
 
 ---
 

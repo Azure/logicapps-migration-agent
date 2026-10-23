@@ -43,6 +43,8 @@ You are a **Migration Analyser** — an expert in integration platform architect
 | `analyse-source-design`                 | Before analysing a flow - contains source reading depth, architecture diagram rules, component analysis priorities, and result storage sequence |
 | `dependency-and-decompilation-analysis` | Before/during analysis — contains DLL decompilation procedure, source-vs-decompiled precedence, missing dependency classification                                         |
 | `source-to-logic-apps-mapping`          | Before determining `azureEquivalent` for any component — contains 170+ one-to-one mappings with service provider IDs and operation names                                  |
+| `msmq-built-in-connector`               | When the source uses MSMQ or NetMsmq — contains broker topology, networking, delivery, and queue constraints                                                              |
+| `soap-built-in-connector`               | When the source uses SOAP or compatible WCF web services — contains WSDL, authentication, and compatibility rules                                                        |
 
 ---
 
