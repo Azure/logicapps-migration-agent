@@ -55,6 +55,7 @@ export class PlatformDetector implements vscode.Disposable {
         this.detectors.set('biztalk', new BizTalkDetector());
         this.detectors.set('mulesoft', new MuleSoftDetector());
         this.detectors.set('tibco', new TIBCODetector());
+        this.detectors.set('sappi', new SAPPIDetector());
     }
 
     /**
@@ -172,7 +173,7 @@ export class PlatformDetector implements vscode.Disposable {
         }
 
         // Add all platforms
-        const allPlatforms: SourcePlatformType[] = ['biztalk', 'mulesoft', 'tibco'];
+        const allPlatforms: SourcePlatformType[] = ['biztalk', 'mulesoft', 'tibco', 'sappi'];
 
         for (const platform of allPlatforms) {
             if (
@@ -228,6 +229,7 @@ export class PlatformDetector implements vscode.Disposable {
             biztalk: 'BizTalk Server',
             mulesoft: 'MuleSoft Anypoint',
             tibco: 'TIBCO BusinessWorks',
+            sappi: 'SAP PI/PO',
             generic: 'Generic/Other',
         };
         return names[platform] || platform;
@@ -241,6 +243,7 @@ export class PlatformDetector implements vscode.Disposable {
             'BizTalk Server': 'biztalk',
             'MuleSoft Anypoint': 'mulesoft',
             'TIBCO BusinessWorks': 'tibco',
+            'SAP PI/PO': 'sappi',
             'Generic/Other': 'generic',
         };
         return mapping[displayName] || 'generic';
@@ -277,7 +280,20 @@ abstract class BasePlatformDetector implements IPlatformDetector {
         maxDepth = 2
     ): Promise<string[]> {
         const matches: string[] = [];
-        await this.scanDirectory(folderPath, patterns, matches, 0, maxDepth);
+        await this.scanDirectory(folderPath, patterns, matches, 0, maxDepth, false);
+        return matches;
+    }
+
+    /**
+     * Helper to scan directory for directories matching patterns.
+     */
+    protected async findDirectories(
+        folderPath: string,
+        patterns: string[],
+        maxDepth = 1
+    ): Promise<string[]> {
+        const matches: string[] = [];
+        await this.scanDirectory(folderPath, patterns, matches, 0, maxDepth, true);
         return matches;
     }
 
@@ -286,7 +302,8 @@ abstract class BasePlatformDetector implements IPlatformDetector {
         patterns: string[],
         matches: string[],
         currentDepth: number,
-        maxDepth: number
+        maxDepth: number,
+        findDirs: boolean = false
     ): Promise<void> {
         if (currentDepth > maxDepth) {
             return;
@@ -298,23 +315,37 @@ abstract class BasePlatformDetector implements IPlatformDetector {
             for (const entry of entries) {
                 const fullPath = path.join(dir, entry.name);
 
-                if (entry.isFile()) {
+                if (!findDirs && entry.isFile()) {
+                    // Looking for files
                     for (const pattern of patterns) {
                         if (this.matchPattern(entry.name, pattern)) {
                             matches.push(fullPath);
                         }
                     }
+                } else if (findDirs && entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+                    // Looking for directories
+                    for (const pattern of patterns) {
+                        if (this.matchPattern(entry.name, pattern)) {
+                            matches.push(fullPath);
+                        }
+                    }
+                    // Continue recursion for nested directories
+                    if (currentDepth < maxDepth) {
+                        await this.scanDirectory(fullPath, patterns, matches, currentDepth + 1, maxDepth, findDirs);
+                    }
                 } else if (
-                    entry.isDirectory() &&
+                    !findDirs && entry.isDirectory() &&
                     !entry.name.startsWith('.') &&
                     entry.name !== 'node_modules'
                 ) {
+                    // When looking for files, recurse into subdirectories
                     await this.scanDirectory(
                         fullPath,
                         patterns,
                         matches,
                         currentDepth + 1,
-                        maxDepth
+                        maxDepth,
+                        findDirs
                     );
                 }
             }
@@ -678,6 +709,114 @@ class TIBCODetector extends BasePlatformDetector {
 
         return {
             platform: 'tibco',
+            version,
+            confidence: Math.min(confidence, 100),
+            indicators,
+            alternativePlatforms: [],
+        };
+    }
+}
+
+/**
+ * SAP PI/PO platform detector.
+ */
+class SAPPIDetector extends BasePlatformDetector {
+    readonly platform: SourcePlatformType = 'sappi';
+
+    async detect(folderPath: string): Promise<PlatformDetectionResult | null> {
+        const indicators: PlatformIndicator[] = [];
+        let confidence = 0;
+        let version: string | undefined;
+
+        // Check for SAP PI/PO configuration directories (ipproviders, iarexportstructure, etc)
+        // These are typically directories, not files
+        const sappiConfigDirs = await this.findDirectories(folderPath, [
+            'ipproviders',
+            'iarexportstructure',
+        ]);
+        if (sappiConfigDirs.length > 0) {
+            confidence += 50; // High confidence - these are very specific to SAP PI/PO
+            indicators.push({
+                platform: 'sappi',
+                indicatorType: 'folder-structure',
+                match: `${sappiConfigDirs.length} SAP PI/PO config directory(ies)`,
+                confidence: 'high',
+            });
+        }
+
+        // Check for .iar files (Integration Archive)
+        const iarFiles = await this.findFiles(folderPath, ['*.iar']);
+        if (iarFiles.length > 0) {
+            confidence += 50;
+            indicators.push({
+                platform: 'sappi',
+                indicatorType: 'file-extension',
+                match: `${iarFiles.length} Integration Archive(ies)`,
+                confidence: 'high',
+            });
+        }
+
+        // Check for Integration Process XML files
+        const integrationProcessFiles = await this.findFiles(folderPath, ['IntegrationProcess*.xml']);
+        if (integrationProcessFiles.length > 0) {
+            confidence += 40;
+            indicators.push({
+                platform: 'sappi',
+                indicatorType: 'file-extension',
+                match: `${integrationProcessFiles.length} Integration Process(es)`,
+                confidence: 'high',
+            });
+        }
+
+        // Check for MessageMapping files
+        const messageMappingFiles = await this.findFiles(folderPath, ['MessageMapping*.xml']);
+        if (messageMappingFiles.length > 0) {
+            confidence += 35;
+            indicators.push({
+                platform: 'sappi',
+                indicatorType: 'file-extension',
+                match: `${messageMappingFiles.length} Message Mapping(s)`,
+                confidence: 'high',
+            });
+        }
+
+        // Check for CommunicationChannel files
+        const channelFiles = await this.findFiles(folderPath, ['CommunicationChannel*.xml']);
+        if (channelFiles.length > 0) {
+            confidence += 30;
+            indicators.push({
+                platform: 'sappi',
+                indicatorType: 'file-extension',
+                match: `${channelFiles.length} Communication Channel(s)`,
+                confidence: 'high',
+            });
+        }
+
+        // Check for manifest files (SAP PI/PO projects often contain manifest.xml)
+        const manifestFiles = await this.findFiles(folderPath, [
+            'MANIFEST.MF',
+            'manifest.xml',
+            'Objects.xml',
+        ]);
+        if (manifestFiles.length > 0) {
+            const content = await this.readFileContent(manifestFiles[0]);
+            if (content && (content.includes('sappi') || content.includes('sap/pi'))) {
+                confidence += 25;
+                indicators.push({
+                    platform: 'sappi',
+                    indicatorType: 'config-file',
+                    match: path.basename(manifestFiles[0]),
+                    confidence: 'medium',
+                });
+            }
+        }
+
+        if (indicators.length === 0) {
+            return null;
+        }
+
+        return {
+            platform: 'sappi',
             version,
             confidence: Math.min(confidence, 100),
             indicators,
