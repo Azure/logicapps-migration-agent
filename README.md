@@ -165,6 +165,30 @@ The Flow Visualizer provides an interactive webview for exploring your integrati
 - Copilot chat integration — discuss or correct any flow group
 - Badge indicators for gaps, dependencies, and patterns
 
+## Migration tests
+
+Run the BizTalk and TIBCO stage tests before submitting a pull request:
+
+```powershell
+npm ci --ignore-scripts
+npm test
+```
+
+This strictly compiles TypeScript and runs all unit and stage-handoff integration tests.
+The tests use fixed agent responses; they do not call Copilot or Azure. Skipped and
+focused (`.only`) tests fail the suite.
+
+The `Migration tests` GitHub Actions check runs for every pull request targeting
+`main` (the default branch) or `master`, pushes to those branches, and merge-queue
+requests, without path filters.
+
+**Repository administrator setup:** after the check first runs, configure an active
+branch ruleset for `main` under **Settings > Rules > Rulesets**. Require a pull request,
+require the `Migration tests` status check, and require branches to be up to date.
+Keep existing required checks and prevent bypasses so direct pushes cannot skip the
+tests. Apply the same rules to `master` if that branch is used. Adding the workflow
+alone does not make its result mandatory for merging.
+
 ## Contributing a New Platform
 
 This project is open-source and designed for extensibility. There are **two ways** to add support for a new integration platform:

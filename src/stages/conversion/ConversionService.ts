@@ -484,7 +484,10 @@ export class ConversionService implements vscode.Disposable {
                                 `[ConversionService] loadState: correcting flow "${flow.id}" from "${flow.status}" to "in-progress"`
                             );
                             flow.status = 'in-progress';
-                        } else if (flow.status === 'thinking' || flow.status === 'in-progress') {
+                        } else if (
+                            !hasRunning &&
+                            (flow.status === 'thinking' || flow.status === 'in-progress')
+                        ) {
                             this.logger.debug(
                                 `[ConversionService] loadState: correcting flow "${flow.id}" from "${flow.status}" to "tasks-ready" (no running tasks)`
                             );
