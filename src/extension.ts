@@ -71,16 +71,17 @@ export async function activate(
         const previousVersion = context.globalState.get<string>('extensionVersion');
         if (previousVersion && previousVersion !== currentVersion) {
             void context.globalState.update('extensionVersion', currentVersion);
-            const reload = await vscode.window.showInformationMessage(
-                UserPrompts.extensionUpdated(currentVersion),
-                UserPrompts.BUTTON_RELOAD_WINDOW,
-                UserPrompts.BUTTON_LATER
-            );
-            if (reload === UserPrompts.BUTTON_RELOAD_WINDOW) {
-                void vscode.commands.executeCommand('workbench.action.reloadWindow');
-                // Return minimal API — window will reload
-                return createExtensionAPI(currentVersion);
-            }
+            void vscode.window
+                .showInformationMessage(
+                    UserPrompts.extensionUpdated(currentVersion),
+                    UserPrompts.BUTTON_RELOAD_WINDOW,
+                    UserPrompts.BUTTON_LATER
+                )
+                .then((reload) => {
+                    if (reload === UserPrompts.BUTTON_RELOAD_WINDOW) {
+                        void vscode.commands.executeCommand('workbench.action.reloadWindow');
+                    }
+                });
         } else {
             void context.globalState.update('extensionVersion', currentVersion);
         }

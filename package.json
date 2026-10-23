@@ -2,7 +2,7 @@
     "name": "logicapps-migration-agent",
     "displayName": "Logic Apps Migration Agent",
     "description": "Migrate BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard with AI-powered agent",
-    "version": "1.9.0",
+    "version": "1.16.0",
     "aiKey": "setInGitHubBuild",
     "publisher": "ms-azuretools",
     "license": "MIT",
@@ -30,12 +30,12 @@
     "icon": "resources/icons/extension-icon.png",
     "repository": {
         "type": "git",
-        "url": "https://github.com/microsoft/integration-migration-agent"
+        "url": "https://github.com/Azure/logicapps-migration-agent"
     },
     "bugs": {
-        "url": "https://github.com/microsoft/integration-migration-agent/issues"
+        "url": "https://github.com/Azure/logicapps-migration-agent/issues"
     },
-    "homepage": "https://github.com/microsoft/integration-migration-agent#readme",
+    "homepage": "https://github.com/Azure/logicapps-migration-agent#readme",
     "activationEvents": [
         "onStartupFinished",
         "workspaceContains:**/*.btproj",
@@ -1860,7 +1860,7 @@
         "lint:fix": "eslint src --fix",
         "format": "prettier --write \"src/**/*.ts\"",
         "format:check": "prettier --check \"src/**/*.ts\"",
-        "test": "pnpm run compile && pnpm run test:unit && pnpm run test:integration",
+        "test": "npm run compile && npm run test:unit && npm run test:integration",
         "test:unit": "node ./out/test/runTest.js unit",
         "test:integration": "node ./out/test/runTest.js integration",
         "package": "vsce package",
@@ -1870,6 +1870,7 @@
     "devDependencies": {
         "@types/glob": "^8.1.0",
         "@types/mocha": "^10.0.6",
+        "@types/mock-require": "^3.0.0",
         "@types/node": "^22.0.0",
         "@types/uuid": "^10.0.0",
         "@types/vscode": "^1.85.0",
@@ -1884,6 +1885,7 @@
         "husky": "^9.0.0",
         "lint-staged": "^16.0.0",
         "mocha": "^11.0.0",
+        "mock-require": "^3.0.3",
         "prettier": "^3.2.4",
         "ts-unused-exports": "^11.0.1",
         "typescript": "^5.3.3",

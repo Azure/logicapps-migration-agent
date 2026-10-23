@@ -118,7 +118,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             // Update tab title with flow name
             const selectedFlowName2 =
                 taskPlan?.flowName || flows.find((f) => f.id === selectedFlowId)?.name;
-            this.panel.title = selectedFlowName2 ? `⚙️ ${selectedFlowName2}` : 'Conversion';
+            this.panel.title = selectedFlowName2 ? `⚙️ Conversion: ${selectedFlowName2}` : 'Conversion';
 
             this.panel.webview.html = this.getHtmlContent(flows, selectedFlowId, taskPlan);
         } catch (err) {
@@ -246,6 +246,10 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                     if (state?.taskPlans[flowId]) {
                         delete state.taskPlans[flowId];
                     }
+
+                    // Clear any stale Execute All orchestration state so the regenerated
+                    // task list starts clean and isn't stuck showing "Executing...".
+                    void this.conversionService.setExecuteAllActive(flowId, false);
 
                     void this.conversionService.selectFlow(flowId);
                     this.update();
@@ -384,6 +388,40 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                     // Also persist to disk
                     const cfs = ConversionFileService.getInstance();
                     cfs.updateTaskStatus(skipPayload.flowId, skipPayload.taskId, 'skipped');
+                }
+                break;
+            }
+
+            case 'stopExecution': {
+                const stopFlowId = message.data as string;
+                if (stopFlowId) {
+                    this.logger.debug(`Stop execution requested for flow: ${stopFlowId}`);
+                    // Cancel the running Copilot agent turn so the chat actually stops,
+                    // not just the extension's task state. Focus the chat first so the
+                    // cancel command targets the active request.
+                    void (async () => {
+                        try {
+                            await vscode.commands.executeCommand('workbench.action.chat.open');
+                            await vscode.commands.executeCommand('workbench.action.chat.cancel');
+                        } catch (err) {
+                            this.logger.debug(`Chat cancel not available: ${err}`);
+                        }
+                    })();
+                    this.conversionService.stopExecution(stopFlowId).then(
+                        () => {
+                            // Clear the Home flow-group "executing" flag so both views agree.
+                            void import('../discovery/SourceFlowVisualizer')
+                                .then(({ SourceFlowVisualizer }) => {
+                                    SourceFlowVisualizer.executingGroupIds.delete(stopFlowId);
+                                    SourceFlowVisualizer.refreshFlowGroupSelectorIfOpen();
+                                })
+                                .catch(() => {
+                                    /* non-critical */
+                                });
+                            this.update();
+                        },
+                        (err) => this.logger.error(`Stop execution failed: ${stopFlowId} — ${err}`)
+                    );
                 }
                 break;
             }
@@ -541,6 +579,16 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             color: var(--vscode-button-secondaryForeground);
         }
         .btn-disabled:hover { background: var(--vscode-button-secondaryBackground); }
+        .btn-danger {
+            background: transparent;
+            color: var(--vscode-errorForeground);
+            border: 1px solid var(--vscode-errorForeground);
+            margin-left: 6px;
+        }
+        .btn-danger:hover {
+            background: var(--vscode-errorForeground);
+            color: var(--vscode-button-foreground);
+        }
         .btn-icon {
             background: transparent;
             border: 1px solid var(--vscode-button-background);
@@ -940,6 +988,10 @@ export class ConversionWebviewPanel implements vscode.Disposable {
         function convertAll(flowId) {
             vscode.postMessage({ command: 'convertAll', data: flowId });
         }
+
+        function stopExecution(flowId) {
+            vscode.postMessage({ command: 'stopExecution', data: flowId });
+        }
     </script>
 </body>
 </html>`;
@@ -1106,7 +1158,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
         if (allDone) {
             convertAllBtnHtml = `<span class="task-done-label" style="font-size: 13px;">✓ All tasks complete</span>`;
         } else if (hasRunningTask || flowInProgress) {
-            convertAllBtnHtml = `<button class="btn btn-sm btn-disabled" disabled>Executing...</button>`;
+            convertAllBtnHtml = `<button class="btn btn-sm btn-disabled" disabled>Executing...</button> <button class="btn btn-sm btn-danger" onclick="stopExecution('${this.escapeHtml(plan.flowId)}')" title="Stopped Copilot? Reset execution so you can run again">■ Stop</button>`;
         } else if (hasPendingTasks) {
             convertAllBtnHtml = `<button class="btn btn-sm btn-primary" onclick="convertAll('${this.escapeHtml(plan.flowId)}')">▶ Execute All</button>`;
         }

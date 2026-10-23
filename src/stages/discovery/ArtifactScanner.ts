@@ -120,6 +120,7 @@ const EXTENSION_TO_CATEGORY: Record<string, ArtifactCategory> = {
     '.vbproj': 'custom-code',
     '.dll': 'custom-code',
     '.jar': 'custom-code',
+    '.edmx': 'custom-code',
 };
 
 /**
@@ -134,6 +135,7 @@ const CUSTOM_CODE_EXTENSIONS = new Set([
     '.vbproj',
     '.dll',
     '.jar',
+    '.edmx',
 ]);
 
 // =============================================================================
@@ -314,7 +316,11 @@ export class ArtifactScanner implements vscode.Disposable {
                     // parser — create a lightweight inventory entry so they appear
                     // in the inventory under the "Custom Code & Assemblies" category.
                     if (CUSTOM_CODE_EXTENSIONS.has(ext)) {
-                        const depArtifact = this.createDependencyArtifact(file.path, folderPath);
+                        const depArtifact = this.createDependencyArtifact(
+                            file.path,
+                            folderPath,
+                            platform
+                        );
                         if (depArtifact) {
                             parsedArtifacts.push(depArtifact);
                         }
@@ -324,7 +330,12 @@ export class ArtifactScanner implements vscode.Disposable {
                     // No parser available — create an "other" inventory entry
                     // so every file in the source folder is visible in the tree.
                     const category: ArtifactCategory = EXTENSION_TO_CATEGORY[ext] || 'other';
-                    const otherArtifact = this.createOtherArtifact(file.path, folderPath, category);
+                    const otherArtifact = this.createOtherArtifact(
+                        file.path,
+                        folderPath,
+                        category,
+                        platform
+                    );
                     if (otherArtifact) {
                         parsedArtifacts.push(otherArtifact);
                     }
@@ -521,6 +532,7 @@ export class ArtifactScanner implements vscode.Disposable {
         supportedExtensions.add('.hidx');
         supportedExtensions.add('.brl');
         supportedExtensions.add('.bre');
+        supportedExtensions.add('.edmx');
 
         // Add custom code file extensions so they are discovered
         for (const ext of CUSTOM_CODE_EXTENSIONS) {
@@ -691,7 +703,8 @@ export class ArtifactScanner implements vscode.Disposable {
     private createOtherArtifact(
         filePath: string,
         rootPath: string,
-        category: ArtifactCategory
+        category: ArtifactCategory,
+        platform: SourcePlatformType
     ): ParsedArtifact | undefined {
         const relativePath = path.relative(rootPath, filePath);
         const ext = path.extname(filePath).toLowerCase();
@@ -707,7 +720,7 @@ export class ArtifactScanner implements vscode.Disposable {
             return undefined;
         }
 
-        const ir = createEmptyIRDocument(`other-${fileName}`, fileName, 'biztalk');
+        const ir = createEmptyIRDocument(`other-${fileName}`, fileName, platform);
         const enrichedIR: IRDocument = {
             ...ir,
             metadata: {
@@ -750,7 +763,8 @@ export class ArtifactScanner implements vscode.Disposable {
      */
     private createDependencyArtifact(
         filePath: string,
-        rootPath: string
+        rootPath: string,
+        platform: SourcePlatformType
     ): ParsedArtifact | undefined {
         const relativePath = path.relative(rootPath, filePath);
         const ext = path.extname(filePath).toLowerCase();
@@ -777,10 +791,11 @@ export class ArtifactScanner implements vscode.Disposable {
                 '.vbproj': 'VB.NET Project',
                 '.dll': '.NET Assembly',
                 '.jar': 'Java Archive',
+                '.edmx': 'Entity Framework EDMX',
             }[ext] || ext;
 
         // Create a minimal IR document for the dependency
-        const ir = createEmptyIRDocument(`dep-${fileName}`, fileName, 'biztalk');
+        const ir = createEmptyIRDocument(`dep-${fileName}`, fileName, platform);
 
         // Enrich with dependency-specific metadata
         const enrichedIR: IRDocument = {

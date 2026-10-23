@@ -1,0 +1,46 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Insert_row": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "tableName": "OracleWorkflow_TableName",
+            "setColumns": "OracleWorkflow_SetColumns"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "oracledb",
+            "operationId": "insertRow",
+            "serviceProviderId": "/serviceProviders/oracledb"
+          }
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 201,
+          "body": "@body('Insert_row')"
+        },
+        "runAfter": {
+          "Insert_row": [
+            "Succeeded",
+            "Failed"
+          ]
+        }
+      }
+    },
+    "triggers": {
+      "manual": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {}
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

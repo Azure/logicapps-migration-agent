@@ -123,7 +123,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             // Update tab title with flow name
             const selectedFlowName =
                 cachedPlanResult?.flowName || flows.find((f) => f.id === selectedFlowId)?.name;
-            this.panel.title = selectedFlowName ? `📝 ${selectedFlowName}` : 'Planning';
+            this.panel.title = selectedFlowName ? `📝 Planning: ${selectedFlowName}` : 'Planning';
 
             this.panel.webview.html = this.getHtmlContent(
                 flows,

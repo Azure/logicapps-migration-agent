@@ -75,6 +75,12 @@ For all **other** (non-custom-code) components:
 
 ---
 
+### 3.4 Runtime Connection Selection
+
+Use dynamic connections only when the source flow requires runtime switching between different connection configurations, following `connections-json-generation-rules` section 2.1. Otherwise, use the normal connection approach and preserve existing ports, branches, and workflow boundaries.
+
+When needed, include the source routing expression, required predefined connections, and settings in the plan. Preserve the source's access requirements and default/error behavior, and document the Code View limitation. Inspect the source before reporting missing routing details; do not invent routing or silently choose one destination.
+
 ## 4. Reference Lookup (MANDATORY)
 
 Before generating any workflow definition:
@@ -82,7 +88,7 @@ Before generating any workflow definition:
 1. Read the skill `source-to-logic-apps-mapping` to look up the exact Logic Apps Standard equivalent for every component.
 2. Call `migration_searchReferenceWorkflows` and `migration_readReferenceWorkflow` to find real reference examples.
 3. Use the operation names from the mapping skill as search terms.
-4. Copy exact `serviceProviderConfiguration` and `operationId` values from references — do NOT invent these.
+4. Copy exact provider IDs, `operationId` values, and configuration structure from references. Only when dynamic connections are needed, read the `DynamicConnections` references and adapt `connectionName` to the source routing expression.
 5. If the first search returns no relevant results, RETRY 2-4 more times with different word combinations.
 6. Also call `migration_readReferenceDoc` to verify connector capabilities.
 

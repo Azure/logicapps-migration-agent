@@ -1,0 +1,12 @@
+{
+    "archive": "Tibco.zip",
+    "archiveSha256": "2b0d845359d6aeb5797ba589af74a57e1438f329d9569a9a27baff3b4b9d9931",
+    "sourceDirectory": "Tibco/TibcoALMERPDallasBatchService/CommonLogging",
+    "selection": "Unmodified BW6 module descriptor and synchronous logging process. Deployment configuration, endpoint-bearing WSDL, binaries, and unrelated modules are excluded.",
+    "scenario": "Invoke the synchronous logging service.",
+    "processName": "commonlogging.sh.invokeSyncLogEvent",
+    "files": [
+        "META-INF/module.bwm",
+        "Processes/commonlogging/sh/invokeSyncLogEvent.bwp"
+    ]
+}
