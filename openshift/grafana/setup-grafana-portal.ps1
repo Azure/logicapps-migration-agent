@@ -4,6 +4,7 @@ param(
     [string]$SqlDatabase,
     [string]$SqlUser,
     [string]$SqlPassword,
+    [string]$SqlConnectionString,
     [string]$LogicAppBaseUrl,
     [string]$MasterKey,
     [string]$PrometheusUrl,
@@ -75,6 +76,8 @@ $script:DefaultDashboardFileName = 'logicapps-workflow-hub.json'
 $script:DefaultDashboardUid = 'logicapps-monitor'
 $script:PrimaryLogicAppName = ''
 $script:LogicAppHostName = ''
+$script:LogicAppPlatformAuthKey = ''
+$script:LogicAppPlatformSiteName = ''
 
 function Write-Step([string]$Message) {
     Write-Host "`n=== $Message ===" -ForegroundColor Cyan
@@ -173,12 +176,23 @@ function Get-HostSecretsFileCandidates {
     foreach ($rootName in @('LOGICAPPS_STORAGE_PATH', 'SMB_SHARE_PATH', 'STORAGE_PATH')) {
         $rootPath = [Environment]::GetEnvironmentVariable($rootName)
         if (-not [string]::IsNullOrWhiteSpace($rootPath)) {
+            $candidates.Add((Join-Path $rootPath 'Functions\keys\host.json'))
             $candidates.Add((Join-Path $rootPath 'Functions\Secrets\host.json'))
         }
     }
 
-    $candidates.Add('C:\storage\Functions\Secrets\host.json')
-    $candidates.Add('D:\storage\Functions\Secrets\host.json')
+    foreach ($storageRoot in @('C:\storage', 'D:\storage')) {
+        if (-not (Test-Path -LiteralPath $storageRoot)) {
+            continue
+        }
+
+        $candidates.Add((Join-Path $storageRoot 'Functions\keys\host.json'))
+        $candidates.Add((Join-Path $storageRoot 'Functions\Secrets\host.json'))
+        foreach ($projectDirectory in @(Get-ChildItem -LiteralPath $storageRoot -Directory -ErrorAction SilentlyContinue)) {
+            $candidates.Add((Join-Path $projectDirectory.FullName 'Functions\keys\host.json'))
+            $candidates.Add((Join-Path $projectDirectory.FullName 'Functions\Secrets\host.json'))
+        }
+    }
 
     @($candidates | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
 }
@@ -198,6 +212,10 @@ function Try-ResolveMasterKeyFromHostSecrets {
                     $resolved = [string]$secrets.masterKey
                 }
                 elseif ($secrets.masterKey -and ($secrets.masterKey.PSObject.Properties.Name -contains 'value')) {
+                    if ($secrets.masterKey.PSObject.Properties.Name -contains 'encrypted' -and [bool]$secrets.masterKey.encrypted) {
+                        Write-Info "Found encrypted Functions host keys at '$candidate'; the stored value cannot be used as a management API key."
+                        continue
+                    }
                     $resolved = [string]$secrets.masterKey.value
                 }
             }
@@ -228,20 +246,43 @@ function Try-ResolveMasterKeyFromPodSecrets {
         return ''
     }
 
-    $podName = ([string](& oc -n $Namespace get pods -l "containerapps.io/app-name=$targetAppName" -o jsonpath='{.items[0].metadata.name}' 2>$null)).Trim()
-    if ([string]::IsNullOrWhiteSpace($podName)) {
+    $ocBaseArgs = @()
+    if (-not [string]::IsNullOrWhiteSpace($KubeContext)) {
+        $ocBaseArgs += @('--context', $KubeContext)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($KubeConfigPath) -and (Test-Path -LiteralPath $KubeConfigPath)) {
+        $ocBaseArgs += @('--kubeconfig', $KubeConfigPath)
+    }
+
+    $podResult = Invoke-OcProbe -Arguments ($ocBaseArgs + @(
+        '-n', $Namespace,
+        'get', 'pods',
+        '-l', "containerapps.io/app-name=$targetAppName",
+        '--field-selector=status.phase=Running',
+        '--sort-by=.metadata.creationTimestamp',
+        '-o', 'jsonpath={.items[-1:].metadata.name}'
+    ))
+    $podName = $podResult.Output.Trim()
+    if ($podResult.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($podName)) {
         return ''
     }
 
     $candidateFiles = @(
+        '/home/site/wwwroot/Functions/keys/host.json',
         '/home/site/wwwroot/Functions/Secrets/host.json',
         '/home/site/wwwroot/host.json',
+        '/home/data/Functions/keys/host.json',
         '/home/data/Functions/Secrets/host.json'
     )
 
     foreach ($candidate in $candidateFiles) {
-        $content = (& oc -n $Namespace exec -c logicapps-container $podName -- cat $candidate 2>$null)
-        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($content)) {
+        $contentResult = Invoke-OcProbe -Arguments ($ocBaseArgs + @(
+            '-n', $Namespace,
+            'exec', '-c', 'logicapps-container', $podName,
+            '--', 'cat', $candidate
+        ))
+        $content = $contentResult.Output
+        if ($contentResult.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($content)) {
             continue
         }
 
@@ -253,6 +294,10 @@ function Try-ResolveMasterKeyFromPodSecrets {
                     $resolved = [string]$secrets.masterKey
                 }
                 elseif ($secrets.masterKey -and ($secrets.masterKey.PSObject.Properties.Name -contains 'value')) {
+                    if ($secrets.masterKey.PSObject.Properties.Name -contains 'encrypted' -and [bool]$secrets.masterKey.encrypted) {
+                        Write-Info "Found encrypted Functions host keys in pod '$podName' ($candidate); the stored value cannot be used as a management API key."
+                        continue
+                    }
                     $resolved = [string]$secrets.masterKey.value
                 }
             }
@@ -270,6 +315,94 @@ function Try-ResolveMasterKeyFromPodSecrets {
     }
 
     return ''
+}
+
+function Try-ResolveLogicAppPlatformAuth {
+    if (-not (Test-CommandAvailable -Name 'oc')) {
+        return $null
+    }
+
+    $targetAppName = if (-not [string]::IsNullOrWhiteSpace($AppName)) { $AppName } elseif (-not [string]::IsNullOrWhiteSpace($script:PrimaryLogicAppName)) { $script:PrimaryLogicAppName } else { '' }
+    if ([string]::IsNullOrWhiteSpace($Namespace) -or [string]::IsNullOrWhiteSpace($targetAppName)) {
+        return $null
+    }
+
+    $ocBaseArgs = @()
+    if (-not [string]::IsNullOrWhiteSpace($KubeContext)) {
+        $ocBaseArgs += @('--context', $KubeContext)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($KubeConfigPath) -and (Test-Path -LiteralPath $KubeConfigPath)) {
+        $ocBaseArgs += @('--kubeconfig', $KubeConfigPath)
+    }
+
+    $podResult = Invoke-OcProbe -Arguments ($ocBaseArgs + @(
+        '-n', $Namespace,
+        'get', 'pods',
+        '-l', "containerapps.io/app-name=$targetAppName",
+        '--field-selector=status.phase=Running',
+        '--sort-by=.metadata.creationTimestamp',
+        '-o', 'jsonpath={.items[-1:].metadata.name}'
+    ))
+    $podName = $podResult.Output.Trim()
+    if ($podResult.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($podName)) {
+        return $null
+    }
+
+    $keyResult = Invoke-OcProbe -Arguments ($ocBaseArgs + @(
+        '-n', $Namespace, 'exec', '-c', 'logicapps-container', $podName,
+        '--', 'printenv', 'WEBSITE_AUTH_ENCRYPTION_KEY'
+    ))
+    $siteResult = Invoke-OcProbe -Arguments ($ocBaseArgs + @(
+        '-n', $Namespace, 'exec', '-c', 'logicapps-container', $podName,
+        '--', 'printenv', 'WEBSITE_SITE_NAME'
+    ))
+    if ($keyResult.ExitCode -ne 0 -or $siteResult.ExitCode -ne 0 -or
+        [string]::IsNullOrWhiteSpace($keyResult.Output) -or [string]::IsNullOrWhiteSpace($siteResult.Output)) {
+        return $null
+    }
+
+    Write-Info "Resolved Logic Apps platform authentication from pod '$podName'."
+    [pscustomobject]@{
+        Key = $keyResult.Output.Trim()
+        SiteName = $siteResult.Output.Trim()
+    }
+}
+
+function New-LogicAppPlatformToken {
+    if ([string]::IsNullOrWhiteSpace($script:LogicAppPlatformAuthKey) -or
+        [string]::IsNullOrWhiteSpace($script:LogicAppPlatformSiteName)) {
+        return ''
+    }
+
+    function ConvertTo-Base64Url([byte[]]$Bytes) {
+        [Convert]::ToBase64String($Bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+    }
+
+    $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $header = ConvertTo-Base64Url ([Text.Encoding]::UTF8.GetBytes('{"alg":"HS256","typ":"JWT"}'))
+    $payloadObject = [ordered]@{
+        aud = "https://$($script:LogicAppPlatformSiteName).azurewebsites.net"
+        iss = 'https://appservice.core.azurewebsites.net'
+        nbf = $now - 30
+        exp = $now + 300
+    }
+    $payload = ConvertTo-Base64Url ([Text.Encoding]::UTF8.GetBytes(($payloadObject | ConvertTo-Json -Compress)))
+    $unsignedToken = "$header.$payload"
+    $keyBytes = try {
+        [Convert]::FromBase64String($script:LogicAppPlatformAuthKey)
+    }
+    catch {
+        [Text.Encoding]::UTF8.GetBytes($script:LogicAppPlatformAuthKey)
+    }
+    $hmac = [Security.Cryptography.HMACSHA256]::new($keyBytes)
+    try {
+        $signature = ConvertTo-Base64Url ($hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($unsignedToken)))
+        "$unsignedToken.$signature"
+    }
+    finally {
+        $hmac.Dispose()
+        [Array]::Clear($keyBytes, 0, $keyBytes.Length)
+    }
 }
 
 function Parse-ConnectionString {
@@ -675,15 +808,17 @@ function Try-ResolvePrometheusSettingsFromOpenShift {
         return $null
     }
 
-    $resolvedToken = Get-NormalizedValue (& oc @ocBaseArgs whoami -t 2>$null)
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($resolvedToken) -or $resolvedToken -match 'Unauthorized|forbidden|error') {
+    $userTokenResult = Invoke-OcProbe -Arguments ($ocBaseArgs + @('whoami', '-t'))
+    $resolvedToken = Get-NormalizedValue $userTokenResult.Output
+    if ($userTokenResult.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($resolvedToken) -or $resolvedToken -match 'Unauthorized|forbidden|error') {
         $resolvedToken = ''
     }
 
     if ([string]::IsNullOrWhiteSpace($resolvedToken)) {
         foreach ($saName in @('prometheus-k8s', 'thanos-querier')) {
-            $candidateToken = Get-NormalizedValue (& oc @ocBaseArgs -n openshift-monitoring create token $saName --duration=24h 2>$null)
-            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($candidateToken)) {
+            $serviceAccountTokenResult = Invoke-OcProbe -Arguments ($ocBaseArgs + @('-n', 'openshift-monitoring', 'create', 'token', $saName, '--duration=24h'))
+            $candidateToken = Get-NormalizedValue $serviceAccountTokenResult.Output
+            if ($serviceAccountTokenResult.ExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($candidateToken)) {
                 $resolvedToken = $candidateToken
                 break
             }
@@ -870,6 +1005,36 @@ function Refresh-SessionPath {
 
 function Test-CommandAvailable([string]$Name) {
     $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
+}
+
+function Invoke-OcProbe {
+    param([Parameter(Mandatory)][string[]]$Arguments)
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $nativeErrorPreferenceVar = Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue
+    $hasNativeErrorPreference = $null -ne $nativeErrorPreferenceVar
+    $previousNativeErrorPreference = if ($hasNativeErrorPreference) { [bool]$nativeErrorPreferenceVar.Value } else { $false }
+
+    try {
+        $ErrorActionPreference = 'SilentlyContinue'
+        if ($hasNativeErrorPreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+
+        $output = & oc @Arguments 2>$null
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+        if ($hasNativeErrorPreference) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativeErrorPreference
+        }
+    }
+
+    [pscustomobject]@{
+        ExitCode = $exitCode
+        Output = ($output -join [Environment]::NewLine)
+    }
 }
 
 function Get-DefaultSwitchIPv4 {
@@ -1134,65 +1299,48 @@ function Ensure-OcCli {
         throw "Unable to resolve OpenShift API server URL from kubeconfig using 'oc config view --minify -o jsonpath={.clusters[0].cluster.server}'."
     }
 
-    $previousNativeErrorPreference = $null
-    $nativeErrorPreferenceVar = Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue
-    $hasNativeErrorPreference = $null -ne $nativeErrorPreferenceVar
-    if ($hasNativeErrorPreference) {
-        $previousNativeErrorPreference = [bool]$nativeErrorPreferenceVar.Value
-        $PSNativeCommandUseErrorActionPreference = $false
-    }
-
-    try {
-        $tokenAutoDetected = $false
-        if ([string]::IsNullOrWhiteSpace($OpenShiftToken)) {
-            $detectedToken = (& oc @authArgs whoami -t 2>$null)
-            if ($null -ne $detectedToken) {
-                $detectedToken = $detectedToken.ToString().Trim()
-            }
-            if ($LASTEXITCODE -eq 0 -and
-                -not [string]::IsNullOrWhiteSpace($detectedToken) -and
-                $detectedToken -notmatch 'Unauthorized|forbidden|error') {
-                $OpenShiftToken = $detectedToken
-                $tokenAutoDetected = $true
-                Write-Info 'Using OpenShift token resolved from current oc context (oc whoami -t).'
-            }
-        }
-
-        $tokenLoginSucceeded = $false
-        if (-not [string]::IsNullOrWhiteSpace($OpenShiftToken)) {
-            $loginOutput = (& oc @authArgs login $apiServer "--token=$OpenShiftToken" "--insecure-skip-tls-verify=$($SkipTlsVerify.ToString().ToLowerInvariant())" --request-timeout=30s 2>$null)
-            if ($LASTEXITCODE -eq 0) {
-                $tokenLoginSucceeded = $true
-            }
-            elseif ($tokenAutoDetected) {
-                Write-Warning "Auto-detected OpenShift token failed to login for '$apiServer'. Falling back to password/current context."
-                $OpenShiftToken = ''
-            }
-            else {
-                throw "oc login with token failed for '$apiServer': $($loginOutput -join [Environment]::NewLine)"
-            }
-        }
-
-        if (-not $tokenLoginSucceeded -and -not [string]::IsNullOrWhiteSpace($OpenShiftPassword)) {
-            $loginOutput = (& oc @authArgs login -u $OpenShiftUsername -p $OpenShiftPassword $apiServer "--insecure-skip-tls-verify=$($SkipTlsVerify.ToString().ToLowerInvariant())" --request-timeout=30s 2>$null)
-            if ($LASTEXITCODE -ne 0) {
-                throw "oc login with username/password failed for '$apiServer': $($loginOutput -join [Environment]::NewLine)"
-            }
-        }
-
-        $identity = (& oc @authArgs whoami 2>$null)
-        if ($null -ne $identity) {
-            $identity = $identity.ToString().Trim()
-        }
-        $contextLabel = if (-not [string]::IsNullOrWhiteSpace($KubeContext)) { $KubeContext } else { '(current context)' }
-        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($identity)) {
-            throw "oc CLI is available but authentication failed for context '$contextLabel' (API: $apiServer). Provide -OpenShiftToken or -OpenShiftPassword (or OPENSHIFT_TOKEN / OPENSHIFT_PASSWORD), then retry."
+    $tokenAutoDetected = $false
+    if ([string]::IsNullOrWhiteSpace($OpenShiftToken)) {
+        $tokenProbe = Invoke-OcProbe -Arguments ($authArgs + @('whoami', '-t'))
+        $detectedToken = $tokenProbe.Output.Trim()
+        if ($tokenProbe.ExitCode -eq 0 -and
+            -not [string]::IsNullOrWhiteSpace($detectedToken) -and
+            $detectedToken -notmatch 'Unauthorized|forbidden|error') {
+            $OpenShiftToken = $detectedToken
+            $tokenAutoDetected = $true
+            Write-Info 'Using OpenShift token resolved from current oc context (oc whoami -t).'
         }
     }
-    finally {
-        if ($hasNativeErrorPreference) {
-            $PSNativeCommandUseErrorActionPreference = $previousNativeErrorPreference
+
+    $tokenLoginSucceeded = $false
+    if (-not [string]::IsNullOrWhiteSpace($OpenShiftToken)) {
+        $loginOutput = (& oc @authArgs login $apiServer "--token=$OpenShiftToken" "--insecure-skip-tls-verify=$($SkipTlsVerify.ToString().ToLowerInvariant())" --request-timeout=30s 2>$null)
+        if ($LASTEXITCODE -eq 0) {
+            $tokenLoginSucceeded = $true
         }
+        elseif ($tokenAutoDetected) {
+            Write-Warning "Auto-detected OpenShift token failed to login for '$apiServer'. Falling back to password/current context."
+            $OpenShiftToken = ''
+        }
+        else {
+            throw "oc login with token failed for '$apiServer': $($loginOutput -join [Environment]::NewLine)"
+        }
+    }
+
+    if (-not $tokenLoginSucceeded -and -not [string]::IsNullOrWhiteSpace($OpenShiftPassword)) {
+        $loginOutput = (& oc @authArgs login -u $OpenShiftUsername -p $OpenShiftPassword $apiServer "--insecure-skip-tls-verify=$($SkipTlsVerify.ToString().ToLowerInvariant())" --request-timeout=30s 2>$null)
+        if ($LASTEXITCODE -ne 0) {
+            throw "oc login with username/password failed for '$apiServer': $($loginOutput -join [Environment]::NewLine)"
+        }
+    }
+
+    $identity = (& oc @authArgs whoami 2>$null)
+    if ($null -ne $identity) {
+        $identity = $identity.ToString().Trim()
+    }
+    $contextLabel = if (-not [string]::IsNullOrWhiteSpace($KubeContext)) { $KubeContext } else { '(current context)' }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($identity)) {
+        throw "oc CLI is available but authentication failed for context '$contextLabel' (API: $apiServer). Provide -OpenShiftToken or -OpenShiftPassword (or OPENSHIFT_TOKEN / OPENSHIFT_PASSWORD), then retry."
     }
 }
 
@@ -1266,7 +1414,7 @@ function Escape-SqlString([string]$Value) {
     $Value.Replace("'", "''")
 }
 
-function Invoke-SqlQuery {
+function Invoke-SqlQueryLegacy {
     param([string]$Query)
 
     $connectionString = "Server=$SqlServer;Database=$SqlDatabase;User ID=$SqlUser;Password=$SqlPassword;Encrypt=False;TrustServerCertificate=True;Connection Timeout=15;"
@@ -1290,6 +1438,51 @@ function Invoke-SqlQuery {
     }
 }
 
+function Invoke-SqlQuery {
+    param([string]$Query)
+
+    $connectionString = "Server=$SqlServer;Database=$SqlDatabase;User ID=$SqlUser;Password=$SqlPassword;Encrypt=False;TrustServerCertificate=True;Connection Timeout=15;"
+    $maxAttempts = 5
+    $baseDelaySeconds = 2
+    $querySummary = (($Query -replace '\s+', ' ').Trim())
+    if ($querySummary.Length -gt 140) {
+        $querySummary = $querySummary.Substring(0, 140) + '...'
+    }
+
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        $connection = New-Object System.Data.SqlClient.SqlConnection $connectionString
+        $command = $connection.CreateCommand()
+        $command.CommandText = $Query
+        $command.CommandTimeout = 60
+        $adapter = New-Object System.Data.SqlClient.SqlDataAdapter $command
+        $table = New-Object System.Data.DataTable
+
+        try {
+            $connection.Open()
+            $null = $adapter.Fill($table)
+            return ,$table
+        }
+        catch [System.Data.SqlClient.SqlException] {
+            $isDeadlock = $_.Exception.Number -eq 1205 -or $_.Exception.Message -match 'deadlocked on lock resources'
+            $isLockTimeout = $_.Exception.Number -eq 1222
+            if (($isDeadlock -or $isLockTimeout) -and $attempt -lt $maxAttempts) {
+                $sleepSeconds = $baseDelaySeconds * $attempt
+                Write-Warning ("Transient SQL error ({0}) while executing query: {1}. Retrying in {2}s ({3}/{4})." -f $_.Exception.Number, $querySummary, $sleepSeconds, $attempt, $maxAttempts)
+                Start-Sleep -Seconds $sleepSeconds
+                continue
+            }
+
+            throw
+        }
+        finally {
+            $connection.Close()
+            $connection.Dispose()
+            $adapter.Dispose()
+            $command.Dispose()
+        }
+    }
+}
+
 function Resolve-LogicAppUrl([string]$RelativePath) {
     $base = $script:EffectiveLogicAppBaseUrl.TrimEnd('/')
     "$base$RelativePath"
@@ -1310,9 +1503,19 @@ function Invoke-LogicAppRequest {
         TimeoutSec  = 30
         ErrorAction = 'Stop'
     }
+    $headers = @{}
     if (-not [string]::IsNullOrWhiteSpace($script:LogicAppHostName) -and
         ([uri]$uri).Host -match '^(localhost|127\.0\.0\.1)$') {
-        $params.Headers = @{ Host = $script:LogicAppHostName }
+        $headers.Host = $script:LogicAppHostName
+    }
+    if ([string]::IsNullOrWhiteSpace($MasterKey)) {
+        $platformToken = New-LogicAppPlatformToken
+        if (-not [string]::IsNullOrWhiteSpace($platformToken)) {
+            $headers['x-ms-site-token'] = $platformToken
+        }
+    }
+    if ($headers.Count -gt 0) {
+        $params.Headers = $headers
     }
     if ($PSBoundParameters.ContainsKey('Body')) {
         $params.ContentType = 'application/json'
@@ -1328,12 +1531,16 @@ function Invoke-LogicAppRequest {
     $refreshedMasterKey = $false
     for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
         try {
+            if ([string]::IsNullOrWhiteSpace($MasterKey) -and $params.ContainsKey('Headers')) {
+                $params.Headers['x-ms-site-token'] = New-LogicAppPlatformToken
+            }
             return Invoke-RestMethod @params
         }
         catch {
             $statusCode = $null
-            if ($_.Exception.Response -and ($_.Exception.Response.PSObject.Properties.Name -contains 'StatusCode')) {
-                $statusCode = [int]$_.Exception.Response.StatusCode
+            $responseProperty = $_.Exception.PSObject.Properties['Response']
+            if ($responseProperty -and $responseProperty.Value -and ($responseProperty.Value.PSObject.Properties.Name -contains 'StatusCode')) {
+                $statusCode = [int]$responseProperty.Value.StatusCode
             }
             $message = $_.Exception.Message
 
@@ -1907,45 +2114,6 @@ function New-DashboardObject {
         [ordered]@{ refId = $RefId; rawSql = $RawSql; format = $Format }
     }
 
-    function New-KpiApiTarget([string]$Selector) {
-        [ordered]@{
-            refId = 'A'
-            type = 'json'
-            source = 'url'
-            format = 'table'
-            parser = 'backend'
-            datasource = @{ type = 'yesoreyeram-infinity-datasource'; uid = 'logicapps-kpi-api' }
-            url = 'http://host.docker.internal:3001/api/kpi/summary?window=24h&app=' + $grafanaAppVar
-            url_options = @{ method = 'GET'; data = '' }
-            root_selector = ''
-            json_options = @{ columnar = $false; root_is_not_array = $true }
-            columns = @(@{ selector = $Selector; text = 'value'; type = 'number' })
-            filters = @()
-            global_query_id = ''
-        }
-    }
-
-    function New-KpiTimeseriesTarget([string]$Selector) {
-        [ordered]@{
-            refId = 'A'
-            type = 'json'
-            source = 'url'
-            format = 'table'
-            parser = 'backend'
-            datasource = @{ type = 'yesoreyeram-infinity-datasource'; uid = 'logicapps-kpi-api' }
-            url = 'http://host.docker.internal:3001/api/kpi/timeseries?window=24h&app=' + $grafanaAppVar
-            url_options = @{ method = 'GET'; data = '' }
-            root_selector = 'series'
-            json_options = @{ columnar = $false; root_is_not_array = $false }
-            columns = @(
-                @{ selector = 'time'; text = 'time'; type = 'timestamp_epoch' },
-                @{ selector = $Selector; text = 'value'; type = 'number' }
-            )
-            filters = @()
-            global_query_id = ''
-        }
-    }
-
     function New-PromTarget([string]$RefId, [string]$Expr, [string]$LegendFormat, [bool]$Instant = $false, [string]$Format = $null) {
         $target = [ordered]@{ refId = $RefId; expr = $Expr; legendFormat = $LegendFormat }
         if ($Instant) { $target.instant = $true }
@@ -1972,7 +2140,7 @@ DECLARE @wf NVARCHAR(MAX) = N'$grafanaWorkflowCsv';
 DECLARE @sep NCHAR(1) = N',';
 DECLARE @u NVARCHAR(MAX) = N'';
 SELECT @u = @u + CASE WHEN @u = N'' THEN N'' ELSE N' UNION ALL ' END +
-  N'SELECT CreatedTime, EndTime, Status, TriggerName, FlowRunSequenceId, Code, COALESCE(NULLIF(LTRIM(RTRIM(FlowName)),''''), N''' + REPLACE(t.name,'''','''''') + N''') AS FlowName FROM [$escapedSchema].[' + t.name + N']'
+  N'SELECT CreatedTime, EndTime, Status, TriggerName, FlowRunSequenceId, Code, COALESCE(NULLIF(LTRIM(RTRIM(FlowName)),''''), N''' + REPLACE(t.name,'''','''''') + N''') AS FlowName FROM [$escapedSchema].[' + t.name + N'] WHERE RowKey NOT LIKE N''%[_]Status:%'''
 FROM sys.tables t
 JOIN sys.schemas s ON t.schema_id = s.schema_id
 WHERE s.name = N'$escapedSchema'
@@ -1992,10 +2160,11 @@ EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@workflow NVARCHAR(512),@
     $runSchema = if ($WorkflowMappings -and $WorkflowMappings[0].SchemaName) { $WorkflowMappings[0].SchemaName } else { 'dt' }
     # Discover every per-workflow run table (Logic Apps creates a new flow<hash>runs table on
     # each redeploy) at query time and aggregate by FlowName so new runs always show up.
+    # Status secondary-index rows repeat failed/running runs; only primary rows are executions.
     $inventoryQuery = @'
 DECLARE @u NVARCHAR(MAX) = N'';
 SELECT @u = @u + CASE WHEN @u=N'' THEN N'' ELSE N' UNION ALL ' END +
-  N'SELECT FlowName, Status, CreatedTime, EndTime FROM [__SCHEMA__].[' + t.name + N']'
+  N'SELECT FlowName, Status, CreatedTime, EndTime FROM [__SCHEMA__].[' + t.name + N'] WHERE RowKey NOT LIKE N''%[_]Status:%'''
 FROM sys.tables t JOIN sys.schemas s ON t.schema_id=s.schema_id AND s.name=N'__SCHEMA__'
 WHERE t.name LIKE N'flow%runs';
 IF @u = N'' SET @u = N'SELECT CAST(NULL AS NVARCHAR(200)) AS FlowName, CAST(NULL AS NVARCHAR(50)) AS Status, CAST(NULL AS DATETIME) AS CreatedTime, CAST(NULL AS DATETIME) AS EndTime WHERE 1=0';
@@ -2158,14 +2327,12 @@ GROUP BY $__timeGroup(CreatedTime, $__interval)
 ORDER BY 1
 '@
     $avgDurationQuery = New-DynamicFlowRunsQuery -QueryBody @'
-SELECT $__timeGroupAlias(CreatedTime, $__interval), CAST(AVG(DATEDIFF(MILLISECOND, CreatedTime, EndTime)) / 1000.0 AS DECIMAL(10,2)) AS [Avg Duration]
+SELECT CAST(AVG(DATEDIFF_BIG(MILLISECOND, CreatedTime, EndTime) / 1000.0) AS DECIMAL(18,2)) AS [Avg Duration]
 FROM runs
 WHERE EndTime IS NOT NULL AND EndTime > CreatedTime $workflowFilterClause
-GROUP BY $__timeGroup(CreatedTime, $__interval)
-ORDER BY 1
 '@
     $successRateQuery = New-DynamicFlowRunsQuery -QueryBody @'
-SELECT CAST(ISNULL(SUM(CASE WHEN Status = ''Succeeded'' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0), 0) AS DECIMAL(5,1)) AS success_rate
+SELECT CAST(SUM(CASE WHEN Status = 'Succeeded' THEN 1.0 ELSE 0 END) * 100.0 / NULLIF(SUM(CASE WHEN Status IN ('Succeeded', 'Failed') THEN 1.0 ELSE 0 END), 0) AS DECIMAL(5,1)) AS success_rate
 FROM runs
 WHERE 1 = 1 $workflowFilterClause
 '@
@@ -2192,7 +2359,7 @@ DECLARE @wf NVARCHAR(MAX) = N'${workflow:csv}';
 DECLARE @sep NCHAR(1) = N',';
 DECLARE @union NVARCHAR(MAX)=N'';
 SELECT @union = @union + CASE WHEN @union=N'' THEN N'' ELSE N' UNION ALL ' END +
-   N'SELECT Status, COALESCE(NULLIF(LTRIM(RTRIM(FlowName)),''''),'''+t.name+''') AS FlowName, CreatedTime FROM [__SCHEMA__].'+QUOTENAME(t.name)
+   N'SELECT Status, COALESCE(NULLIF(LTRIM(RTRIM(FlowName)),''''),'''+t.name+''') AS FlowName, CreatedTime FROM [__SCHEMA__].'+QUOTENAME(t.name)+N' WHERE RowKey NOT LIKE N''%[_]Status:%'''
 FROM sys.tables t JOIN sys.schemas s ON t.schema_id=s.schema_id
 WHERE s.name='__SCHEMA__' AND t.name LIKE 'flow%runs';
 IF @union=N'' SET @union=N'SELECT CAST(NULL AS NVARCHAR(64)) AS Status, CAST(NULL AS NVARCHAR(255)) AS FlowName, CAST(NULL AS DATETIME) AS CreatedTime WHERE 1=0';
@@ -2207,7 +2374,7 @@ EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@wf NVARCHAR(MAX),@sep NC
 
     # Overview KPI trend stats (Total Runs / Succeeded / Failed) query the durable SQL
     # run-history tables over the dashboard time range so the stat value AND its sparkline
-    # reflect all runs, not the ~40/workflow cap of the live management KPI API.
+    # reflect persisted runs, independently of management API availability/pagination.
     # NOTE(psrivas): the time bucket is built with DATEADD/DATEDIFF anchored at @from and
     # is deliberately quote-free. The $__timeGroup macro expands to a date string literal
     # ('1970-01-01') whose single quotes terminate the dynamic @sql N'...' literal early,
@@ -2222,9 +2389,9 @@ DECLARE @bmin INT = CASE WHEN DATEDIFF(MINUTE,@from,@to)<=0 THEN 1 ELSE (DATEDIF
     DECLARE @sep NCHAR(1) = N',';
     DECLARE @union NVARCHAR(MAX)=N'';
     SELECT @union = @union + CASE WHEN @union=N'' THEN N'' ELSE N' UNION ALL ' END +
-       N'SELECT CreatedTime, Status, COALESCE(NULLIF(LTRIM(RTRIM(FlowName)),''''),'''+t.name+''') AS FlowName FROM [dt].'+QUOTENAME(t.name)
+       N'SELECT CreatedTime, Status, COALESCE(NULLIF(LTRIM(RTRIM(FlowName)),''''),'''+t.name+''') AS FlowName FROM [__SCHEMA__].'+QUOTENAME(t.name)+N' WHERE RowKey NOT LIKE N''%[_]Status:%'''
     FROM sys.tables t JOIN sys.schemas s ON t.schema_id=s.schema_id
-    WHERE s.name='dt' AND t.name LIKE 'flow%runs';
+    WHERE s.name='__SCHEMA__' AND t.name LIKE 'flow%runs';
     IF @union=N'' SET @union=N'SELECT CAST(NULL AS DATETIME) AS CreatedTime, CAST(NULL AS NVARCHAR(64)) AS Status, CAST(NULL AS NVARCHAR(255)) AS FlowName WHERE 1=0';
     DECLARE @sql NVARCHAR(MAX)=
       N'SELECT DATEADD(MINUTE,(DATEDIFF(MINUTE,@from,CreatedTime)/@bmin)*@bmin,@from) AS time, COUNT(*) AS [__VALUECOL__]
@@ -2232,31 +2399,36 @@ DECLARE @bmin INT = CASE WHEN DATEDIFF(MINUTE,@from,@to)<=0 THEN 1 ELSE (DATEDIF
         GROUP BY DATEADD(MINUTE,(DATEDIFF(MINUTE,@from,CreatedTime)/@bmin)*@bmin,@from) ORDER BY 1';
     EXEC sp_executesql @sql, N'@from DATETIME,@to DATETIME,@bmin INT,@wf NVARCHAR(MAX),@sep NCHAR(1)',@from,@to,@bmin,@wf,@sep;
 '@
+    $kpiTrendTemplate = $kpiTrendTemplate.Replace('__SCHEMA__', $runSchema)
+    if (-not $IncludeLiveAppPanels) {
+        $kpiTrendTemplate = $kpiTrendTemplate.Replace('${workflow:csv}', '*')
+    }
     $statTotalRunsQuery = $kpiTrendTemplate.Replace('__VALUECOL__', 'Runs').Replace('__STATUSFILTER__', '')
     $statSucceededQuery = $kpiTrendTemplate.Replace('__VALUECOL__', 'Succeeded').Replace('__STATUSFILTER__', "AND Status=''Succeeded''")
     $statFailedQuery    = $kpiTrendTemplate.Replace('__VALUECOL__', 'Failed').Replace('__STATUSFILTER__', "AND Status=''Failed''")
 
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Total Runs'; type = 'stat'; gridPos = (New-GridPos 5 4 0 0)
-        targets = @((New-KpiApiTarget -Selector 'totalRuns'))
-        fieldConfig = @{ defaults = @{ noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'blue' }) } } }
-        options = @{ reduceOptions = @{ calcs = @('lastNotNull') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'none' }
+        description = 'Persisted runs in the configured SQL database during the selected time range, including workflows from previous deployments.'
+        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $statTotalRunsQuery))
+        fieldConfig = @{ defaults = @{ unit = 'none'; decimals = 0; noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'blue' }) } } }
+        options = @{ reduceOptions = @{ calcs = @('sum'); fields = '/^Runs$/'; values = $false }; textMode = 'value'; colorMode = 'value'; graphMode = 'area' }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Succeeded'; type = 'stat'; gridPos = (New-GridPos 5 4 4 0)
-        targets = @((New-KpiApiTarget -Selector 'succeeded'))
-        fieldConfig = @{ defaults = @{ noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'green' }) } } }
-        options = @{ reduceOptions = @{ calcs = @('lastNotNull') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'none' }
+        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $statSucceededQuery))
+        fieldConfig = @{ defaults = @{ unit = 'none'; decimals = 0; noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'green' }) } } }
+        options = @{ reduceOptions = @{ calcs = @('sum'); fields = '/^Succeeded$/'; values = $false }; textMode = 'value'; colorMode = 'value'; graphMode = 'area' }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Failed'; type = 'stat'; gridPos = (New-GridPos 5 4 8 0)
-        targets = @((New-KpiApiTarget -Selector 'failed'))
-        fieldConfig = @{ defaults = @{ noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'green' }, @{ value = 1; color = 'red' }) } } }
-        options = @{ reduceOptions = @{ calcs = @('lastNotNull') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'none' }
+        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $statFailedQuery))
+        fieldConfig = @{ defaults = @{ unit = 'none'; decimals = 0; noValue = '0'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'green' }, @{ value = 1; color = 'red' }) } } }
+        options = @{ reduceOptions = @{ calcs = @('sum'); fields = '/^Failed$/'; values = $false }; textMode = 'value'; colorMode = 'value'; graphMode = 'area' }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Avg Duration'; type = 'stat'; gridPos = (New-GridPos 5 4 12 0)
-        targets = @((New-KpiApiTarget -Selector 'avgDurationSec'))
+        targets = @((New-SqlTarget -RefId 'A' -RawSql $avgDurationQuery))
         fieldConfig = @{ defaults = @{ unit = 's'; color = @{ mode = 'thresholds' }; thresholds = @{ steps = @(@{ value = $null; color = 'purple' }) } } }
         options = @{ reduceOptions = @{ calcs = @('lastNotNull') }; textMode = 'value_and_name'; colorMode = 'value'; graphMode = 'none' }
     })
@@ -2268,7 +2440,7 @@ DECLARE @bmin INT = CASE WHEN DATEDIFF(MINUTE,@from,@to)<=0 THEN 1 ELSE (DATEDIF
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Success Rate'; type = 'gauge'; gridPos = (New-GridPos 5 4 20 0)
-        targets = @((New-KpiApiTarget -Selector 'successRate'))
+        targets = @((New-SqlTarget -RefId 'A' -RawSql $successRateQuery))
         fieldConfig = @{ defaults = @{ min = 0; max = 100; unit = 'percent'; thresholds = @{ steps = @(@{ value = $null; color = 'red' }, @{ value = 80; color = 'yellow' }, @{ value = 95; color = 'green' }) } } }
         options = @{ reduceOptions = @{ calcs = @('lastNotNull') }; showThresholdMarkers = $true; showThresholdLabels = $false }
     })
@@ -2442,14 +2614,15 @@ ORDER BY rsi.start_time
 '@
     $qsLatencyCpuQuery = @'
 SELECT
-  rsi.start_time AS time,
+  CASE WHEN MAX(rs.last_execution_time) > $__timeTo() THEN $__timeTo() ELSE MAX(rs.last_execution_time) END AS time,
   CAST(SUM(rs.avg_duration * rs.count_executions) / NULLIF(SUM(rs.count_executions), 0) / 1000.0 AS DECIMAL(12,2)) AS [Avg ms],
   CAST(SUM(rs.avg_cpu_time * rs.count_executions) / NULLIF(SUM(rs.count_executions), 0) / 1000.0 AS DECIMAL(12,2)) AS [CPU ms]
 FROM sys.query_store_runtime_stats rs
 JOIN sys.query_store_runtime_stats_interval rsi ON rs.runtime_stats_interval_id = rsi.runtime_stats_interval_id
-WHERE $__timeFilter(rsi.start_time)
+WHERE rsi.start_time <= $__timeTo() AND rsi.end_time > $__timeFrom()
+  AND rs.first_execution_time <= $__timeTo() AND rs.last_execution_time >= $__timeFrom()
 GROUP BY rsi.start_time
-ORDER BY rsi.start_time
+ORDER BY time
 '@
     $qsWaitCategoryQuery = @'
 SELECT
@@ -2479,7 +2652,7 @@ ORDER BY [Total ms] DESC
 '@
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'Total Runs Over Time'; type = 'timeseries'; gridPos = (New-GridPos 8 24 0 60)
-        targets = @((New-KpiTimeseriesTarget -Selector 'total'))
+        targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $statTotalRunsQuery))
         fieldConfig = @{ defaults = @{ unit = 'none'; decimals = 0; color = @{ mode = 'fixed'; fixedColor = 'blue' }; custom = @{ drawStyle = 'line'; lineInterpolation = 'smooth'; lineWidth = 2; fillOpacity = 10; spanNulls = $true; showPoints = 'never' } } }
         options = @{ legend = @{ showLegend = $true; displayMode = 'list'; placement = 'bottom'; calcs = @('sum', 'max') }; tooltip = @{ mode = 'multi'; sort = 'desc' } }
     })
@@ -2497,9 +2670,10 @@ ORDER BY [Total ms] DESC
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'SQL Avg Duration & CPU (ms)'; type = 'timeseries'; gridPos = (New-GridPos 8 12 12 76)
+        description = 'Database-wide, execution-weighted Query Store interval averages. Points follow the latest recorded execution. Partial time ranges include whole overlapping Query Store aggregates; they are not per-execution measurements.'
         targets = @((New-SqlTarget -RefId 'A' -Format 'time_series' -RawSql $qsLatencyCpuQuery))
-        fieldConfig = @{ defaults = @{ unit = 'ms'; decimals = 2; custom = @{ drawStyle = 'line'; lineWidth = 2; fillOpacity = 10; spanNulls = $true; showPoints = 'never' } } }
-        options = @{ legend = @{ showLegend = $true; displayMode = 'list'; placement = 'bottom'; calcs = @('mean', 'max') }; tooltip = @{ mode = 'multi'; sort = 'desc' } }
+        fieldConfig = @{ defaults = @{ unit = 'ms'; decimals = 2; custom = @{ drawStyle = 'line'; lineWidth = 2; fillOpacity = 10; spanNulls = $true; showPoints = 'auto' } } }
+        options = @{ legend = @{ showLegend = $true; displayMode = 'table'; placement = 'bottom'; calcs = @('lastNotNull', 'mean', 'max') }; tooltip = @{ mode = 'multi'; sort = 'desc' } }
     })
     $null = $panels.Add([ordered]@{
         id = (Next-PanelId); title = 'SQL Wait Stats by Category'; type = 'table'; gridPos = (New-GridPos 8 12 0 84)
@@ -2598,7 +2772,7 @@ ORDER BY [Total ms] DESC
                         skipUrlSync = $true
                         multi = $false
                         includeAll = $true
-                        allValue = ''
+                        allValue = '*'
                         hide = 2
                     }
                 }
@@ -2749,6 +2923,7 @@ function Get-ComposeYaml {
         '    environment:',
         "      GF_SECURITY_ADMIN_USER: $GrafanaAdminUser",
         '      GF_USERS_ALLOW_SIGN_UP: "false"',
+        '      GF_USERS_DEFAULT_THEME: "light"',
         '      GF_PANELS_DISABLE_SANITIZE_HTML: "true"',
         '      GF_SECURITY_ALLOW_EMBEDDING: "true"',
         '      GF_AUTH_ANONYMOUS_ENABLED: "true"',
@@ -2773,6 +2948,23 @@ function Get-ComposeYaml {
     )) -join "`r`n"
 }
 
+function Get-RunManagerRequestFunction {
+    @'
+async function makeRequest(method, urlOrPath, body, appName, options) {
+  if (!makeRequest.client) {
+    const { createWorkflowRuntimeClient } = require('./workflow-runtime-client');
+    makeRequest.client = createWorkflowRuntimeClient(CONFIG, {
+      runOc,
+      getBaseUrl: app => typeof ensureAppBaseUrl === 'function' ? ensureAppBaseUrl(app) : CONFIG.logicAppBase,
+      getMasterKey: app => typeof resolveMasterKeyForApp === 'function' ? resolveMasterKeyForApp(app) : CONFIG.masterKey
+    });
+  }
+  return makeRequest.client.request(method, urlOrPath, body, appName, options);
+}
+
+'@
+}
+
 function Get-RunManagerScript {
     $ocCmd = Get-Command oc -ErrorAction SilentlyContinue
     $ocPathForRunManager = if ($ocCmd -and $ocCmd.Source) { $ocCmd.Source } else { 'oc' }
@@ -2792,6 +2984,8 @@ function Get-RunManagerScript {
         port         = $RunManagerPort
         logicAppBase = $script:EffectiveLogicAppBaseUrl
         masterKey    = $MasterKey
+        platformAuthKey = $script:LogicAppPlatformAuthKey
+        platformSiteName = $script:LogicAppPlatformSiteName
         apiVersion   = '2020-05-01-preview'
         namespace    = $Namespace
         appName      = $AppName
@@ -2804,20 +2998,20 @@ function Get-RunManagerScript {
         smbPassword  = $portalSmbPassword
     } | ConvertTo-Json -Compress
 
-    $existingRunManager = Join-Path $PortalRoot 'run-manager.js'
-    if (-not (Test-Path -LiteralPath $existingRunManager)) {
-        throw "Run-manager source file not found at '$existingRunManager'."
+    $template = Get-RunManagerTemplate
+    $requestPattern = '(?ms)^(?:async )?function makeRequest\(.*?(?=^(?:async )?function makeRequestWithRetry\()'
+    if (-not [regex]::IsMatch($template, $requestPattern)) {
+        throw 'Run-manager template does not contain the expected request function.'
     }
-    $existingScript = Get-Content -LiteralPath $existingRunManager -Raw
-    if ($existingScript -match 'const CONFIG = .+?;') {
-        return [regex]::Replace($existingScript, 'const CONFIG = .+?;', "const CONFIG = $configJson;", 1)
+    $template = [regex]::Replace($template, $requestPattern, (Get-RunManagerRequestFunction))
+    if ([regex]::Matches($template, '(?m)^const CONFIG = __CONFIG_JSON__;').Count -ne 1) {
+        throw 'Run-manager template must contain exactly one configuration placeholder.'
     }
-    if ($existingScript -match 'const PORT = CONFIG\.port;') {
-        return [regex]::Replace($existingScript, 'const PORT = CONFIG\.port;', "const CONFIG = $configJson;`nconst PORT = CONFIG.port;", 1)
-    }
-    throw "Run-manager source file at '$existingRunManager' does not contain a replaceable CONFIG block."
+    return $template.Replace('const CONFIG = __CONFIG_JSON__;', "const CONFIG = $configJson;")
+}
 
-    $runManagerScriptTemplate = @'
+function Get-RunManagerTemplate {
+    @'
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
@@ -2826,10 +3020,16 @@ const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
 const path = require('path');
 const fs = require('fs');
+const net = require('net');
+const crypto = require('crypto');
 
 const CONFIG = __CONFIG_JSON__;
 const PORT = CONFIG.port;
+const APP_PORTFWD_CACHE = new Map();
+let APP_LIST_CACHE = [];
 const SMB_AUTH_CACHE = new Set();
+const PROJECT_ROOT_BY_APP = new Map();
+const MASTER_KEY_BY_APP = new Map();
 
 // Never let a transient upstream error (e.g. the 8088 tunnel dropping during a
 // pod rollover) take the whole manager down — log and keep serving.
@@ -2853,12 +3053,14 @@ function hostPrimaryIPv4() {
   } catch (e) { /* ignore */ }
   return '127.0.0.1';
 }
-let _volCache = { at: 0, data: null };
+let _volCache = new Map();
 const VOL_TTL_MS = 30000;
-function computeVolumes() {
-  const root = CONFIG.projectRoot || 'C:\\storage';
+async function computeVolumes(appName) {
+  const root = await resolveProjectRootForApp(appName) || CONFIG.projectRoot || 'C:\\storage';
+  await ensureSmbSessionForPath(root);
   const shareHost = CONFIG.smbHost || hostPrimaryIPv4();
   const shareName = CONFIG.smbShare || 'storage';
+  const workflowNames = new Set((await listWorkflowsRaw(appName)).map((w) => String(w && w.name || '').trim()).filter(Boolean));
   let entries;
   try {
     entries = fs.readdirSync(root, { withFileTypes: true });
@@ -2873,6 +3075,8 @@ function computeVolumes() {
   for (const ent of entries) {
     if (!ent.isDirectory()) continue;
     const name = ent.name;
+    // Do not hard-filter by workflow names. Folder names in storage can differ
+    // from runtime workflow identifiers, and strict filtering causes false "No data".
     const mountPath = `/home/site/wwwroot/${name}`;
     if (seen.has(mountPath)) continue; // unique per mount path
     seen.add(mountPath);
@@ -2892,11 +3096,13 @@ function computeVolumes() {
   rows.sort((a, b) => a.Volume.localeCompare(b.Volume));
   return rows;
 }
-function getVolumes() {
+async function getVolumes(appName) {
+  const cacheKey = normalizeAppName(appName);
   const now = Date.now();
-  if (_volCache.data && (now - _volCache.at) < VOL_TTL_MS) return _volCache.data;
-  const data = computeVolumes();
-  _volCache = { at: now, data };
+  const cached = _volCache.get(cacheKey);
+  if (cached && (now - cached.at) < VOL_TTL_MS) return cached.data;
+  const data = await computeVolumes(appName);
+  _volCache.set(cacheKey, { at: now, data });
   return data;
 }
 
@@ -2948,22 +3154,271 @@ function sendJson(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+function redactPayload(value) {
+  if (Array.isArray(value)) return value.map(redactPayload);
+  if (!value || typeof value !== 'object') return value;
+  const redacted = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (/^(authorization|proxy-authorization|cookie|set-cookie|x-functions-key|x-api-key|api[-_]?key|access[-_]?token|client[-_]?secret|password)$/i.test(key)) {
+      redacted[key] = '[REDACTED]';
+    } else {
+      redacted[key] = redactPayload(item);
+    }
+  }
+  return redacted;
+}
+
 function normalizeAppName(appName) {
   const value = String(appName || '').trim();
-  if (
-    value === '*' ||
-    value === '$__all' ||
-    value.toLowerCase() === 'all' ||
-    (value.startsWith('${') && value.endsWith('}')) ||
-    value === '$app'
-  ) {
-    return CONFIG.appName;
-  }
   return value || CONFIG.appName;
+}
+
+async function resolveProjectRootForApp(appName) {
+  const selected = normalizeAppName(appName);
+  const baseRoot = String(CONFIG.projectRoot || '').trim();
+  if (!baseRoot || isAllAppsValue(selected)) return baseRoot;
+  if (PROJECT_ROOT_BY_APP.has(selected)) {
+    const cached = PROJECT_ROOT_BY_APP.get(selected);
+    if (cached && cached !== baseRoot) return cached;
+  }
+
+  try {
+    await ensureSmbSessionForPath(baseRoot);
+    const entries = fs.readdirSync(baseRoot, { withFileTypes: true }).filter((e) => e && e.isDirectory && e.isDirectory());
+    for (const entry of entries) {
+      const candidateRoot = path.join(baseRoot, entry.name);
+      const hostJson = path.join(candidateRoot, 'Functions', 'Secrets', 'host.json');
+      if (!fs.existsSync(hostJson)) continue;
+      const payload = tryParseJson(fs.readFileSync(hostJson, 'utf8')) || {};
+      const hostName = String(payload.hostName || '').toLowerCase();
+      const selectedLower = selected.toLowerCase();
+      if (hostName.startsWith(`${selectedLower}.`) || hostName.includes(selectedLower)) {
+        PROJECT_ROOT_BY_APP.set(selected, candidateRoot);
+        return candidateRoot;
+      }
+    }
+  } catch {
+    // fall through to default root
+  }
+
+  return baseRoot;
+}
+
+function extractMasterKeyFromHostSecrets(payload) {
+  if (!payload || typeof payload !== 'object') return '';
+  if (typeof payload.masterKey === 'string') return payload.masterKey.trim();
+  if (payload.masterKey && typeof payload.masterKey.value === 'string') return payload.masterKey.value.trim();
+  return '';
+}
+
+async function resolveMasterKeyForApp(appName) {
+  const selected = normalizeAppName(appName);
+  if (isAllAppsValue(selected)) return String(CONFIG.masterKey || '');
+  if (MASTER_KEY_BY_APP.has(selected)) return MASTER_KEY_BY_APP.get(selected);
+  let key = String(CONFIG.masterKey || '');
+  try {
+    const root = await resolveProjectRootForApp(selected);
+    const hostJson = root ? path.join(root, 'Functions', 'Secrets', 'host.json') : '';
+    if (hostJson && fs.existsSync(hostJson)) {
+      const payload = tryParseJson(fs.readFileSync(hostJson, 'utf8')) || {};
+      const resolved = extractMasterKeyFromHostSecrets(payload);
+      if (resolved) key = resolved;
+    }
+  } catch {
+    // keep default key
+  }
+  MASTER_KEY_BY_APP.set(selected, key);
+  return key;
 }
 
 function getRequestedApp(url) {
   return normalizeAppName(url.searchParams.get('app'));
+}
+
+function isAllAppsValue(appName) {
+  const value = String(appName || '').trim().toLowerCase();
+  return value === '*' || value === '$__all' || value === 'all';
+}
+
+function getLocalPortFromBaseUrl(baseUrl) {
+  try {
+    const u = new URL(baseUrl);
+    if (u.hostname !== '127.0.0.1' && u.hostname !== 'localhost') return null;
+    return Number(u.port || (u.protocol === 'https:' ? 443 : 80));
+  } catch {
+    return null;
+  }
+}
+
+async function listApps() {
+  const names = new Set(Array.isArray(APP_LIST_CACHE) ? APP_LIST_CACHE : []);
+  if (CONFIG.appName) names.add(CONFIG.appName);
+  if (!CONFIG.namespace) {
+    return Array.from(names).sort((a, b) => a.localeCompare(b)).map((name) => ({
+      name,
+      text: name,
+      value: name,
+      __text: name,
+      __value: name
+    }));
+  }
+
+  let discovered = false;
+  let podItems = [];
+  try {
+    const out = await runOc(['-n', CONFIG.namespace, 'get', 'pods', '-o', 'json']);
+    const payload = tryParseJson(out) || {};
+    podItems = Array.isArray(payload.items) ? payload.items : [];
+  } catch {}
+
+  for (const item of podItems) {
+    const meta = item.metadata || {};
+    const labels = meta.labels || {};
+    const appLabel = String(labels['containerapps.io/app-name'] || '').trim();
+    if (appLabel) {
+      names.add(appLabel);
+      discovered = true;
+    }
+    const revisionName = String(labels['containerapps.io/revision-name'] || '').trim();
+    const podName = String(meta.name || '').trim();
+    const inferred = (
+      revisionName.match(/^(.+?)--\d{6,}(?:-|$)/) ||
+      podName.match(/^(.+?)--\d{6,}(?:-|$)/)
+    );
+    if (inferred && inferred[1]) {
+      names.add(inferred[1]);
+      discovered = true;
+    }
+  }
+
+  // Also discover app names from ContainerApp resources so app refresh remains
+  // stable during pod rollovers or temporary pod-list failures.
+  try {
+    const out = await runOc(['-n', CONFIG.namespace, 'get', 'containerapp', '-o', 'json']);
+    const payload = tryParseJson(out) || {};
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    for (const item of items) {
+      const appName = String(item && item.metadata && item.metadata.name || '').trim();
+      if (appName) {
+        names.add(appName);
+        discovered = true;
+      }
+    }
+  } catch {}
+
+  if (discovered && names.size > 0) {
+    APP_LIST_CACHE = Array.from(names);
+  } else if (APP_LIST_CACHE.length > 0) {
+    for (const appName of APP_LIST_CACHE) names.add(appName);
+  }
+
+  return Array.from(names).sort((a, b) => a.localeCompare(b)).map((name) => ({
+    name,
+    text: name,
+    value: name,
+    __text: name,
+    __value: name
+  }));
+}
+
+function waitForPortConnectable(port, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve) => {
+    const attempt = () => {
+      const socket = net.createConnection({ host: '127.0.0.1', port });
+      const finish = (ok) => {
+        socket.destroy();
+        if (ok) {
+          resolve(true);
+          return;
+        }
+        if (Date.now() >= deadline) {
+          resolve(false);
+          return;
+        }
+        setTimeout(attempt, 250);
+      };
+      socket.once('connect', () => finish(true));
+      socket.once('error', () => finish(false));
+      socket.setTimeout(1000, () => finish(false));
+    };
+    attempt();
+  });
+}
+
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.unref();
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      server.close(() => resolve(address.port));
+    });
+  });
+}
+
+async function getAppPod(appName) {
+  if (isAllAppsValue(appName)) {
+    throw new Error("App '*' is aggregate mode; select a specific app for pod-level operations.");
+  }
+  const out = await runOc(['-n', CONFIG.namespace, 'get', 'pods', '-l', `containerapps.io/app-name=${appName}`, '-o', 'json']);
+  const payload = tryParseJson(out) || {};
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  if (!items.length) {
+    throw new Error(`No pods found for app '${appName}' in namespace '${CONFIG.namespace}'.`);
+  }
+  const running = items.find((item) => (item.status && item.status.phase) === 'Running') || items[0];
+  const podName = (running.metadata && running.metadata.name) || '';
+  if (!podName) {
+    throw new Error(`Unable to resolve a pod for app '${appName}'.`);
+  }
+  return podName;
+}
+
+async function ensureAppBaseUrl(appName) {
+  const selectedApp = normalizeAppName(appName);
+  if (isAllAppsValue(selectedApp)) {
+    return CONFIG.logicAppBase;
+  }
+  if (selectedApp === CONFIG.appName) {
+    const configuredPort = getLocalPortFromBaseUrl(CONFIG.logicAppBase);
+    if (!configuredPort) return CONFIG.logicAppBase;
+    if (await waitForPortConnectable(configuredPort, 500)) return CONFIG.logicAppBase;
+  }
+
+  const cached = APP_PORTFWD_CACHE.get(selectedApp);
+  if (cached && cached.baseUrl && cached.child && !cached.child.killed && cached.child.exitCode === null) {
+    return cached.baseUrl;
+  }
+
+  const podName = await getAppPod(selectedApp);
+  const localPort = await getFreePort();
+  const env = { ...process.env };
+  if (CONFIG.kubeconfigPath) env.KUBECONFIG = CONFIG.kubeconfigPath;
+  const args = [];
+  if (CONFIG.kubeContext) args.push('--context', CONFIG.kubeContext);
+  args.push('-n', CONFIG.namespace, 'port-forward', `pod/${podName}`, `${localPort}:80`, '--address', '127.0.0.1');
+  const child = spawn(CONFIG.ocPath, args, { env, stdio: 'ignore' });
+  const baseUrl = `http://127.0.0.1:${localPort}`;
+  APP_PORTFWD_CACHE.set(selectedApp, { baseUrl, port: localPort, podName, child, startedAt: Date.now() });
+  child.on('exit', () => {
+    const current = APP_PORTFWD_CACHE.get(selectedApp);
+    if (current && current.child === child) {
+      APP_PORTFWD_CACHE.delete(selectedApp);
+    }
+  });
+  child.on('error', () => {
+    const current = APP_PORTFWD_CACHE.get(selectedApp);
+    if (current && current.child === child) {
+      APP_PORTFWD_CACHE.delete(selectedApp);
+    }
+  });
+  const ready = await waitForPortConnectable(localPort);
+  if (!ready) {
+    throw new Error(`Port-forward for app '${selectedApp}' did not become ready on ${baseUrl}.`);
+  }
+  return baseUrl;
 }
 
 function openWorkflowInVSCode(workflow) {
@@ -2997,41 +3452,23 @@ function openWorkflowInVSCode(workflow) {
   }
 }
 
-function makeRequest(method, urlOrPath, body) {
-  return new Promise((resolve, reject) => {
-    const target = /^https?:\/\//i.test(urlOrPath) ? new URL(urlOrPath) : new URL(urlOrPath, CONFIG.logicAppBase);
-    const transport = target.protocol === 'https:' ? https : http;
-    const bodyStr = body === undefined || body === null ? '' : JSON.stringify(body);
-    const req = transport.request({
-      protocol: target.protocol,
-      hostname: target.hostname,
-      port: target.port || (target.protocol === 'https:' ? 443 : 80),
-      path: target.pathname + target.search,
-      method,
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(bodyStr)
-      },
-      timeout: 15000,
-      rejectUnauthorized: false
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => resolve({ status: res.statusCode, body: data, json: tryParseJson(data) }));
+async function makeRequest(method, urlOrPath, body, appName, options) {
+  if (!makeRequest.client) {
+    const { createWorkflowRuntimeClient } = require('./workflow-runtime-client');
+    makeRequest.client = createWorkflowRuntimeClient(CONFIG, {
+      runOc,
+      getBaseUrl: app => typeof ensureAppBaseUrl === 'function' ? ensureAppBaseUrl(app) : CONFIG.logicAppBase,
+      getMasterKey: app => typeof resolveMasterKeyForApp === 'function' ? resolveMasterKeyForApp(app) : CONFIG.masterKey
     });
-    req.on('timeout', () => { req.destroy(); reject(new Error('Request timeout')); });
-    req.on('error', reject);
-    if (bodyStr) req.write(bodyStr);
-    req.end();
-  });
+  }
+  return makeRequest.client.request(method, urlOrPath, body, appName, options);
 }
 
-async function makeRequestWithRetry(method, urlOrPath, body, attempts = 4) {
+async function makeRequestWithRetry(method, urlOrPath, body, attempts = 4, appName) {
   let lastErr;
   for (let i = 0; i < attempts; i++) {
     try {
-      const result = await makeRequest(method, urlOrPath, body);
+      const result = await makeRequest(method, urlOrPath, body, appName);
       if (result.status >= 500) {
         lastErr = new Error(`Upstream returned ${result.status}`);
       } else {
@@ -3047,17 +3484,61 @@ async function makeRequestWithRetry(method, urlOrPath, body, attempts = 4) {
 
 function managementPath(path) {
   const separator = path.includes('?') ? '&' : '?';
-  return `${path}${separator}api-version=${encodeURIComponent(CONFIG.apiVersion)}&code=${encodeURIComponent(CONFIG.masterKey)}`;
+  const code = CONFIG.masterKey ? `&code=${encodeURIComponent(CONFIG.masterKey)}` : '';
+  return `${path}${separator}api-version=${encodeURIComponent(CONFIG.apiVersion)}${code}`;
 }
 
-async function getWorkflowDetail(name) {
-  const result = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(name)}`));
+function createPlatformToken() {
+  if (!CONFIG.platformAuthKey || !CONFIG.platformSiteName) return '';
+  const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const now = Math.floor(Date.now() / 1000);
+  const header = encode({ alg: 'HS256', typ: 'JWT' });
+  const payload = encode({
+    aud: `https://${CONFIG.platformSiteName}.azurewebsites.net`,
+    iss: 'https://appservice.core.azurewebsites.net',
+    nbf: now - 30,
+    exp: now + 300
+  });
+  const unsigned = `${header}.${payload}`;
+  const rawKey = String(CONFIG.platformAuthKey).trim();
+  const key = /^[0-9a-f]{64}$/i.test(rawKey)
+    ? Buffer.from(rawKey, 'hex')
+    : Buffer.from(rawKey, 'base64');
+  const signature = crypto.createHmac('sha256', key).update(unsigned).digest('base64url');
+  return `${unsigned}.${signature}`;
+}
+
+async function getWorkflowDetail(name, appName) {
+  const result = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(name)}`), undefined, appName);
   if (result.status >= 400) throw new Error(result.body || `Workflow detail lookup failed (${result.status})`);
   return result.json || {};
 }
 
-async function getWorkflowTriggerName(name) {
-  const detail = await getWorkflowDetail(name);
+function normalizeWorkflowKey(name) {
+  return String(name || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+async function resolveWorkflowName(inputName, appName) {
+  const requested = String(inputName || '').trim();
+  if (!requested) throw new Error('Workflow name is required.');
+  let rows = [];
+  try { rows = await listWorkflowsRaw(appName); } catch { rows = []; }
+  if (!rows.length) return requested;
+  const names = rows.map((r) => String(r && r.name || '').trim()).filter(Boolean);
+  const exact = names.find((n) => n === requested);
+  if (exact) return exact;
+  const ci = names.find((n) => n.toLowerCase() === requested.toLowerCase());
+  if (ci) return ci;
+  const key = normalizeWorkflowKey(requested);
+  if (key) {
+    const normalized = names.find((n) => normalizeWorkflowKey(n) === key);
+    if (normalized) return normalized;
+  }
+  return requested;
+}
+
+async function getWorkflowTriggerName(name, appName) {
+  const detail = await getWorkflowDetail(name, appName);
   const triggers = detail.triggers || (detail.properties && detail.properties.triggers) || {};
   const names = Object.keys(triggers);
   if (!names.length) throw new Error(`No trigger definitions found for workflow '${name}'`);
@@ -3082,9 +3563,9 @@ function findAppContainerIndex(containers) {
 // Enable/disable a Standard workflow via the control plane: patch the
 // `Workflows.<name>.FlowState` app setting on the ContainerApp resource (oc).
 // This is the ARM-equivalent operation; it triggers a new revision rollover.
-async function setFlowState(name, state) {
-  if (!CONFIG.namespace || !CONFIG.appName) throw new Error('ContainerApp namespace/appName not configured');
-  const out = await runOc(['-n', CONFIG.namespace, 'get', 'containerapp', CONFIG.appName, '-o', 'json']);
+async function setFlowState(name, state, appName) {
+  if (!CONFIG.namespace || !normalizeAppName(appName)) throw new Error('ContainerApp namespace/appName not configured');
+  const out = await runOc(['-n', CONFIG.namespace, 'get', 'containerapp', normalizeAppName(appName), '-o', 'json']);
   const appJson = tryParseJson(out) || {};
   const containers = (appJson.spec && appJson.spec.template && appJson.spec.template.containers) || [];
   const cIdx = findAppContainerIndex(containers);
@@ -3094,7 +3575,7 @@ async function setFlowState(name, state) {
   const patch = eIdx >= 0
     ? [{ op: 'replace', path: `/spec/template/containers/${cIdx}/env/${eIdx}/value`, value: state }]
     : [{ op: 'add', path: `/spec/template/containers/${cIdx}/env/-`, value: { name: key, value: state } }];
-  await runOc(['-n', CONFIG.namespace, 'patch', 'containerapp', CONFIG.appName, '--type=json', '-p', JSON.stringify(patch)]);
+  await runOc(['-n', CONFIG.namespace, 'patch', 'containerapp', normalizeAppName(appName), '--type=json', '-p', JSON.stringify(patch)]);
   return { workflow: name, state, revisionRollover: true };
 }
 
@@ -3108,14 +3589,25 @@ function normalizeWorkflowEntryFromDefinition(name, payload) {
   return { name, kind, triggers, isDisabled: false, health: { state: 'Unknown' } };
 }
 
-async function listWorkflowsFromVfs() {
-  const dirResult = await makeRequestWithRetry('GET', managementPath('/admin/vfs/home/site/wwwroot/'), undefined, 2);
+async function listWorkflowsFromVfs(appName) {
+  const dirResult = await makeRequestWithRetry('GET', managementPath('/admin/vfs/home/site/wwwroot/'), undefined, 2, appName);
   const entries = Array.isArray(dirResult.json) ? dirResult.json : [];
-  const names = [];
+  let names = [];
   for (const entry of entries) {
     const raw = String((entry && entry.name) || '').trim().replace(/[\\/]+$/, '');
     if (!raw || raw.startsWith('.')) continue;
     names.push(raw);
+  }
+  try {
+    const root = await resolveProjectRootForApp(appName);
+    if (root) {
+      const scoped = new Set(findWorkflowNamesOnDisk(root));
+      if (scoped.size > 0) {
+        names = names.filter((n) => scoped.has(n));
+      }
+    }
+  } catch {
+    // keep VFS-discovered names when local scope resolution is unavailable
   }
   if (!names.length) return [];
 
@@ -3125,7 +3617,8 @@ async function listWorkflowsFromVfs() {
         'GET',
         managementPath(`/admin/vfs/home/site/wwwroot/${encodeURIComponent(name)}/workflow.json`),
         undefined,
-        2
+        2,
+        appName
       );
       if (result.status >= 400 || !result.json) return null;
       return normalizeWorkflowEntryFromDefinition(name, result.json);
@@ -3137,31 +3630,56 @@ async function listWorkflowsFromVfs() {
 }
 
 function findWorkflowNamesOnDisk(root) {
-  let entries = [];
-  try {
-    entries = fs.readdirSync(root, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-  return entries
-    .filter((e) => e && e.isDirectory && e.isDirectory())
-    .map((e) => e.name)
-    .filter((name) => {
+  const names = new Set();
+  const stack = [root];
+  while (stack.length) {
+    const dir = stack.pop();
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    for (const entry of entries) {
+      if (!entry || !entry.isDirectory || !entry.isDirectory()) continue;
+      const full = path.join(dir, entry.name);
       try {
-        return fs.existsSync(path.join(root, name, 'workflow.json'));
+        if (fs.existsSync(path.join(full, 'workflow.json'))) names.add(entry.name);
+        else stack.push(full);
       } catch {
-        return false;
+        // Continue scanning accessible workflow roots.
       }
-    });
+    }
+  }
+  return Array.from(names);
 }
 
-async function listWorkflowsFromMountedStorage() {
-  const root = CONFIG.projectRoot;
+async function listWorkflowsFromMountedStorage(appName) {
+  const selected = normalizeAppName(appName);
+  let root = await resolveProjectRootForApp(appName);
+  const baseRoot = String(CONFIG.projectRoot || '').trim();
+  if (root === baseRoot && root) {
+    try {
+      const entries = fs.readdirSync(baseRoot, { withFileTypes: true }).filter((e) => e && e.isDirectory && e.isDirectory());
+      for (const entry of entries) {
+        const candidateRoot = path.join(baseRoot, entry.name);
+        const hostJson = path.join(candidateRoot, 'Functions', 'Secrets', 'host.json');
+        if (!fs.existsSync(hostJson)) continue;
+        const payload = tryParseJson(fs.readFileSync(hostJson, 'utf8')) || {};
+        const hostName = String(payload.hostName || '').toLowerCase();
+        const selectedLower = selected.toLowerCase();
+        if (hostName.startsWith(`${selectedLower}.`) || hostName.includes(selectedLower)) {
+          root = candidateRoot;
+          break;
+        }
+      }
+    } catch {
+      // keep resolved root as-is
+    }
+  }
   if (!root) return [];
   await ensureSmbSessionForPath(root);
   const names = findWorkflowNamesOnDisk(root);
   if (!names.length) return [];
 
+  // Prefer app-scoped runtime detail so workflows are correctly attributed to the
+  // selected app when management list API is flaky.
   const scoped = [];
   for (const name of names) {
     try {
@@ -3169,7 +3687,8 @@ async function listWorkflowsFromMountedStorage() {
         'GET',
         managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(name)}`),
         undefined,
-        1
+        1,
+        appName
       );
       if (detail.status >= 400 || !detail.json) continue;
       scoped.push({ ...(detail.json || {}), name });
@@ -3183,11 +3702,10 @@ async function listWorkflowsFromMountedStorage() {
   for (const name of names) {
     try {
       const wfPath = path.join(root, name, 'workflow.json');
-      let sourcePath = wfPath;
-      if (!fs.existsSync(sourcePath)) {
-        sourcePath = null;
+      if (!fs.existsSync(wfPath)) {
+        const hit = [];
         const stack = [root];
-        while (stack.length && !sourcePath) {
+        while (stack.length && !hit.length) {
           const dir = stack.pop();
           let entries = [];
           try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { entries = []; }
@@ -3195,14 +3713,17 @@ async function listWorkflowsFromMountedStorage() {
             const full = path.join(dir, entry.name);
             if (entry.isDirectory()) stack.push(full);
             if (entry.isFile() && entry.name.toLowerCase() === 'workflow.json' && path.basename(path.dirname(full)) === name) {
-              sourcePath = full;
+              hit.push(full);
               break;
             }
           }
         }
-        if (!sourcePath) continue;
+        if (!hit.length) continue;
+        const json = tryParseJson(fs.readFileSync(hit[0], 'utf8')) || {};
+        out.push(normalizeWorkflowEntryFromDefinition(name, json));
+        continue;
       }
-      const json = tryParseJson(fs.readFileSync(sourcePath, 'utf8')) || {};
+      const json = tryParseJson(fs.readFileSync(wfPath, 'utf8')) || {};
       out.push(normalizeWorkflowEntryFromDefinition(name, json));
     } catch {
       // best effort per folder
@@ -3211,21 +3732,55 @@ async function listWorkflowsFromMountedStorage() {
   return out;
 }
 
-async function listWorkflowsRaw() {
+async function listWorkflowsWithFallback(appName) {
+  const selected = normalizeAppName(appName);
+  let rows = [];
   try {
-    const result = await makeRequestWithRetry('GET', managementPath('/runtime/webhooks/workflow/api/management/workflows'), undefined, 3);
-    const rows = (result.json && result.json.value) || (Array.isArray(result.json) ? result.json : []);
-    if (rows.length) return rows;
-  } catch {}
+    const result = await makeRequestWithRetry(
+      'GET',
+      managementPath('/runtime/webhooks/workflow/api/management/workflows'),
+      undefined,
+      3,
+      selected
+    );
+    rows = (result.json && result.json.value) || (Array.isArray(result.json) ? result.json : []);
+  } catch {
+    rows = [];
+  }
+  if (rows.length) {
+    return rows.map((w) => ({ ...w, __appName: selected }));
+  }
+
   try {
-    const rows = await listWorkflowsFromMountedStorage();
-    if (rows.length) return rows;
+    const diskRows = await listWorkflowsFromMountedStorage(selected);
+    if (diskRows.length) return diskRows.map((w) => ({ ...w, __appName: selected }));
   } catch {}
+
   try {
-    const rows = await listWorkflowsFromVfs();
-    if (rows.length) return rows;
+    const vfsRows = await listWorkflowsFromVfs(selected);
+    if (vfsRows.length) return vfsRows.map((w) => ({ ...w, __appName: selected }));
   } catch {}
+
   return [];
+}
+
+async function listWorkflowsRaw(appName) {
+  if (!isAllAppsValue(appName)) {
+    return listWorkflowsWithFallback(appName);
+  }
+
+  const apps = await listApps();
+  const appNames = apps.map((a) => String(a && a.name || '').trim()).filter(Boolean);
+  const merged = [];
+  for (const app of appNames) {
+    try {
+      const rows = await listWorkflowsWithFallback(app);
+      for (const w of rows) merged.push(w);
+    } catch {
+      // best effort: one app failing should not zero out aggregated results
+    }
+  }
+  return merged;
 }
 
 // Roll up run stats for the last 24h from the management runs API.
@@ -3266,14 +3821,14 @@ function parseWindowMs(w) {
 
 // Page a single workflow's runs newer than sinceIso. Server honours
 // "$filter=startTime ge <iso>"; we follow nextLink defensively with a cap.
-async function fetchRunsInWindow(name, sinceIso, maxPages) {
+async function fetchRunsInWindow(name, sinceIso, maxPages, appName) {
   const runs = [];
   let apiPath = managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(name)}/runs`)
     + `&$top=250&$filter=${encodeURIComponent('startTime ge ' + sinceIso)}`;
   let pages = 0;
   while (apiPath && pages < maxPages) {
     let result;
-    try { result = await makeRequestWithRetry('GET', apiPath, undefined, 2); } catch { break; }
+    try { result = await makeRequestWithRetry('GET', apiPath, undefined, 2, appName); } catch { break; }
     if (!result.json) break;
     const val = result.json.value || [];
     for (const r of val) runs.push(r);
@@ -3289,11 +3844,11 @@ const KPI_CACHE = new Map(); // windowMs -> { ts, data, inFlight }
 const KPI_CACHE_TTL_MS = 25000;       // considered fresh for 25s
 const KPI_CACHE_MAX_AGE_MS = 600000;  // serve stale up to 10 min while refreshing
 
-async function _computeKpiRaw(windowMs) {
+async function _computeKpiRaw(windowMs, appName) {
   const t0 = Date.now();
   const now = Date.now();
   const sinceIso = new Date(now - windowMs).toISOString();
-  const items = await listWorkflowsRaw();
+  const items = await listWorkflowsRaw(appName);
 
   // Bucket the window into ~48 slots for the runs-over-time series.
   const buckets = 48;
@@ -3309,7 +3864,7 @@ async function _computeKpiRaw(windowMs) {
   for (let i = 0; i < items.length; i += CONCURRENCY) {
     const slice = items.slice(i, i + CONCURRENCY);
     const runLists = await Promise.all(slice.map(w =>
-      fetchRunsInWindow(w.name, sinceIso, 40).catch(() => [])
+      fetchRunsInWindow(w.name, sinceIso, 40, w.__appName || appName).catch(() => [])
     ));
     for (const runs of runLists) {
       for (const r of runs) {
@@ -3366,18 +3921,19 @@ async function _computeKpiRaw(windowMs) {
 // Cache wrapper: single-flight + stale-while-revalidate so that the 5 KPI
 // panels (all hitting this at once) never trigger overlapping full scans and
 // Grafana refreshes get an instant (possibly slightly stale) response.
-async function computeKpi(windowMs) {
-  const entry = KPI_CACHE.get(windowMs) || {};
+async function computeKpi(windowMs, appName) {
+  const cacheKey = `${normalizeAppName(appName)}|${windowMs}`;
+  const entry = KPI_CACHE.get(cacheKey) || {};
   const age = entry.ts ? (Date.now() - entry.ts) : Infinity;
 
   if (entry.data && age < KPI_CACHE_TTL_MS) return entry.data;
 
   const refresh = () => {
     if (entry.inFlight) return entry.inFlight;
-    entry.inFlight = _computeKpiRaw(windowMs)
-      .then(data => { entry.data = data; entry.ts = Date.now(); entry.inFlight = null; KPI_CACHE.set(windowMs, entry); return data; })
-      .catch(err => { entry.inFlight = null; KPI_CACHE.set(windowMs, entry); throw err; });
-    KPI_CACHE.set(windowMs, entry);
+    entry.inFlight = _computeKpiRaw(windowMs, appName)
+      .then(data => { entry.data = data; entry.ts = Date.now(); entry.inFlight = null; KPI_CACHE.set(cacheKey, entry); return data; })
+      .catch(err => { entry.inFlight = null; KPI_CACHE.set(cacheKey, entry); throw err; });
+    KPI_CACHE.set(cacheKey, entry);
     return entry.inFlight;
   };
 
@@ -3426,12 +3982,12 @@ async function getInventory(appName) {
   return rows;
 }
 
-async function cancelRunningRuns(name) {
-  const result = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(name)}/runs`) + `&$top=100&$filter=${encodeURIComponent("status eq 'Running'")}`);
+async function cancelRunningRuns(name, appName) {
+  const result = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(name)}/runs`) + `&$top=100&$filter=${encodeURIComponent("status eq 'Running'")}`, undefined, appName);
   const runs = (result.json && result.json.value) || [];
   let canceled = 0;
   for (const run of runs) {
-    const r = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(name)}/runs/${encodeURIComponent(run.name)}/cancel`));
+    const r = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(name)}/runs/${encodeURIComponent(run.name)}/cancel`), undefined, appName);
     if (r.status >= 200 && r.status < 300) canceled++;
   }
   return { workflow: name, canceled, total: runs.length };
@@ -3449,6 +4005,7 @@ body{margin:0;padding:12px;font:13px/1.45 Inter,Segoe UI,Arial,sans-serif;backgr
 .alllink{margin-left:auto;color:var(--link);text-decoration:none;font-size:12px}
 .search{margin-left:14px;flex:0 1 260px;font:inherit;font-size:12px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 10px}
 .search::placeholder{color:var(--muted)}
+.run-filter{width:100%;min-width:110px;font:inherit;font-size:12px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px}
 .bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 12px;background:var(--bar);border-bottom:1px solid var(--border)}
 .selcount{font-size:12px;color:var(--muted);margin-right:6px;min-width:74px}
 .tb{font:inherit;font-size:12px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer}
@@ -3483,6 +4040,10 @@ body.dark .errbox{background:#3a1d1d;color:#f8b4b4;border-color:#5b2626}
 body.dark .hp.ok{color:#4ade80}body.dark .hp.warn{color:#facc15}body.dark .hp.bad{color:#f87171}
 .actions a{color:var(--link);text-decoration:none;margin-right:10px;font-size:12px}
 .actions a:hover{text-decoration:underline}
+.payloadbox{margin:12px 14px;border:1px solid var(--border);border-radius:6px;background:var(--surface);overflow:hidden}
+.payloadhead{display:flex;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);font-weight:600}
+.payloadhead a{margin-left:auto;color:var(--link);text-decoration:none}
+.payloadbox pre{margin:0;padding:10px;max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-word;font:12px/1.45 Consolas,Menlo,monospace}
 #status{display:none;padding:8px 14px;font-size:12px;color:var(--muted);border-top:1px solid var(--border)}
 input[type=checkbox]{width:15px;height:15px;cursor:pointer}
 </style></head><body>
@@ -3551,26 +4112,170 @@ function rowAction(enc,action){var name=decodeURIComponent(enc);var a=ACTIONS[ac
 function editWorkflow(enc){var name=decodeURIComponent(enc);setStatus('Opening '+name+' in VS Code...');api('/api/workflows/'+encodeURIComponent(name)+'/open-vscode',{method:'POST'}).then(function(r){setStatus(r.message||('Opened '+name+' in VS Code.'));}).catch(function(e){setStatus('Edit failed: '+e.message);});return false;}
 function runBadge(st){var c=st==='Succeeded'?'badge-on':(st==='Running'?'badge-run':'badge-off');return '<span class="badge '+c+'">'+esc(st||'-')+'</span>';}
 function fmtDur(p){if(!p.startTime||!p.endTime)return '-';var d=(new Date(p.endTime)-new Date(p.startTime))/1000;return (d>=0?d.toFixed(1):'0.0')+'s';}
-function closeRuns(){var d=document.getElementById('detail');d.style.display='none';d.innerHTML='';return false;}
-function showRuns(enc){var name=decodeURIComponent(enc);var d=document.getElementById('detail');d.style.display='block';d.innerHTML='<div class="head"><div class="title">&#9737; Runs \\u2014 '+esc(name)+'</div><a class="alllink" href="#" onclick="return closeRuns()">Close &#10005;</a></div><div class="rl muted">Loading runs...</div>';d.scrollIntoView({behavior:'smooth',block:'nearest'});api('/api/workflows/'+encodeURIComponent(name)+'/runs?top=100').then(function(res){renderRuns(name,res.value||[]);}).catch(function(e){var m=d.querySelector('.rl');if(m)m.textContent='Error: '+e.message;});return false;}
-function renderRuns(name,runs){var d=document.getElementById('detail');var nEnc=encodeURIComponent(name);var head='<div class="head"><div class="title">&#9737; Runs \\u2014 '+esc(name)+' <span class="muted" style="font-weight:400">('+runs.length+')</span></div><a class="alllink" href="#" onclick="return closeRuns()">Close &#10005;</a></div>';if(!runs.length){d.innerHTML=head+'<div class="rl muted">No runs found.</div>';return;}var h=head+'<table><thead><tr><th>Run ID</th><th>Status</th><th>Start</th><th class="num">Duration</th><th>Error</th><th>Actions</th></tr></thead><tbody>';runs.forEach(function(run){var p=run.properties||{};var start=(p.startTime||'').replace('T',' ').slice(0,19);var err=(p.error&&p.error.message)?p.error.message:'';var rEnc=encodeURIComponent(run.name);h+='<tr><td class="sub"><a href="#" class="rid" onclick="return showRunDetail(\\''+nEnc+'\\',\\''+rEnc+'\\')">'+esc(run.name)+'</a></td><td>'+runBadge(p.status||'')+'</td><td class="sub">'+esc(start)+'</td><td class="num sub">'+fmtDur(p)+'</td><td class="sub muted" style="max-width:280px">'+esc(err)+'</td><td class="actions"><a href="#" onclick="return resubmitRun(\\''+nEnc+'\\',\\''+rEnc+'\\')">Resubmit</a></td></tr>';});h+='</tbody></table>';d.innerHTML=h;}
+var runView=null;
+function stopRunQuery(){if(runView){clearTimeout(runView.timer);if(runView.controller)runView.controller.abort();runView.serial++;}}
+function closeRuns(){stopRunQuery();runView=null;var d=document.getElementById('detail');d.style.display='none';d.innerHTML='';return false;}
+function showRuns(enc){
+  stopRunQuery();
+  var name=decodeURIComponent(enc);
+  runView={name:name,serial:0,previous:[],cursor:null,next:null,loading:false};
+  var d=document.getElementById('detail');d.style.display='block';d.innerHTML='';
+  renderRuns(name,[]);
+  d.scrollIntoView({behavior:'smooth',block:'nearest'});
+  loadRunPage(null,[]);
+  return false;
+}
+function loadRunPage(cursor,previous){
+  if(!runView)return;
+  stopRunQuery();
+  var view=runView;var serial=++view.serial;view.controller=new AbortController();view.loading=true;view.next=null;
+  view.previous=previous;view.cursor=cursor;
+  var query=new URLSearchParams({view:'table',top:'100'});
+  document.getElementById('detail').querySelectorAll('[data-run-filter]').forEach(function(control){if(control.value.trim())query.set(control.getAttribute('data-run-filter'),control.value.trim());});
+  if(cursor)query.set('cursor',cursor);
+  document.getElementById('runFilterCount').textContent='Filtering on server...';
+  document.getElementById('runPrevious').disabled=true;document.getElementById('runNext').disabled=true;
+  document.getElementById('runRows').innerHTML='<tr><td colspan="6" class="rl muted">Loading matching runs...</td></tr>';
+  api('/api/workflows/'+encodeURIComponent(view.name)+'/runs?'+query.toString(),{signal:view.controller.signal}).then(function(result){
+    if(runView!==view||serial!==view.serial)return;
+    view.next=result.nextCursor||null;
+    renderRuns(view.name,result.value||[]);
+  }).catch(function(error){
+    if(runView!==view||serial!==view.serial||error.name==='AbortError')return;
+    document.getElementById('runRows').innerHTML='<tr><td colspan="6" class="rl muted">Error: '+esc(error.message)+'</td></tr>';
+    document.getElementById('runFilterCount').textContent='Server filter query failed';
+  }).finally(function(){
+    if(runView!==view||serial!==view.serial)return;
+    view.loading=false;
+    document.getElementById('runPrevious').disabled=!view.previous.length;
+    document.getElementById('runNext').disabled=!view.next;
+  });
+}
+function applyRunFilters(){
+  if(!runView)return;
+  stopRunQuery();
+  document.getElementById('runPrevious').disabled=true;document.getElementById('runNext').disabled=true;
+  document.getElementById('runFilterCount').textContent='Filtering on server...';
+  runView.timer=setTimeout(function(){loadRunPage(null,[]);},300);
+}
+function clearRunFilters(){
+  document.getElementById('detail').querySelectorAll('[data-run-filter]').forEach(function(control){control.value='';});
+  loadRunPage(null,[]);
+}
+function changeRunPage(direction){
+  if(!runView||runView.loading)return;
+  if(direction>0&&runView.next)loadRunPage(runView.next,runView.previous.concat([runView.cursor]));
+  else if(direction<0&&runView.previous.length)loadRunPage(runView.previous[runView.previous.length-1],runView.previous.slice(0,-1));
+}
+function renderRuns(name,runs){
+  var d=document.getElementById('detail');
+  var nEnc=encodeURIComponent(name);
+  if(!d.querySelector('[data-run-filter]')){
+  var head='<div class="head"><div class="title">&#9737; Runs \\u2014 '+esc(name)+'</div><a class="alllink" href="#" onclick="return closeRuns()">Close &#10005;</a></div>';
+  var statuses=['Succeeded','Failed','Running','Waiting','Cancelled','TimedOut','Skipped','Suspended','Aborted'];
+  var statusOptions=statuses.map(function(status){return '<option value="'+esc(status)+'">'+esc(status)+'</option>';}).join('');
+  var h=head+'<div class="bar"><span id="runFilterCount" class="muted" aria-live="polite"></span><button id="runPrevious" type="button" class="tb" onclick="changeRunPage(-1)" disabled>Previous</button><button id="runNext" type="button" class="tb" onclick="changeRunPage(1)" disabled>Next</button><button type="button" class="tb ghost" style="margin-left:auto" onclick="clearRunFilters()">Clear filters</button></div><div style="overflow-x:auto"><table><thead><tr><th>Run ID</th><th>Status</th><th>Start</th><th class="num">Duration</th><th>Error</th><th>Actions</th></tr><tr>'
+    +'<th><input type="search" class="run-filter" data-run-filter="runId" aria-label="Filter by Run ID" placeholder="Filter Run ID" oninput="applyRunFilters()"></th>'
+    +'<th><select class="run-filter" data-run-filter="status" aria-label="Filter by Status" onchange="applyRunFilters()"><option value="">All statuses</option>'+statusOptions+'</select></th>'
+    +'<th><input type="search" class="run-filter" data-run-filter="start" aria-label="Filter by Start" placeholder="YYYY-MM-DD or time" oninput="applyRunFilters()"></th>'
+    +'<th><input type="search" class="run-filter" data-run-filter="duration" aria-label="Filter by Duration" placeholder="e.g. 1.2s" oninput="applyRunFilters()"></th>'
+    +'<th><input type="search" class="run-filter" data-run-filter="error" aria-label="Filter by Error" placeholder="Filter error" oninput="applyRunFilters()"></th><th></th></tr></thead><tbody id="runRows"></tbody></table></div>';
+  d.innerHTML=h;
+  }
+  var h='';
+  runs.forEach(function(run){var p=run.properties||{};var start=(p.startTime||'').replace('T',' ').slice(0,19);var err=(p.error&&p.error.message)?p.error.message:'';var rEnc=encodeURIComponent(run.name);h+='<tr data-run-row><td class="sub"><a href="#" class="rid" onclick="return showRunDetail(\\''+nEnc+'\\',\\''+rEnc+'\\')">'+esc(run.name)+'</a></td><td>'+runBadge(p.status||'')+'</td><td class="sub">'+esc(start)+'</td><td class="num sub">'+fmtDur(p)+'</td><td class="sub muted" style="max-width:280px">'+esc(err)+'</td><td class="actions"><a href="#" onclick="return resubmitRun(\\''+nEnc+'\\',\\''+rEnc+'\\')">Resubmit</a></td></tr>';});
+  if(!runs.length)h='<tr id="runFilterEmpty"><td colspan="6" class="rl muted">No runs match these filters.</td></tr>';
+  document.getElementById('runRows').innerHTML=h;
+  document.getElementById('runFilterCount').textContent='Showing '+runs.length+' server-filtered runs (page '+(runView.previous.length+1)+')';
+}
 function resubmitRun(nEnc,rEnc){var name=decodeURIComponent(nEnc);var rid=decodeURIComponent(rEnc);setStatus('Resubmitting '+rid+'...');api('/api/workflows/'+encodeURIComponent(name)+'/runs/'+encodeURIComponent(rid)+'/resubmit',{method:'POST'}).then(function(){setStatus('Resubmitted '+rid+'. Reloading...');setTimeout(function(){showRuns(encodeURIComponent(name));},1500);}).catch(function(e){setStatus('Error: '+e.message);});return false;}
 function kv(k,v){return '<div class="kv"><span class="kvk">'+esc(k)+'</span><span class="kvv">'+v+'</span></div>';}
-function showRunDetail(nEnc,rEnc){var name=decodeURIComponent(nEnc);var rid=decodeURIComponent(rEnc);var d=document.getElementById('detail');d.style.display='block';d.innerHTML='<div class="head"><div class="title">&#9737; Run detail</div><a class="alllink" href="#" onclick="return showRuns(\\''+nEnc+'\\')">&#8592; Back to runs</a></div><div class="rl muted">Loading run '+esc(rid)+'...</div>';d.scrollIntoView({behavior:'smooth',block:'nearest'});api('/api/workflows/'+encodeURIComponent(name)+'/runs/'+encodeURIComponent(rid)).then(function(res){renderRunDetail(nEnc,rid,res);}).catch(function(e){var m=d.querySelector('.rl');if(m)m.textContent='Error: '+e.message;});return false;}
+function showRunDetail(nEnc,rEnc){stopRunQuery();var name=decodeURIComponent(nEnc);var rid=decodeURIComponent(rEnc);var d=document.getElementById('detail');d.style.display='block';d.innerHTML='<div class="head"><div class="title">&#9737; Run detail</div><a class="alllink" href="#" onclick="return showRuns(\\''+nEnc+'\\')">&#8592; Back to runs</a></div><div class="rl muted">Loading run '+esc(rid)+'...</div>';d.scrollIntoView({behavior:'smooth',block:'nearest'});api('/api/workflows/'+encodeURIComponent(name)+'/runs/'+encodeURIComponent(rid)).then(function(res){renderRunDetail(nEnc,rid,res);}).catch(function(e){var m=d.querySelector('.rl');if(m)m.textContent='Error: '+e.message;});return false;}
+function showActionPayload(nEnc,rid,aEnc,direction){var box=document.getElementById('actionPayload');var name=decodeURIComponent(nEnc);var action=decodeURIComponent(aEnc);box.style.display='block';box.innerHTML='<div class="payloadhead">'+esc(action)+' '+esc(direction)+'<a href="#" onclick="this.parentNode.parentNode.style.display=\\'none\\';return false;">Close &#10005;</a></div><pre>Loading...</pre>';api('/api/workflows/'+encodeURIComponent(name)+'/runs/'+encodeURIComponent(rid)+'/actions/'+encodeURIComponent(action)+'/content/'+direction).then(function(res){var content=res.content;var text=typeof content==='string'?content:JSON.stringify(content,null,2);box.querySelector('pre').textContent=text||'(empty)';}).catch(function(e){box.querySelector('pre').textContent='Error: '+e.message;});return false;}
 function renderRunDetail(nEnc,rid,res){var d=document.getElementById('detail');var run=res.run||{};var p=run.properties||{};var actions=res.actions||[];var err=(p.error&&p.error.message)?p.error.message:'';var ctid=(p.correlation&&p.correlation.clientTrackingId)?p.correlation.clientTrackingId:'';var start=(p.startTime||'').replace('T',' ').slice(0,19);var end=(p.endTime||'').replace('T',' ').slice(0,19);var trig=(p.trigger&&p.trigger.name)?p.trigger.name:'';
   var h='<div class="head"><div class="title">&#9737; Run detail <span class="muted" style="font-weight:400">'+esc(rid)+'</span></div><a class="alllink" href="#" onclick="return showRuns(\\''+nEnc+'\\')">&#8592; Back to runs</a></div>';
   h+='<div class="rl"><div class="kvgrid">'+kv('Status',runBadge(p.status||''))+kv('Start',esc(start)||'-')+kv('End',esc(end)||'-')+kv('Duration',fmtDur(p))+kv('Code',esc(p.code||'-'))+kv('Trigger',esc(trig||'-'))+kv('Tracking ID',esc(ctid||'-'))+'</div>';
   if(err)h+='<div class="errbox">'+esc(err)+'</div>';
   h+='</div>';
-  h+='<table><thead><tr><th>Action</th><th>Status</th><th>Start</th><th class="num">Duration</th><th>Code</th><th>Error</th></tr></thead><tbody>';
-  if(!actions.length){h+='<tr><td colspan="6" class="muted rl">No action-level details available for this run.</td></tr>';}
-  actions.forEach(function(a){var ap=a.properties||{};var aerr=(ap.error&&ap.error.message)?ap.error.message:'';var as=(ap.startTime||'').replace('T',' ').slice(0,19);h+='<tr><td class="sub">'+esc(a.name)+'</td><td>'+runBadge(ap.status||'')+'</td><td class="sub">'+esc(as)+'</td><td class="num sub">'+fmtDur(ap)+'</td><td class="sub">'+esc(ap.code||'-')+'</td><td class="sub muted" style="max-width:260px">'+esc(aerr)+'</td></tr>';});
-  h+='</tbody></table>';
+  h+='<table><thead><tr><th>Action</th><th>Status</th><th>Start</th><th class="num">Duration</th><th>Code</th><th>Error</th><th>Content</th></tr></thead><tbody>';
+  if(!actions.length){h+='<tr><td colspan="7" class="muted rl">No action-level details available for this run.</td></tr>';}
+  actions.forEach(function(a){var ap=a.properties||{};var aerr=(ap.error&&ap.error.message)?ap.error.message:'';var as=(ap.startTime||'').replace('T',' ').slice(0,19);var aEnc=encodeURIComponent(a.name);var links='<span class="actions">'+(ap.inputsLink?'<a href="#" onclick="return showActionPayload(\\''+nEnc+'\\',\\''+encodeURIComponent(rid)+'\\',\\''+aEnc+'\\',\\'inputs\\')">Inputs</a>':'')+(ap.outputsLink?'<a href="#" onclick="return showActionPayload(\\''+nEnc+'\\',\\''+encodeURIComponent(rid)+'\\',\\''+aEnc+'\\',\\'outputs\\')">Outputs</a>':'')+'</span>';h+='<tr><td class="sub">'+esc(a.name)+'</td><td>'+runBadge(ap.status||'')+'</td><td class="sub">'+esc(as)+'</td><td class="num sub">'+fmtDur(ap)+'</td><td class="sub">'+esc(ap.code||'-')+'</td><td class="sub muted" style="max-width:260px">'+esc(aerr)+'</td><td>'+links+'</td></tr>';});
+  h+='</tbody></table><div id="actionPayload" class="payloadbox" style="display:none"></div>';
   d.innerHTML=h;}
 document.getElementById('selall').addEventListener('change',function(){toggleAll(this);});
 load();
 setInterval(load,60000);
 </script></body></html>`;
+
+const APP_SWITCHER_HTML = `<!DOCTYPE html>
+<html><head><meta charset="utf-8" /><title>App Switcher</title><style>
+*{box-sizing:border-box}
+body{margin:0;padding:10px;font:13px/1.45 Inter,Segoe UI,Arial,sans-serif;background:#f4f5f5;color:#1f1f1f}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+label{font-weight:600}
+select,button{font:inherit;border:1px solid #dfe2e5;border-radius:6px;padding:6px 10px}
+button{background:#3871dc;color:#fff;border:none;cursor:pointer}
+.muted{color:#6e6e78;font-size:12px}
+</style></head><body>
+<div class="row">
+  <label for="app">App</label>
+  <select id="app"></select>
+  <button id="open">Open Dashboard</button>
+  <span id="msg" class="muted"></span>
+</div>
+<script>
+const appEl = document.getElementById('app');
+const msgEl = document.getElementById('msg');
+const openBtn = document.getElementById('open');
+function esc(s){return String(s==null?'':s);}
+function buildDashboardUrl(app){
+  const u = new URL('http://localhost:3000/d/logicapps-monitor/logic-apps-workflow-hub');
+  u.searchParams.set('orgId','1');
+  u.searchParams.set('from','now-24h');
+  u.searchParams.set('to','now');
+  u.searchParams.set('timezone','browser');
+  u.searchParams.set('var-app', app || '*');
+  u.searchParams.set('var-workflow', '$__all');
+  u.searchParams.set('refresh','30s');
+  u.searchParams.set('dtab','Overview & Health');
+  return u.toString();
+}
+function goToDashboard(){
+  const url = buildDashboardUrl(appEl.value);
+  try {
+    if (window.top && window.top !== window) {
+      window.top.location.href = url;
+      return;
+    }
+  } catch (_) {}
+  window.location.href = url;
+}
+openBtn.addEventListener('click', goToDashboard);
+appEl.addEventListener('change', goToDashboard);
+fetch('/api/apps')
+  .then(r => r.json())
+  .then(d => {
+    const items = Array.isArray(d.value) ? d.value : [];
+    appEl.innerHTML = '';
+    const allOpt = document.createElement('option');
+    allOpt.value = '*'; allOpt.textContent = 'All';
+    appEl.appendChild(allOpt);
+    items.forEach(it => {
+      const name = esc(it && (it.name || it.value || it.text));
+      if (!name) return;
+      const o = document.createElement('option');
+      o.value = name;
+      o.textContent = name;
+      appEl.appendChild(o);
+    });
+    const q = new URLSearchParams(window.location.search);
+    const current = q.get('app') || '*';
+    appEl.value = current;
+    msgEl.textContent = items.length ? '' : 'No apps returned from /api/apps';
+  })
+  .catch(e => { msgEl.textContent = 'Failed to load apps: ' + (e && e.message ? e.message : e); });
+</script>
+</body></html>`;
 
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -3580,6 +4285,7 @@ const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const path = url.pathname;
+  const appName = getRequestedApp(url);
 
   try {
     // Cheap liveness probe for the watchdog — never touches upstream, so a slow
@@ -3596,6 +4302,12 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (path === '/api/apps' && req.method === 'GET') {
+      const apps = await listApps();
+      sendJson(res, 200, { value: apps });
+      return;
+    }
+
     if (path === '/api/inventory' && req.method === 'GET') {
       const rows = await getInventory(appName);
       sendJson(res, 200, { value: rows });
@@ -3605,7 +4317,7 @@ const server = http.createServer(async (req, res) => {
     if (path === '/api/kpi/summary' && req.method === 'GET') {
       const windowMs = parseWindowMs(url.searchParams.get('window'));
       try {
-        const k = await computeKpi(windowMs);
+        const k = await computeKpi(windowMs, appName);
         sendJson(res, 200, {
           window: url.searchParams.get('window') || '24h',
           since: k.since,
@@ -3628,7 +4340,7 @@ const server = http.createServer(async (req, res) => {
     if (path === '/api/kpi/timeseries' && req.method === 'GET') {
       const windowMs = parseWindowMs(url.searchParams.get('window'));
       try {
-        const k = await computeKpi(windowMs);
+        const k = await computeKpi(windowMs, appName);
         sendJson(res, 200, { window: url.searchParams.get('window') || '24h', series: k.series });
       } catch (err) {
         sendJson(res, 502, { error: `KPI timeseries failed: ${err.message || err}` });
@@ -3638,7 +4350,7 @@ const server = http.createServer(async (req, res) => {
 
     if (path === '/api/volumes' && req.method === 'GET') {
       try {
-        sendJson(res, 200, getVolumes());
+        sendJson(res, 200, await getVolumes(appName));
       } catch (err) {
         sendJson(res, 500, { error: `volumes failed: ${err.message || err}` });
       }
@@ -3650,7 +4362,7 @@ const server = http.createServer(async (req, res) => {
       const workflow = decodeURIComponent(m[1]);
       const verb = m[2];
       try {
-        const out = await setFlowState(workflow, verb === 'enable' ? 'Enabled' : 'Disabled');
+        const out = await setFlowState(workflow, verb === 'enable' ? 'Enabled' : 'Disabled', appName);
         sendJson(res, 200, { message: `${verb === 'enable' ? 'Enabled' : 'Disabled'} ${workflow} (revision rollover in progress)`, ...out });
       } catch (err) {
         sendJson(res, 500, { error: `Failed to ${verb} ${workflow}: ${err.message || err}` });
@@ -3660,7 +4372,7 @@ const server = http.createServer(async (req, res) => {
 
     if (path.match(/^\/api\/workflows\/([^/]+)\/cancel-running$/) && req.method === 'POST') {
       const workflow = decodeURIComponent(path.match(/^\/api\/workflows\/([^/]+)\/cancel-running$/)[1]);
-      const out = await cancelRunningRuns(workflow);
+      const out = await cancelRunningRuns(workflow, appName);
       sendJson(res, 200, { message: `Canceled ${out.canceled}/${out.total} running run(s) for ${workflow}`, ...out });
       return;
     }
@@ -3674,7 +4386,7 @@ const server = http.createServer(async (req, res) => {
 
     if (path.match(/^\/api\/workflows\/([^/]+)\/definition$/) && req.method === 'GET') {
       const workflow = decodeURIComponent(path.match(/^\/api\/workflows\/([^/]+)\/definition$/)[1]);
-      const result = await makeRequest('GET', managementPath(`/admin/vfs/home/site/wwwroot/${encodeURIComponent(workflow)}/workflow.json`));
+      const result = await makeRequest('GET', managementPath(`/admin/vfs/home/site/wwwroot/${encodeURIComponent(workflow)}/workflow.json`), undefined, appName);
       res.writeHead(result.status === 200 ? 200 : result.status, { 'Content-Type': 'application/json' });
       res.end(result.body || '{}');
       return;
@@ -3686,8 +4398,31 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (path === '/app-switcher' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(APP_SWITCHER_HTML);
+      return;
+    }
+
     if (path.match(/^\/api\/workflows\/([^/]+)\/runs$/) && req.method === 'GET') {
-      const workflow = decodeURIComponent(path.match(/^\/api\/workflows\/([^/]+)\/runs$/)[1]);
+      const workflow = await resolveWorkflowName(decodeURIComponent(path.match(/^\/api\/workflows\/([^/]+)\/runs$/)[1]), appName);
+      if (url.searchParams.get('view') === 'table') {
+        const { queryRuns, RunQueryError } = require('./workflow-run-query');
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        res.once('close', abort);
+        try {
+          const result = await queryRuns({ params: url.searchParams, workflow, appName, managementPath, makeRequest, signal: controller.signal });
+          sendJson(res, 200, result);
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          if (error instanceof RunQueryError) sendJson(res, error.status, { error: error.message });
+          else throw error;
+        } finally {
+          res.removeListener('close', abort);
+        }
+        return;
+      }
       const top = url.searchParams.get('top') || '20';
       const filter = url.searchParams.get('filter');
       let apiPath = managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs`) + `&$top=${encodeURIComponent(top)}`;
@@ -3705,8 +4440,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (path.match(/^\/api\/workflows\/([^/]+)\/runs\/([^/]+)$/) && req.method === 'GET') {
-      const [, workflow, runId] = path.match(/^\/api\/workflows\/([^/]+)\/runs\/([^/]+)$/);
-      const runResult = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs/${encodeURIComponent(runId)}`));
+      const [, workflowRaw, runId] = path.match(/^\/api\/workflows\/([^/]+)\/runs\/([^/]+)$/);
+      const workflow = await resolveWorkflowName(decodeURIComponent(workflowRaw), appName);
+      const runResult = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs/${encodeURIComponent(runId)}`), undefined, appName);
       const runErrCode = String(runResult.json && runResult.json.error && runResult.json.error.code || '');
       const runErrMsg = String(runResult.json && runResult.json.error && runResult.json.error.message || runResult.body || '');
       const workflowMissing = runResult.status === 404 || /workflownotfound/i.test(runErrCode) || /workflow\s+'.+'\s+could not be found/i.test(runErrMsg);
@@ -3716,16 +4452,58 @@ const server = http.createServer(async (req, res) => {
       }
       let actions = [];
       try {
-        const actResult = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs/${encodeURIComponent(runId)}/actions`) + `&$top=100`);
+        const actResult = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs/${encodeURIComponent(runId)}/actions`) + `&$top=100`, undefined, appName);
         if (actResult.json && Array.isArray(actResult.json.value)) actions = actResult.json.value;
       } catch (e) { /* actions best effort */ }
       sendJson(res, runResult.status, { run: runResult.json || {}, actions });
       return;
     }
 
+    if (path.match(/^\/api\/workflows\/([^/]+)\/runs\/([^/]+)\/actions\/([^/]+)\/content\/(inputs|outputs)$/) && req.method === 'GET') {
+      const [, workflowRaw, runIdRaw, actionRaw, direction] = path.match(/^\/api\/workflows\/([^/]+)\/runs\/([^/]+)\/actions\/([^/]+)\/content\/(inputs|outputs)$/);
+      const workflow = await resolveWorkflowName(decodeURIComponent(workflowRaw), appName);
+      const runId = decodeURIComponent(runIdRaw);
+      const actionName = decodeURIComponent(actionRaw);
+      const actResult = await makeRequest(
+        'GET',
+        managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs/${encodeURIComponent(runId)}/actions`) + '&$top=100',
+        undefined,
+        appName
+      );
+      const actions = (actResult.json && Array.isArray(actResult.json.value)) ? actResult.json.value : [];
+      const action = actions.find((item) => String(item && item.name || '') === actionName);
+      if (!action) {
+        sendJson(res, 404, { error: `Action '${actionName}' was not found in run '${runId}'.` });
+        return;
+      }
+      const link = action.properties && action.properties[`${direction}Link`];
+      const contentUrl = link && (link.uri || link.url);
+      if (!contentUrl) {
+        sendJson(res, 404, { error: `${direction} content is not available for action '${actionName}'.` });
+        return;
+      }
+      const contentResult = await makeRequest('GET', contentUrl, undefined, appName);
+      if (contentResult.status < 200 || contentResult.status >= 300) {
+        sendJson(res, contentResult.status, { error: `Unable to load ${direction} for action '${actionName}'.` });
+        return;
+      }
+      const maxChars = 2 * 1024 * 1024;
+      const safeContent = redactPayload(contentResult.json !== null ? contentResult.json : contentResult.body);
+      const serialized = typeof safeContent === 'string' ? safeContent : JSON.stringify(safeContent);
+      const tooLarge = serialized.length > maxChars;
+      const content = tooLarge ? serialized.slice(0, maxChars) : safeContent;
+      sendJson(res, 200, {
+        action: actionName,
+        direction,
+        content,
+        truncated: tooLarge
+      });
+      return;
+    }
+
     if (path.match(/^\/api\/workflows\/([^/]+)\/runs\/([^/]+)\/cancel$/) && req.method === 'POST') {
       const [, workflow, runId] = path.match(/^\/api\/workflows\/([^/]+)\/runs\/([^/]+)\/cancel$/);
-      const result = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs/${encodeURIComponent(runId)}/cancel`));
+      const result = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs/${encodeURIComponent(runId)}/cancel`), undefined, appName);
       sendJson(res, result.status >= 200 && result.status < 300 ? 200 : result.status, {
         message: result.status >= 200 && result.status < 300 ? `Canceled ${runId}` : `Cancel failed (${result.status})`,
         status: result.status,
@@ -3736,10 +4514,10 @@ const server = http.createServer(async (req, res) => {
 
     if (path.match(/^\/api\/workflows\/([^/]+)\/runs\/([^/]+)\/resubmit$/) && req.method === 'POST') {
       const [, workflow, runId] = path.match(/^\/api\/workflows\/([^/]+)\/runs\/([^/]+)\/resubmit$/);
-      const runResult = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs/${encodeURIComponent(runId)}`));
+      const runResult = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs/${encodeURIComponent(runId)}`), undefined, appName);
       const run = runResult.json || {};
-      const triggerName = run.properties && run.properties.trigger && run.properties.trigger.name ? run.properties.trigger.name : await getWorkflowTriggerName(workflow);
-      const result = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/triggers/${encodeURIComponent(triggerName)}/histories/${encodeURIComponent(runId)}/resubmit`));
+      const triggerName = run.properties && run.properties.trigger && run.properties.trigger.name ? run.properties.trigger.name : await getWorkflowTriggerName(workflow, appName);
+      const result = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/triggers/${encodeURIComponent(triggerName)}/histories/${encodeURIComponent(runId)}/resubmit`), undefined, appName);
       sendJson(res, result.status === 202 ? 200 : result.status, {
         message: result.status === 202 ? `Resubmitted ${runId} via trigger '${triggerName}'` : `Resubmit failed (${result.status})`,
         status: result.status,
@@ -3751,12 +4529,12 @@ const server = http.createServer(async (req, res) => {
 
     if (path.match(/^\/api\/workflows\/([^/]+)\/resubmit-failed$/) && req.method === 'POST') {
       const workflow = decodeURIComponent(path.match(/^\/api\/workflows\/([^/]+)\/resubmit-failed$/)[1]);
-      const runsResult = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs`) + `&$top=250&$filter=${encodeURIComponent("status eq 'Failed'")}`);
+      const runsResult = await makeRequest('GET', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/runs`) + `&$top=250&$filter=${encodeURIComponent("status eq 'Failed'")}`, undefined, appName);
       const runs = (runsResult.json && runsResult.json.value) || [];
       const results = [];
       for (const run of runs) {
-        const triggerName = run.properties && run.properties.trigger && run.properties.trigger.name ? run.properties.trigger.name : await getWorkflowTriggerName(workflow);
-        const result = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/triggers/${encodeURIComponent(triggerName)}/histories/${encodeURIComponent(run.name)}/resubmit`));
+        const triggerName = run.properties && run.properties.trigger && run.properties.trigger.name ? run.properties.trigger.name : await getWorkflowTriggerName(workflow, appName);
+        const result = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/triggers/${encodeURIComponent(triggerName)}/histories/${encodeURIComponent(run.name)}/resubmit`), undefined, appName);
         results.push({ runId: run.name, trigger: triggerName, status: result.status, ok: result.status === 202 });
       }
       sendJson(res, 200, { message: `Resubmitted ${results.filter(r => r.ok).length}/${results.length} failed runs`, results });
@@ -3765,24 +4543,24 @@ const server = http.createServer(async (req, res) => {
 
     if (path.match(/^\/api\/workflows\/([^/]+)\/trigger$/) && req.method === 'POST') {
       const workflow = decodeURIComponent(path.match(/^\/api\/workflows\/([^/]+)\/trigger$/)[1]);
-      const triggerName = await getWorkflowTriggerName(workflow);
-      const result = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/triggers/${encodeURIComponent(triggerName)}/run`));
+      const triggerName = await getWorkflowTriggerName(workflow, appName);
+      const result = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/triggers/${encodeURIComponent(triggerName)}/run`), undefined, appName);
       sendJson(res, result.status === 200 || result.status === 202 ? 200 : result.status, { message: result.status < 300 ? `Triggered ${workflow}` : `Trigger failed (${result.status})`, trigger: triggerName, status: result.status, error: result.status >= 400 ? result.body : undefined });
       return;
     }
 
     if (path.match(/^\/api\/workflows\/([^/]+)\/callback-url$/) && req.method === 'GET') {
       const workflow = decodeURIComponent(path.match(/^\/api\/workflows\/([^/]+)\/callback-url$/)[1]);
-      const triggerName = await getWorkflowTriggerName(workflow);
-      const result = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/triggers/${encodeURIComponent(triggerName)}/listCallbackUrl`));
+      const triggerName = await getWorkflowTriggerName(workflow, appName);
+      const result = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/triggers/${encodeURIComponent(triggerName)}/listCallbackUrl`), undefined, appName);
       sendJson(res, result.status, { workflow, trigger: triggerName, callbackUrl: result.json || result.body });
       return;
     }
 
     if (path.match(/^\/api\/workflows\/([^/]+)\/trigger-remote$/) && req.method === 'POST') {
       const workflow = decodeURIComponent(path.match(/^\/api\/workflows\/([^/]+)\/trigger-remote$/)[1]);
-      const triggerName = await getWorkflowTriggerName(workflow);
-      const callbackResult = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/triggers/${encodeURIComponent(triggerName)}/listCallbackUrl`));
+      const triggerName = await getWorkflowTriggerName(workflow, appName);
+      const callbackResult = await makeRequest('POST', managementPath(`/runtime/webhooks/workflow/api/management/workflows/${encodeURIComponent(workflow)}/triggers/${encodeURIComponent(triggerName)}/listCallbackUrl`), undefined, appName);
       const callbackBody = callbackResult.json || {};
       const callbackUrl = callbackBody.value || callbackBody.url;
       if (!callbackUrl) throw new Error('Callback URL was not returned by listCallbackUrl');
@@ -3794,7 +4572,7 @@ const server = http.createServer(async (req, res) => {
 
     if (path === '/runs' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(`<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Logic Apps Run Manager</title><style>*{box-sizing:border-box} :root{--bg:#f4f5f5;--card:#fff;--border:#dfe2e5;--text:#1f1f1f;--muted:#6e6e78;--btn:#3871dc;--danger:#e02f44;--success:#1a7f4b;--accent:#6f42c1;--surface:#fafafa} body.dark{--bg:transparent;--card:#1f2028;--border:#30323d;--text:#d8d9e3;--muted:#a7a9b7;--surface:#111218} body{margin:0;padding:12px;font:13px/1.45 Inter,Arial,sans-serif;background:var(--bg);color:var(--text)} h1{margin:0 0 12px;font-size:16px}.card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:10px}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center} button,select,textarea{font:inherit} button{border:none;border-radius:4px;color:#fff;padding:6px 10px;cursor:pointer}.primary{background:var(--btn)}.danger{background:var(--danger)}.success{background:var(--success)}.accent{background:var(--accent)} select,textarea{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:4px;padding:6px 8px} textarea{min-height:80px} table{width:100%;border-collapse:collapse;margin-top:10px} th,td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left} th{color:var(--muted);font-weight:600}.muted{color:var(--muted)} #output{white-space:pre-wrap;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px;display:none}</style></head><body><script>(function(){try{const p=window.parent&&window.parent.document&&window.parent.document.body;if(p&&(p.classList.contains('theme-dark')||p.getAttribute('data-theme')==='dark'))document.body.classList.add('dark')}catch{} if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)document.body.classList.add('dark'); if(new URLSearchParams(window.location.search).get('theme')==='dark')document.body.classList.add('dark');})();</script><h1>⚡ Logic Apps Run Manager</h1><div class="card"><div class="row"><div style="min-width:220px;flex:1 1 220px;"><label class="muted">Workflow</label><select id="workflow"></select></div><div class="row" style="align-self:flex-end;"><button class="primary" onclick="listRuns()">List Runs</button><button class="danger" onclick="listFailedRuns()">Failed Runs</button><button class="danger" onclick="resubmitFailed()">Retry All Failed</button><button class="success" onclick="triggerWorkflow()">Trigger</button><button class="success" onclick="triggerRemote()">Remote Trigger</button><button class="accent" onclick="getRemoteTriggerUrl()">Remote URL</button></div></div></div><div class="card"><label class="muted">Remote trigger payload (JSON)</label><textarea id="payload">{}</textarea></div><div id="output"></div><div id="results"></div><script>const workflowEl=document.getElementById('workflow'); const outputEl=document.getElementById('output'); const resultsEl=document.getElementById('results'); function showOutput(v){outputEl.style.display='block'; outputEl.textContent=typeof v==='string'?v:JSON.stringify(v,null,2)} function selectedWorkflow(){return workflowEl.value} async function api(path,options){const response=await fetch(path,options); const data=await response.json().catch(()=>({})); if(!response.ok) throw new Error(data.error||data.message||\`Request failed (\${response.status})\`); return data} async function refreshWorkflows(){const data=await api('/api/workflows'); const items=Array.isArray(data.value)?data.value:(Array.isArray(data)?data:[]); workflowEl.innerHTML=''; items.forEach(item=>{const option=document.createElement('option'); option.value=item.name; option.textContent=item.name; workflowEl.appendChild(option);});} function renderRuns(runs,failedOnly=false){if(!runs.length){resultsEl.innerHTML='<div class="card">No runs found.</div>'; return;} let html='<div class="card"><table><tr><th>Run ID</th><th>Status</th><th>Start</th><th>Duration</th><th>Action</th></tr>'; runs.forEach(run=>{const p=run.properties||{}; const start=(p.startTime||'').replace('T',' ').slice(0,19); const duration=p.endTime&&p.startTime?\`\${((new Date(p.endTime)-new Date(p.startTime))/1000).toFixed(1)}s\`:'-'; html+=\`<tr><td>\${run.name}</td><td>\${p.status||''}</td><td>\${start}</td><td>\${duration}</td><td><button class="primary" onclick="resubmitRun('\${run.name}')">Resubmit</button></td></tr>\`;}); html+='</table></div>'; resultsEl.innerHTML=html; if(failedOnly) showOutput(\`Loaded \${runs.length} failed run(s).\`); else outputEl.style.display='none';}       async function listRuns(){showOutput('Loading runs...'); const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/runs?top=1000\`); renderRuns(data.value||[]);} async function listFailedRuns(){showOutput('Loading failed runs...'); const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/runs?top=1000&filter=\${encodeURIComponent(\"status eq 'Failed'\")}\`); renderRuns(data.value||[],true);} async function resubmitRun(runId){showOutput(\`Resubmitting \${runId}...\`); const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/runs/\${encodeURIComponent(runId)}/resubmit\`,{method:'POST'}); showOutput(data); setTimeout(listRuns,1500);} async function resubmitFailed(){showOutput('Retrying failed runs...'); const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/resubmit-failed\`,{method:'POST'}); showOutput(data); setTimeout(listRuns,2000);} async function triggerWorkflow(){showOutput(\`Triggering \${selectedWorkflow()}...\`); const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/trigger\`,{method:'POST'}); showOutput(data); setTimeout(listRuns,2000);} async function triggerRemote(){showOutput(\`Sending remote trigger for \${selectedWorkflow()}...\`); let payload={}; try{payload=JSON.parse(document.getElementById('payload').value||'{}')}catch{throw new Error('Payload must be valid JSON')} const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/trigger-remote\`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); showOutput(data); setTimeout(listRuns,2000);} async function getRemoteTriggerUrl(){showOutput(\`Loading callback URL for \${selectedWorkflow()}...\`); const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/callback-url\`); const callback=data.callbackUrl&&data.callbackUrl.value?data.callbackUrl.value:JSON.stringify(data.callbackUrl||{},null,2); resultsEl.innerHTML=\`<div class="card"><div class="muted">Trigger: \${data.trigger||''}</div><textarea readonly>\${callback}</textarea></div>\`; showOutput('Callback URL loaded.');} refreshWorkflows().catch(err=>showOutput(err.message));</script></body></html>`); 
+      res.end(`<!DOCTYPE html><html><head><meta charset="utf-8" /><title>Logic Apps Run Manager</title><style>*{box-sizing:border-box} :root{--bg:#f4f5f5;--card:#fff;--border:#dfe2e5;--text:#1f1f1f;--muted:#6e6e78;--btn:#3871dc;--danger:#e02f44;--success:#1a7f4b;--accent:#6f42c1;--surface:#fafafa} body.dark{--bg:transparent;--card:#1f2028;--border:#30323d;--text:#d8d9e3;--muted:#a7a9b7;--surface:#111218} body{margin:0;padding:12px;font:13px/1.45 Inter,Arial,sans-serif;background:var(--bg);color:var(--text)} h1{margin:0 0 12px;font-size:16px}.card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:10px}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center} button,select,textarea{font:inherit} button{border:none;border-radius:4px;color:#fff;padding:6px 10px;cursor:pointer}.primary{background:var(--btn)}.danger{background:var(--danger)}.success{background:var(--success)}.accent{background:var(--accent)} select,textarea{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:4px;padding:6px 8px} textarea{min-height:80px} table{width:100%;border-collapse:collapse;margin-top:10px} th,td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left} th{color:var(--muted);font-weight:600}.muted{color:var(--muted)} #output{white-space:pre-wrap;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px;display:none}</style></head><body><script>(function(){try{const p=window.parent&&window.parent.document&&window.parent.document.body;if(p&&(p.classList.contains('theme-dark')||p.getAttribute('data-theme')==='dark'))document.body.classList.add('dark')}catch{} if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)document.body.classList.add('dark'); if(new URLSearchParams(window.location.search).get('theme')==='dark')document.body.classList.add('dark');})();</script><h1>⚡ Logic Apps Run Manager</h1><div class="card"><div class="row"><div style="min-width:220px;flex:1 1 220px;"><label class="muted">Workflow</label><select id="workflow"></select></div><div class="row" style="align-self:flex-end;"><button class="primary" onclick="listRuns()">List Runs</button><button class="danger" onclick="listFailedRuns()">Failed Runs</button><button class="danger" onclick="resubmitFailed()">Retry All Failed</button><button class="success" onclick="triggerWorkflow()">Trigger</button><button class="success" onclick="triggerRemote()">Remote Trigger</button><button class="accent" onclick="getRemoteTriggerUrl()">Remote URL</button></div></div></div><div class="card"><label class="muted">Remote trigger payload (JSON)</label><textarea id="payload">{}</textarea></div><div id="output"></div><div id="results"></div><script>      const workflowEl=document.getElementById('workflow'); const outputEl=document.getElementById('output'); const resultsEl=document.getElementById('results'); const pageApp=new URLSearchParams(window.location.search).get('app')||''; function showOutput(v){outputEl.style.display='block'; outputEl.textContent=typeof v==='string'?v:JSON.stringify(v,null,2)} function selectedWorkflow(){return workflowEl.value} function withApp(path){return !pageApp?path:path+(path.indexOf('?')>=0?'&':'?')+'app='+encodeURIComponent(pageApp)} async function api(path,options){const response=await fetch(withApp(path),options); const data=await response.json().catch(()=>({})); if(!response.ok) throw new Error(data.error||data.message||\`Request failed (\${response.status})\`); return data} async function refreshWorkflows(){const data=await api('/api/workflows'); const items=Array.isArray(data.value)?data.value:(Array.isArray(data)?data:[]); workflowEl.innerHTML=''; items.forEach(item=>{const option=document.createElement('option'); option.value=item.name; option.textContent=item.name; workflowEl.appendChild(option);});} function renderRuns(runs,failedOnly=false){if(!runs.length){resultsEl.innerHTML='<div class="card">No runs found.</div>'; return;} let html='<div class="card"><table><tr><th>Run ID</th><th>Status</th><th>Start</th><th>Duration</th><th>Action</th></tr>'; runs.forEach(run=>{const p=run.properties||{}; const start=(p.startTime||'').replace('T',' ').slice(0,19); const duration=p.endTime&&p.startTime?\`\${((new Date(p.endTime)-new Date(p.startTime))/1000).toFixed(1)}s\`:'-'; html+=\`<tr><td>\${run.name}</td><td>\${p.status||''}</td><td>\${start}</td><td>\${duration}</td><td><button class="primary" onclick="resubmitRun('\${run.name}')">Resubmit</button></td></tr>\`;}); html+='</table></div>'; resultsEl.innerHTML=html; if(failedOnly) showOutput(\`Loaded \${runs.length} failed run(s).\`); else outputEl.style.display='none';}       async function listRuns(){showOutput('Loading runs...'); const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/runs?top=1000\`); renderRuns(data.value||[]);} async function listFailedRuns(){showOutput('Loading failed runs...'); const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/runs?top=1000&filter=\${encodeURIComponent(\"status eq 'Failed'\")}\`); renderRuns(data.value||[],true);} async function resubmitRun(runId){showOutput(\`Resubmitting \${runId}...\`); const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/runs/\${encodeURIComponent(runId)}/resubmit\`,{method:'POST'}); showOutput(data); setTimeout(listRuns,1500);} async function resubmitFailed(){showOutput('Retrying failed runs...'); const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/resubmit-failed\`,{method:'POST'}); showOutput(data); setTimeout(listRuns,2000);} async function triggerWorkflow(){showOutput(\`Triggering \${selectedWorkflow()}...\`); const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/trigger\`,{method:'POST'}); showOutput(data); setTimeout(listRuns,2000);} async function triggerRemote(){showOutput(\`Sending remote trigger for \${selectedWorkflow()}...\`); let payload={}; try{payload=JSON.parse(document.getElementById('payload').value||'{}')}catch{throw new Error('Payload must be valid JSON')} const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/trigger-remote\`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); showOutput(data); setTimeout(listRuns,2000);} async function getRemoteTriggerUrl(){showOutput(\`Loading callback URL for \${selectedWorkflow()}...\`); const data=await api(\`/api/workflows/\${encodeURIComponent(selectedWorkflow())}/callback-url\`); const callback=data.callbackUrl&&data.callbackUrl.value?data.callbackUrl.value:JSON.stringify(data.callbackUrl||{},null,2); resultsEl.innerHTML=\`<div class="card"><div class="muted">Trigger: \${data.trigger||''}</div><textarea readonly>\${callback}</textarea></div>\`; showOutput('Callback URL loaded.');} refreshWorkflows().catch(err=>showOutput(err.message));</script></body></html>`);
       return;
     }
 
@@ -3808,9 +4586,6 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`Logic Apps Run Manager listening on http://localhost:${PORT}`);
   console.log(`Using Logic Apps base URL ${CONFIG.logicAppBase}`);
 });
-
-
-
 '@
 }
 
@@ -4395,7 +5170,7 @@ async function streamPodLogs(req, res, url, appName) {
   sseWrite(res, 'status', { message: 'Streaming logs from ' + target.pod + ' (' + target.container + ')', pod: target.pod, container: target.container });
 
   const tailRaw = parseInt(url.searchParams.get('tail'), 10);
-  const tail = Number.isFinite(tailRaw) && tailRaw >= 0 ? String(tailRaw) : '200';
+  const tail = Number.isFinite(tailRaw) && tailRaw >= -1 ? String(tailRaw) : '200';
 
   const env = { ...process.env };
   if (CONFIG.kubeconfigPath) env.KUBECONFIG = CONFIG.kubeconfigPath;
@@ -4577,13 +5352,21 @@ const server = http.createServer(async (req, res) => {
       <h3 style="margin:0;">Live Stream (Logic Apps Pods)</h3>
       <div class="row">
         <select id="logPod" style="min-width:240px;"></select>
-        <input id="logTail" type="number" min="0" value="200" title="Lines of history" style="width:80px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:4px;padding:6px;" />
+        <input id="logFilter" type="search" placeholder="Run ID / Tracking ID / text" title="Case-insensitive text filter" style="min-width:220px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:4px;padding:6px;" />
+        <select id="logLevel" title="Log level filter" style="border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:4px;padding:6px;">
+          <option value="">All levels</option>
+          <option value="error">Errors</option>
+          <option value="warning">Warnings</option>
+          <option value="information">Information</option>
+          <option value="debug">Debug</option>
+        </select>
+        <input id="logTail" type="number" min="-1" value="200" title="History lines; use -1 for all retained pod logs" style="width:80px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:4px;padding:6px;" />
         <button class="success" onclick="startLogStream()">Start</button>
         <button class="danger" onclick="stopLogStream()">Stop</button>
         <button class="accent" onclick="clearLogs()">Clear</button>
       </div>
     </div>
-    <div id="logStatus" class="muted" style="margin-top:6px;">Idle. Select a pod and press Start.</div>
+    <div id="logStatus" class="muted" style="margin-top:6px;">Idle. Enter a run or tracking ID, select a pod, and press Start. Use tail -1 for all retained logs.</div>
     <pre id="logConsole" style="margin-top:8px;max-height:340px;overflow:auto;background:#000;color:#f1f1f1;border:1px solid var(--border);border-radius:4px;padding:8px;white-space:pre-wrap;word-break:break-all;font:12px/1.45 Consolas,Menlo,monospace;"></pre>
   </div>
   <div id="app"><div class="card"><h3 style="margin-top:0;">App Configuration</h3><div class="muted">Loading app settings...</div></div></div>
@@ -4592,10 +5375,32 @@ const server = http.createServer(async (req, res) => {
     const appEl = document.getElementById('app');
     const clusterLoginEl = document.getElementById('clusterLogin');
     const logPodEl = document.getElementById('logPod');
+    const logFilterEl = document.getElementById('logFilter');
+    const logLevelEl = document.getElementById('logLevel');
     const logTailEl = document.getElementById('logTail');
     const logConsoleEl = document.getElementById('logConsole');
     const logStatusEl = document.getElementById('logStatus');
     let logSource = null;
+    function logLevel(line){
+      const text = String(line || '');
+      try {
+        const parsed = JSON.parse(text);
+        return String(parsed.logLevel || parsed.LogLevel || parsed.level || parsed.Level || '').toLowerCase();
+      } catch {}
+      const match = text.match(/\\b(error|critical|fatal|warning|warn|information|info|debug|trace)\\b/i);
+      return match ? match[1].toLowerCase() : '';
+    }
+    function logMatches(line){
+      const filter = logFilterEl.value.trim().toLowerCase();
+      if (filter && !String(line).toLowerCase().includes(filter)) return false;
+      const wanted = logLevelEl.value;
+      if (!wanted) return true;
+      const actual = logLevel(line);
+      if (wanted === 'error') return actual === 'error' || actual === 'critical' || actual === 'fatal';
+      if (wanted === 'warning') return actual === 'warning' || actual === 'warn';
+      if (wanted === 'information') return actual === 'information' || actual === 'info';
+      return actual === wanted;
+    }
     function populateLogPods(replicas){
       const current = logPodEl.value;
       logPodEl.innerHTML = '';
@@ -4622,7 +5427,8 @@ const server = http.createServer(async (req, res) => {
         logStatusEl.textContent = 'Could not load pod list: ' + err.message;
       }
     }
-    function appendLog(line){
+    function appendLog(line, force){
+      if (!force && !logMatches(line)) return;
       const atBottom = logConsoleEl.scrollHeight - logConsoleEl.scrollTop - logConsoleEl.clientHeight < 40;
       logConsoleEl.textContent += line + '\\n';
       if (atBottom) logConsoleEl.scrollTop = logConsoleEl.scrollHeight;
@@ -4641,7 +5447,7 @@ const server = http.createServer(async (req, res) => {
       logSource = es;
       es.addEventListener('status', e => { try { logStatusEl.textContent = JSON.parse(e.data).message || 'Streaming...'; } catch { logStatusEl.textContent = 'Streaming...'; } });
       es.addEventListener('log', e => appendLog(e.data));
-      es.addEventListener('error', e => { let m = 'stream error'; try { m = JSON.parse(e.data).message || m; } catch {} appendLog('[error] ' + m); });
+      es.addEventListener('error', e => { let m = 'stream error'; try { m = JSON.parse(e.data).message || m; } catch {} appendLog('[error] ' + m, true); });
       es.addEventListener('end', e => { let c = ''; try { c = JSON.parse(e.data).code; } catch {} logStatusEl.textContent = 'Stream ended (exit ' + c + '). Press Start to reconnect.'; stopLogStream(); });
       es.onerror = () => { if (logSource) logStatusEl.textContent = 'Connection interrupted, retrying...'; };
     }
@@ -4881,6 +5687,8 @@ function Write-PortalFiles {
     }
 
     Set-Content -LiteralPath $RunManagerFile -Value (Get-RunManagerScript) -Encoding UTF8
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'workflow-runtime-client.js') -Destination (Join-Path $PortalRoot 'workflow-runtime-client.js') -Force
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'workflow-run-query.js') -Destination (Join-Path $PortalRoot 'workflow-run-query.js') -Force
     Set-Content -LiteralPath $WorkflowManagerFile -Value "require('./run-manager.js');`r`n" -Encoding UTF8
     Set-Content -LiteralPath $AppManagerFile -Value (Get-AppManagerScript) -Encoding UTF8
 }
@@ -4993,6 +5801,7 @@ $SqlServer = if (-not [string]::IsNullOrWhiteSpace($SqlServer)) { $SqlServer } e
 $SqlDatabase = if (-not [string]::IsNullOrWhiteSpace($SqlDatabase)) { $SqlDatabase } else { Get-FirstEnvironmentValue @('SQL_DATABASE', 'LOGICAPPS_SQL_DATABASE') }
 $SqlUser = if (-not [string]::IsNullOrWhiteSpace($SqlUser)) { $SqlUser } else { Get-FirstEnvironmentValue @('SQL_USER', 'LOGICAPPS_SQL_USER') }
 $SqlPassword = if (-not [string]::IsNullOrWhiteSpace($SqlPassword)) { $SqlPassword } else { Get-FirstEnvironmentValue @('SQL_PASSWORD', 'LOGICAPPS_SQL_PASSWORD') }
+$SqlConnectionString = if (-not [string]::IsNullOrWhiteSpace($SqlConnectionString)) { $SqlConnectionString } else { Get-FirstEnvironmentValue @('SQL_CONNECTION_STRING', 'LOGICAPPS_SQL_CONNECTION_STRING') }
 $MasterKey = if (-not [string]::IsNullOrWhiteSpace($MasterKey)) { $MasterKey } else { Get-FirstEnvironmentValue @('LOGICAPPS_MASTER_KEY', 'MASTER_KEY') }
 $MasterKey = if (-not [string]::IsNullOrWhiteSpace($MasterKey)) { $MasterKey } else { Try-ResolveMasterKeyFromHostSecrets }
 $LogicAppBaseUrl = if (-not [string]::IsNullOrWhiteSpace($LogicAppBaseUrl)) { $LogicAppBaseUrl } else { Get-FirstEnvironmentValue @('LOGICAPPS_BASE_URL', 'LOGIC_APP_BASE_URL') }
@@ -5007,6 +5816,19 @@ $OpenShiftUsername = if ($openShiftUsernameWasExplicit) { $OpenShiftUsername } e
 $OpenShiftUsername = if (-not [string]::IsNullOrWhiteSpace($OpenShiftUsername)) { $OpenShiftUsername } else { 'kubeadmin' }
 $OpenShiftPassword = if (-not [string]::IsNullOrWhiteSpace($OpenShiftPassword)) { $OpenShiftPassword } else { Get-FirstEnvironmentValue @('OPENSHIFT_PASSWORD') }
 $OpenShiftToken = if (-not [string]::IsNullOrWhiteSpace($OpenShiftToken)) { $OpenShiftToken } else { Get-FirstEnvironmentValue @('OPENSHIFT_TOKEN') }
+
+if (-not [string]::IsNullOrWhiteSpace($SqlConnectionString)) {
+    $connectionSettings = Get-ParsedSqlSettingsFromConnectionString -ConnectionString $SqlConnectionString
+    if (-not $connectionSettings) {
+        throw 'The SQL connection string does not contain recognized SQL Server settings.'
+    }
+
+    if ([string]::IsNullOrWhiteSpace($SqlServer)) { $SqlServer = $connectionSettings.Server }
+    if ([string]::IsNullOrWhiteSpace($SqlDatabase)) { $SqlDatabase = $connectionSettings.Database }
+    if ([string]::IsNullOrWhiteSpace($SqlUser)) { $SqlUser = $connectionSettings.User }
+    if ([string]::IsNullOrWhiteSpace($SqlPassword)) { $SqlPassword = $connectionSettings.Password }
+    Write-Info 'Resolved SQL settings from the supplied connection string.'
+}
 
 if ([string]::IsNullOrWhiteSpace($KubeConfigPath)) {
     $defaultKubeConfig = Join-Path $env:USERPROFILE '.kube\config'
@@ -5053,6 +5875,14 @@ if ([string]::IsNullOrWhiteSpace($script:PrimaryLogicAppName) -and -not [string]
 
 if ([string]::IsNullOrWhiteSpace($MasterKey)) {
     $MasterKey = Try-ResolveMasterKeyFromPodSecrets
+}
+
+if ([string]::IsNullOrWhiteSpace($MasterKey)) {
+    $platformAuth = Try-ResolveLogicAppPlatformAuth
+    if ($platformAuth) {
+        $script:LogicAppPlatformAuthKey = $platformAuth.Key
+        $script:LogicAppPlatformSiteName = $platformAuth.SiteName
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($SqlServer) -or
@@ -5102,7 +5932,9 @@ $SqlServer = Resolve-InputValue -Name 'SqlServer' -CurrentValue $SqlServer -Prom
 $SqlDatabase = Resolve-InputValue -Name 'SqlDatabase' -CurrentValue $SqlDatabase -Prompt 'SQL Database' -DefaultValue 'logicapp' -Required
 $SqlUser = Resolve-InputValue -Name 'SqlUser' -CurrentValue $SqlUser -Prompt 'SQL username' -Required
 $SqlPassword = Resolve-InputValue -Name 'SqlPassword' -CurrentValue $SqlPassword -Prompt 'SQL password' -Secret -Required
-$MasterKey = Resolve-InputValue -Name 'MasterKey' -CurrentValue $MasterKey -Prompt 'Logic Apps master key' -Secret -Required
+if ([string]::IsNullOrWhiteSpace($MasterKey) -and [string]::IsNullOrWhiteSpace($script:LogicAppPlatformAuthKey)) {
+    $MasterKey = Resolve-InputValue -Name 'MasterKey' -CurrentValue $MasterKey -Prompt 'Logic Apps master key' -Secret -Required
+}
 if (-not $UsePortForward) {
     $LogicAppBaseUrl = Resolve-InputValue -Name 'LogicAppBaseUrl' -CurrentValue $LogicAppBaseUrl -Prompt 'Logic Apps base URL' -Required
 }
