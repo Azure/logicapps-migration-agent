@@ -11,6 +11,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { LoggingService } from '../../services/LoggingService';
+import { TelemetryService } from '../../services/TelemetryService';
 import { StateManager } from '../../services/StateManager';
 import { StorageService, StorageKeys } from '../../services/StorageService';
 import { UserPrompts } from '../../constants/UserMessages';
@@ -114,6 +115,8 @@ export class DiscoveryService implements vscode.Disposable {
     // Current discovery state
     private isRunning = false;
     private currentResult: DiscoveryCompleteEvent | undefined;
+    // Set to 'rescan' by rescan(); read and reset to 'initial' at the start of runDiscovery.
+    private discoveryTrigger: 'initial' | 'rescan' = 'initial';
 
     private constructor() {
         this.disposables.push(this._onProgress, this._onComplete);
@@ -139,7 +142,7 @@ export class DiscoveryService implements vscode.Disposable {
         // Restore discovery result from storage
         await this.loadDiscoveryResultFromStorage();
 
-        this.logger.info('Discovery service initialized');
+        this.logger.debug('Discovery service initialized');
     }
 
     /**
@@ -179,7 +182,12 @@ export class DiscoveryService implements vscode.Disposable {
         }
 
         this.isRunning = true;
-        this.logger.info('Starting discovery process');
+        // Snapshot + reset the trigger (set by rescan()) so it reflects this run only.
+        const trigger = this.discoveryTrigger;
+        this.discoveryTrigger = 'initial';
+        const startTime = Date.now();
+        this.logger.debug('Starting discovery process');
+        TelemetryService.getInstance().logStep('discovery.started', { trigger });
 
         try {
             // Phase 1: Select source folder
@@ -194,7 +202,7 @@ export class DiscoveryService implements vscode.Disposable {
             }
 
             if (!sourceFolder) {
-                this.logger.info('Discovery cancelled: no folder selected');
+                this.logger.debug('Discovery cancelled: no folder selected');
                 const result: DiscoveryCompleteEvent = {
                     success: false,
                     error: new Error('No folder selected'),
@@ -223,7 +231,7 @@ export class DiscoveryService implements vscode.Disposable {
             let confirmed: boolean;
 
             if (previouslyDetectedPlatform) {
-                this.logger.info(
+                this.logger.debug(
                     `Skipping platform confirmation — previously detected: ${previouslyDetectedPlatform}`
                 );
                 const detection = await this.platformDetector.detect(
@@ -251,7 +259,7 @@ export class DiscoveryService implements vscode.Disposable {
             }
 
             if (!confirmed) {
-                this.logger.info('Discovery cancelled: platform not confirmed');
+                this.logger.debug('Discovery cancelled: platform not confirmed');
                 const result: DiscoveryCompleteEvent = {
                     success: false,
                     sourceFolder,
@@ -266,6 +274,10 @@ export class DiscoveryService implements vscode.Disposable {
                 100,
                 `Detected: ${platform.platform} (${platform.confidence}% confidence)`
             );
+            TelemetryService.getInstance().logStep('platform.detected', {
+                platform: platform.platform,
+                confidence: platform.confidence,
+            });
 
             // Update state
             await this.stateManager.updateState((draft) => {
@@ -355,9 +367,15 @@ export class DiscoveryService implements vscode.Disposable {
                 draft.inventory = discoveredArtifacts;
             });
 
-            this.logger.info('Discovery completed successfully', {
+            this.logger.debug('Discovery completed successfully', {
                 artifacts: inventory.items.length,
                 dependencies: dependencyGraph.edges.length,
+            });
+            TelemetryService.getInstance().logStep('discovery.completed', {
+                trigger,
+                artifactCount: inventory.items.length,
+                dependencyCount: dependencyGraph.edges.length,
+                durationMs: Date.now() - startTime,
             });
 
             // Provision the @migration-analyser agent file in the workspace
@@ -365,7 +383,7 @@ export class DiscoveryService implements vscode.Disposable {
                 const provisioner = AgentFileProvisioner.getInstance();
                 const created = await provisioner.provision(sourceFolder.path);
                 if (created) {
-                    this.logger.info(
+                    this.logger.debug(
                         '[Discovery] Provisioned @migration-analyser agent in workspace'
                     );
                 }
@@ -383,7 +401,7 @@ export class DiscoveryService implements vscode.Disposable {
                     'DISCOVERY'
                 );
             } catch (openErr) {
-                this.logger.warn(
+                this.logger.debug(
                     `[Discovery] Failed to auto-open discovery view: ${openErr instanceof Error ? openErr.message : String(openErr)}`
                 );
             }
@@ -392,6 +410,11 @@ export class DiscoveryService implements vscode.Disposable {
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
             this.logger.error('Discovery failed', err);
+            TelemetryService.getInstance().logStep('discovery.failed', {
+                trigger,
+                errorMessage: err.message,
+                durationMs: Date.now() - startTime,
+            });
 
             const result: DiscoveryCompleteEvent = {
                 success: false,
@@ -443,6 +466,7 @@ export class DiscoveryService implements vscode.Disposable {
             return undefined;
         }
 
+        this.discoveryTrigger = 'rescan';
         return this.runDiscoveryWithProgress(currentFolder.path);
     }
 
@@ -519,7 +543,7 @@ export class DiscoveryService implements vscode.Disposable {
             // Ignore storage errors during reset
         }
 
-        this.logger.info('Discovery state reset');
+        this.logger.debug('Discovery state reset');
     }
 
     // =========================================================================
@@ -562,7 +586,7 @@ export class DiscoveryService implements vscode.Disposable {
             await storage.setWorkspace(StorageKeys.DISCOVERY_RESULT, serializable);
             this.logger.debug('Discovery result saved to storage');
         } catch (error) {
-            this.logger.error(
+            this.logger.warn(
                 'Failed to save discovery result to storage',
                 error instanceof Error ? error : undefined
             );
@@ -582,12 +606,12 @@ export class DiscoveryService implements vscode.Disposable {
 
             if (stored && stored.success) {
                 this.currentResult = stored;
-                this.logger.info('Discovery result restored from storage', {
+                this.logger.debug('Discovery result restored from storage', {
                     artifacts: stored.inventory?.items?.length ?? 0,
                 });
             }
         } catch (error) {
-            this.logger.error(
+            this.logger.warn(
                 'Failed to load discovery result from storage',
                 error instanceof Error ? error : undefined
             );

@@ -188,7 +188,7 @@ export function enrichConnectionsFromBindings(
                     ir: enrichedIR,
                 };
 
-                logger.info('Enriched orchestration with binding connections', {
+                logger.debug('Enriched orchestration with binding connections', {
                     orchestration: orchExt.orchestrationName,
                     connections: connectionsToAssign.length,
                     receiveEndpoints: receiveEndpoints.length,

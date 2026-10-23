@@ -56,6 +56,13 @@ export interface Override {
  * Complete migration state
  */
 export interface MigrationState {
+    /**
+     * Stable identifier for this migration session. Generated once when a
+     * migration starts and regenerated only on reset. Stamped onto telemetry
+     * so all events for this folder's migration correlate together.
+     */
+    migrationId: string;
+
     /** Current migration stage */
     currentStage: MigrationStage;
 
@@ -94,10 +101,25 @@ export interface StateChangeEvent {
 }
 
 /**
+ * Generate a stable, human-readable migration session identifier.
+ * Format: `mig-YYYYMMDD-HHmmss-<random>`. Generated once per migration and
+ * regenerated only when the migration is reset.
+ */
+function generateMigrationId(): string {
+    const now = new Date();
+    const pad = (n: number): string => String(n).padStart(2, '0');
+    const date = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+    const time = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const random = Math.random().toString(36).slice(2, 6);
+    return `mig-${date}-${time}-${random}`;
+}
+
+/**
  * Initial/default state
  */
 function getInitialState(): MigrationState {
     return {
+        migrationId: generateMigrationId(),
         currentStage: MigrationStage.NotStarted,
         projectPath: undefined,
         sourcePlatform: undefined,
@@ -153,7 +175,12 @@ export class StateManager implements vscode.Disposable {
 
         if (savedState) {
             this.state = { ...getInitialState(), ...savedState };
-            LoggingService.getInstance().info('Migration state restored', {
+            // Backfill a migrationId for states persisted before it existed so it
+            // stays stable across sessions (generated once, persists until reset).
+            if (!savedState.migrationId) {
+                await this.persistState();
+            }
+            LoggingService.getInstance().debug('Migration state restored', {
                 stage: this.state.currentStage,
                 artifactCount: this.state.inventory.length.toString(),
             });
@@ -161,6 +188,9 @@ export class StateManager implements vscode.Disposable {
             this.state = getInitialState();
             LoggingService.getInstance().debug('No saved state found, using initial state');
         }
+
+        // Surface the migration session id to telemetry as a common dimension.
+        TelemetryService.getInstance().setMigrationId(this.state.migrationId);
     }
 
     /**
@@ -211,7 +241,7 @@ export class StateManager implements vscode.Disposable {
 
         // Check if stage changed
         if (previousState.currentStage !== this.state.currentStage) {
-            LoggingService.getInstance().info('Stage changed', {
+            LoggingService.getInstance().debug('Stage changed', {
                 previousStage: previousState.currentStage,
                 currentStage: this.state.currentStage,
             });
@@ -281,6 +311,11 @@ export class StateManager implements vscode.Disposable {
         this.state = getInitialState();
         await this.persistState();
 
+        // A reset starts a brand-new migration session: surface the freshly
+        // generated migrationId to telemetry so subsequent events correlate
+        // under the new session.
+        TelemetryService.getInstance().setMigrationId(this.state.migrationId);
+
         this._onDidChangeState.fire({
             previousState: { ...this.state, currentStage: previousStage },
             currentState: this.state,
@@ -289,7 +324,7 @@ export class StateManager implements vscode.Disposable {
 
         this._onDidChangeStage.fire(MigrationStage.NotStarted);
 
-        LoggingService.getInstance().info('Migration state reset');
+        LoggingService.getInstance().debug('Migration state reset');
         TelemetryService.getInstance().sendEvent('state.reset');
     }
 
@@ -308,6 +343,10 @@ export class StateManager implements vscode.Disposable {
         this.state = snapshot;
         await this.persistState();
 
+        if (this.state.migrationId) {
+            TelemetryService.getInstance().setMigrationId(this.state.migrationId);
+        }
+
         this._onDidChangeState.fire({
             previousState,
             currentState: this.state,
@@ -318,7 +357,7 @@ export class StateManager implements vscode.Disposable {
             this._onDidChangeStage.fire(this.state.currentStage);
         }
 
-        LoggingService.getInstance().info('State restored from snapshot');
+        LoggingService.getInstance().debug('State restored from snapshot');
     }
 
     /**

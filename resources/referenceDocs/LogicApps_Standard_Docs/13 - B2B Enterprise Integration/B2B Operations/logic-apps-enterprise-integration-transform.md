@@ -143,17 +143,16 @@ By default, the response from the transformation starts with a byte order mark (
 
 ```json
 "Transform_XML": {
+   "type": "Xslt",
     "inputs": {
-        "content": "@{triggerBody()}",
-        "integrationAccount": {
-            "map": {
-                "name": "TestMap"
-            }
+      "content": "@{triggerBody()}",
+      "map": {
+         "name": "TestMap",
+         "source": "##source##"
         },
         "transformOptions": "disableByteOrderMark"
     },
-    "runAfter": {},
-    "type": "Xslt"
+   "runAfter": {}
 }
 ```
 

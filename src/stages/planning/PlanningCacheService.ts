@@ -186,7 +186,7 @@ export class PlanningCacheService {
 
         const dir = this.getPlanningDir();
         if (!dir) {
-            this.logger.warn('[PlanningCache] No workspace folder — cannot persist to disk');
+            this.logger.debug('[PlanningCache] No workspace folder — cannot persist to disk');
             return;
         }
 
@@ -199,11 +199,11 @@ export class PlanningCacheService {
             const filePath = path.join(flowDir, FINALIZED_PLAN_FILENAME);
             fs.writeFileSync(filePath, JSON.stringify(result, null, 2), 'utf-8');
 
-            this.logger.info(
+            this.logger.debug(
                 `[PlanningCache] Saved planning result for flow "${result.flowId}" → ${filePath}`
             );
         } catch (error) {
-            this.logger.error('[PlanningCache] Failed to save planning result', error as Error);
+            this.logger.warn('[PlanningCache] Failed to save planning result', error as Error);
         }
     }
 
@@ -249,7 +249,7 @@ export class PlanningCacheService {
         try {
             if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
-                this.logger.info(`[PlanningCache] Removed planning result for flow "${flowId}"`);
+                this.logger.debug(`[PlanningCache] Removed planning result for flow "${flowId}"`);
             }
         } catch (error) {
             this.logger.warn('[PlanningCache] Failed to remove planning result', {
@@ -262,7 +262,7 @@ export class PlanningCacheService {
         try {
             if (fs.existsSync(legacyPath)) {
                 fs.unlinkSync(legacyPath);
-                this.logger.info(`[PlanningCache] Removed legacy plan file for flow "${flowId}"`);
+                this.logger.debug(`[PlanningCache] Removed legacy plan file for flow "${flowId}"`);
             }
         } catch {
             // ignore
@@ -303,7 +303,7 @@ export class PlanningCacheService {
                 }
             }
 
-            this.logger.info(
+            this.logger.debug(
                 `[PlanningCache] Cleared all planning results (${removedCount} files)`
             );
         } catch (error) {
@@ -369,7 +369,7 @@ export class PlanningCacheService {
                 }
             }
 
-            this.logger.info(
+            this.logger.debug(
                 `[PlanningCache] Loaded ${this.cache.size} planning results from disk`
             );
         } catch (error) {

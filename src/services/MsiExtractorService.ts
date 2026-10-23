@@ -204,7 +204,7 @@ export class MsiExtractorService implements vscode.Disposable {
             return mkResult({ error: `MSI file not found: ${msiPath}` });
         }
 
-        this.logger.info('Starting MSI extraction', { msiPath, outputDir });
+        this.logger.debug('Starting MSI extraction', { msiPath, outputDir });
         onProgress?.({ message: 'Preparing extraction…', percentage: 0 });
 
         // Use a staging directory that will be fully removed at the end
@@ -242,7 +242,7 @@ export class MsiExtractorService implements vscode.Disposable {
                 }
             }
 
-            this.logger.info('ADF parsed', {
+            this.logger.debug('ADF parsed', {
                 resources: resources.length,
                 mappings: cabToFileName.size,
             });
@@ -312,7 +312,7 @@ export class MsiExtractorService implements vscode.Disposable {
 
             onProgress?.({ message: 'Extraction complete.', percentage: 100 });
 
-            this.logger.info('MSI extraction completed', {
+            this.logger.debug('MSI extraction completed', {
                 leafFiles: extractedFiles.length,
                 durationMs: Date.now() - startTime,
             });
@@ -352,7 +352,7 @@ export class MsiExtractorService implements vscode.Disposable {
             return [];
         }
 
-        this.logger.info(`Found ${msiFiles.length} MSI file(s) in ${folderPath}`);
+        this.logger.debug(`Found ${msiFiles.length} MSI file(s) in ${folderPath}`);
         const results: MsiExtractionResult[] = [];
 
         for (let i = 0; i < msiFiles.length; i++) {

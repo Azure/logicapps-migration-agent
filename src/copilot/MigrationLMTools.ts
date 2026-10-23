@@ -17,9 +17,12 @@
  */
 
 import * as vscode from 'vscode';
+import * as path from 'path';
+import { randomUUID } from 'crypto';
 import { InventoryService } from '../stages/discovery/InventoryService';
 import { ParsedArtifact } from '../stages/discovery/types';
 import { LoggingService } from '../services/LoggingService';
+import { TelemetryService } from '../services/TelemetryService';
 import { ContextBuilder, ContextScope } from './ContextBuilder';
 import { SourceFlowVisualizer } from '../views/discovery/SourceFlowVisualizer';
 import { GeneratedFlowResult, LLMFlowGenerator, FlowGroup } from '../services/LLMFlowGenerator';
@@ -32,7 +35,7 @@ import { validateWorkflowDefinition } from '../workflowSchema';
 import { ConversionService } from '../stages/conversion/ConversionService';
 import { ConversionFileService } from '../stages/conversion/ConversionFileService';
 import { MermaidValidationService } from '../services/MermaidValidationService';
-import type { ConversionTask, ConversionTaskOutput } from '../stages/conversion/types';
+import type { ConversionTask, ConversionTaskOutput, ConversionTaskPlan } from '../stages/conversion/types';
 
 // ============================================================================
 // Tool Input Types
@@ -800,7 +803,7 @@ class ListArtifactsTool implements vscode.LanguageModelTool<ListArtifactsInput> 
             artifacts: listing,
         };
 
-        logger.info(`[LMTool] migration_listArtifacts: returned ${listing.length} artifacts`);
+        logger.debug(`[LMTool] migration_listArtifacts: returned ${listing.length} artifacts`);
         return new vscode.LanguageModelToolResult([
             new vscode.LanguageModelTextPart(JSON.stringify(result, null, 2)),
         ]);
@@ -825,7 +828,7 @@ class GetArtifactDetailsTool implements vscode.LanguageModelTool<GetArtifactDeta
         const matched = allArtifacts.filter((a) => idSet.has(a.id));
         const details = matched.map((a) => buildCompactSummary(a));
 
-        logger.info(
+        logger.debug(
             `[LMTool] migration_getArtifactDetails: ${artifactIds.length} requested, ${matched.length} found`
         );
 
@@ -869,7 +872,7 @@ class ReadSourceFileTool implements vscode.LanguageModelTool<ReadSourceFileInput
         const artifact = allArtifacts.find((a) => a.id === artifactId);
 
         if (!artifact) {
-            logger.error(`[LMTool] migration_readSourceFile: artifact '${artifactId}' not found`);
+            logger.warn(`[LMTool] migration_readSourceFile: artifact '${artifactId}' not found`);
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({ error: `Artifact '${artifactId}' not found` })
@@ -879,7 +882,7 @@ class ReadSourceFileTool implements vscode.LanguageModelTool<ReadSourceFileInput
 
         const filePath = artifact.absolutePath;
         if (!filePath) {
-            logger.error(
+            logger.warn(
                 `[LMTool] migration_readSourceFile: no absolute path for artifact '${artifactId}'`
             );
             return new vscode.LanguageModelToolResult([
@@ -909,7 +912,7 @@ class ReadSourceFileTool implements vscode.LanguageModelTool<ReadSourceFileInput
                 content,
             };
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_readSourceFile: read ${content.length} chars for '${artifact.name}'`
             );
             return new vscode.LanguageModelToolResult([
@@ -1017,7 +1020,7 @@ class SearchArtifactsTool implements vscode.LanguageModelTool<SearchArtifactsInp
 
         const results = matches.map((a) => buildCompactSummary(a));
 
-        logger.info(
+        logger.debug(
             `[LMTool] migration_searchArtifacts: query='${query}', found ${results.length} matches`
         );
 
@@ -1068,7 +1071,7 @@ class GetMigrationContextTool implements vscode.LanguageModelTool<GetMigrationCo
             result.artifactDetails = ctx.artifactDetails;
         }
 
-        logger.info(`[LMTool] migration_getMigrationContext: scope=${scope}`);
+        logger.debug(`[LMTool] migration_getMigrationContext: scope=${scope}`);
         return new vscode.LanguageModelToolResult([
             new vscode.LanguageModelTextPart(JSON.stringify(result, null, 2)),
         ]);
@@ -1098,7 +1101,7 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
             if (cachedFlowGroups) {
                 const group = cachedFlowGroups.groups.find((g) => g.id === input.groupId);
                 if (group) {
-                    logger.info(
+                    logger.debug(
                         `[LMTool] migration_detectFlowGroups: returning cached group "${group.name}" (${group.artifactIds.length} artifacts)`
                     );
 
@@ -1214,7 +1217,7 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
                     );
                 }
             } else {
-                logger.info(
+                logger.debug(
                     '[LMTool] migration_detectFlowGroups: no cached flow groups available, performing full detection'
                 );
             }
@@ -1234,6 +1237,10 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
 
         try {
             const llmGenerator = LLMFlowGenerator.getInstance();
+
+            TelemetryService.getInstance().logStep('flowgroups.detection.started', {
+                artifactCount: parsedArtifacts.length,
+            });
 
             // Build deterministic connection graph (no LLM calls)
             const connectionGraph = llmGenerator.buildArtifactConnectionGraph(parsedArtifacts);
@@ -1313,7 +1320,7 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
                 );
             }, 0);
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_detectFlowGroups: ${parsedArtifacts.length} artifacts, ${connections.length} connections, ${receiveLocationCount} receive location(s)`
             );
 
@@ -1565,9 +1572,17 @@ class StoreFlowGroupsTool implements vscode.LanguageModelTool<StoreFlowGroupsInp
             // Clear generation flags
             SourceFlowVisualizer.isInitialGenerating = false;
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_discovery_storeFlowGroups: stored ${input.groups.length} groups`
             );
+
+            TelemetryService.getInstance().logStep('flowgroups.detection.completed', {
+                flowGroupCount: input.groups.length,
+                flows: input.groups
+                    .map((g) => `${g.id}|${g.name}|${g.category ?? 'message-flow'}`)
+                    .join('; ')
+                    .slice(0, 1024),
+            });
 
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
@@ -1660,7 +1675,7 @@ class DiscoveryStoreMetaTool implements vscode.LanguageModelTool<DiscoveryStoreM
                 notes: notes || [],
             });
 
-            logger.info(`[LMTool] migration_discovery_storeMeta: stored for "${flowId}"`);
+            logger.debug(`[LMTool] migration_discovery_storeMeta: stored for "${flowId}"`);
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(JSON.stringify({ success: true, flowId })),
             ]);
@@ -1736,7 +1751,7 @@ class DiscoveryStoreArchitectureTool implements vscode.LanguageModelTool<Discove
                 await import('../stages/discovery/DiscoveryCacheService');
             DiscoveryCacheService.getInstance().storeArchitecture(flowId, validation.normalized);
 
-            logger.info(`[LMTool] migration_discovery_storeArchitecture: stored for "${flowId}"`);
+            logger.debug(`[LMTool] migration_discovery_storeArchitecture: stored for "${flowId}"`);
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
@@ -1801,7 +1816,7 @@ class DiscoveryStoreMessageFlowTool implements vscode.LanguageModelTool<Discover
                 await import('../stages/discovery/DiscoveryCacheService');
             DiscoveryCacheService.getInstance().storeMessageFlow(flowId, messageFlow);
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_discovery_storeMessageFlow: stored ${messageFlow.length} steps for "${flowId}"`
             );
             return new vscode.LanguageModelToolResult([
@@ -1869,7 +1884,7 @@ class DiscoveryStoreComponentsTool implements vscode.LanguageModelTool<Discovery
                 await import('../stages/discovery/DiscoveryCacheService');
             DiscoveryCacheService.getInstance().storeComponents(flowId, componentDetails);
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_discovery_storeComponents: stored ${componentDetails.length} components for "${flowId}"`
             );
             return new vscode.LanguageModelToolResult([
@@ -1940,7 +1955,7 @@ class DiscoveryStoreGapsTool implements vscode.LanguageModelTool<DiscoveryStoreG
                 await import('../stages/discovery/DiscoveryCacheService');
             DiscoveryCacheService.getInstance().storeGaps(flowId, gaps);
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_discovery_storeGaps: stored ${(gapAnalysis || []).length} gaps for "${flowId}"`
             );
             return new vscode.LanguageModelToolResult([
@@ -2007,7 +2022,7 @@ class DiscoveryStorePatternsTool implements vscode.LanguageModelTool<DiscoverySt
                 await import('../stages/discovery/DiscoveryCacheService');
             DiscoveryCacheService.getInstance().storePatterns(flowId, patterns);
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_discovery_storePatterns: stored ${(migrationPatterns || []).length} patterns for "${flowId}"`
             );
             return new vscode.LanguageModelToolResult([
@@ -2099,7 +2114,7 @@ class DiscoveryStoreDependenciesTool implements vscode.LanguageModelTool<Discove
 
             DiscoveryCacheService.getInstance().storeDependencies(flowId, dependencyAnalysis);
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_discovery_storeDependencies: stored ${deps.length} dependencies for "${flowId}" (${computedCounts.critical} critical, ${computedCounts.warning} warning)`
             );
             return new vscode.LanguageModelToolResult([
@@ -2233,10 +2248,21 @@ class DiscoveryFinalizeTool implements vscode.LanguageModelTool<DiscoveryFinaliz
                     result as GeneratedFlowResult
                 );
             } catch (vizErr) {
-                logger.warn(`[LMTool] Failed to auto-open analysis panel: ${vizErr}`);
+                logger.debug(`[LMTool] Failed to auto-open analysis panel: ${vizErr}`);
             }
 
-            logger.info(`[LMTool] migration_discovery_finalize: opened webview for "${flowId}"`);
+            logger.debug(`[LMTool] migration_discovery_finalize: opened webview for "${flowId}"`);
+
+            const finalized = result as GeneratedFlowResult;
+            TelemetryService.getInstance().logStep('analysis.completed', {
+                flowId,
+                flowName: title,
+                componentCount: finalized.componentDetails?.length ?? 0,
+                criticalMissingDependencies: finalized.dependencyAnalysis?.counts?.critical ?? 0,
+                criticalRisks: (finalized.gapAnalysis ?? []).filter((g) => g.severity === 'high')
+                    .length,
+                durationMs: TelemetryService.getInstance().endTimer(`analysis:${flowId}`),
+            });
 
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
@@ -2257,6 +2283,15 @@ class DiscoveryFinalizeTool implements vscode.LanguageModelTool<DiscoveryFinaliz
                 '[LMTool] migration_discovery_finalize failed',
                 err instanceof Error ? err : new Error(String(err))
             );
+            TelemetryService.getInstance().logStep('analysis.failed', {
+                flowId,
+                flowName:
+                    SourceFlowVisualizer.getStaticCachedFlowGroups()?.groups.find(
+                        (g) => g.id === flowId
+                    )?.name ?? flowId,
+                errorMessage: err instanceof Error ? err.message : String(err),
+                durationMs: TelemetryService.getInstance().endTimer(`analysis:${flowId}`),
+            });
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
@@ -2300,7 +2335,7 @@ class ReadReferenceDocTool implements vscode.LanguageModelTool<ReadReferenceDocI
             switch (action) {
                 case 'list': {
                     const docs = await registry.listDocs(platform, category);
-                    logger.info(
+                    logger.debug(
                         `[LMTool] migration_readReferenceDoc: list returned ${docs.length} docs`
                     );
                     return new vscode.LanguageModelToolResult([
@@ -2344,7 +2379,7 @@ class ReadReferenceDocTool implements vscode.LanguageModelTool<ReadReferenceDocI
                             ),
                         ]);
                     }
-                    logger.info(
+                    logger.debug(
                         `[LMTool] migration_readReferenceDoc: read "${docId}" (${doc.lineCount} lines)`
                     );
                     return new vscode.LanguageModelToolResult([
@@ -2372,7 +2407,7 @@ class ReadReferenceDocTool implements vscode.LanguageModelTool<ReadReferenceDocI
                         ]);
                     }
                     const results = await registry.searchDocs(query);
-                    logger.info(
+                    logger.debug(
                         `[LMTool] migration_readReferenceDoc: search "${query}" found ${results.length} docs`
                     );
                     return new vscode.LanguageModelToolResult([
@@ -2459,7 +2494,7 @@ class SearchReferenceWorkflowsTool implements vscode.LanguageModelTool<SearchRef
             if (!query || query.trim().length === 0) {
                 // No query — list entries
                 const entries = await registry.list(category);
-                logger.info(
+                logger.debug(
                     `[LMTool] migration_searchReferenceWorkflows: list returned ${entries.length} entries`
                 );
                 return new vscode.LanguageModelToolResult([
@@ -2478,7 +2513,7 @@ class SearchReferenceWorkflowsTool implements vscode.LanguageModelTool<SearchRef
             }
 
             const results = await registry.search(query, category);
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_searchReferenceWorkflows: search "${query}" found ${results.length} results`
             );
 
@@ -2596,7 +2631,7 @@ class ReadReferenceWorkflowTool implements vscode.LanguageModelTool<ReadReferenc
                 ]);
             }
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_readReferenceWorkflow: read "${result.path}" (${result.content.length} chars)`
             );
             return new vscode.LanguageModelToolResult([
@@ -2749,7 +2784,7 @@ class GetDiscoveryAnalysisTool implements vscode.LanguageModelTool<GetDiscoveryA
             patterns: (cachedResult.migrationPatterns ?? []).length,
         };
 
-        logger.info(
+        logger.debug(
             `[LMTool] migration_getDiscoveryAnalysis: returned ${requestedAspects.join(', ')} for group "${groupId}" ` +
                 `(${(cachedResult.componentDetails ?? []).length} components, ` +
                 `${(cachedResult.messageFlow ?? []).length} flow steps, ` +
@@ -2810,7 +2845,7 @@ class PlanningStoreMetaTool implements vscode.LanguageModelTool<PlanningStoreMet
                 updatedAt: now,
             });
 
-            logger.info(`[LMTool] migration_planning_storeMeta: stored for "${flowId}"`);
+            logger.debug(`[LMTool] migration_planning_storeMeta: stored for "${flowId}"`);
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
@@ -2886,7 +2921,7 @@ class PlanningStoreArchitectureTool implements vscode.LanguageModelTool<Planning
             const fileService = PlanningFileService.getInstance();
             const filePath = fileService.storeArchitecture(flowId, validation.normalized);
 
-            logger.info(`[LMTool] migration_planning_storeArchitecture: stored for "${flowId}"`);
+            logger.debug(`[LMTool] migration_planning_storeArchitecture: stored for "${flowId}"`);
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
@@ -2972,7 +3007,7 @@ class PlanningStoreWorkflowDefinitionTool implements vscode.LanguageModelTool<Pl
 
         // Log warnings even on success so the agent can address them
         if (validation.warnings.length > 0) {
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_planning_storeWorkflowDefinition: ${validation.warnings.length} warning(s) for "${flowId}":`
             );
             for (const w of validation.warnings) {
@@ -3043,7 +3078,7 @@ class PlanningStoreWorkflowDefinitionTool implements vscode.LanguageModelTool<Pl
             const actionCount = def.actions ? Object.keys(def.actions).length : 0;
             const triggerCount = def.triggers ? Object.keys(def.triggers).length : 0;
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_planning_storeWorkflowDefinition: stored for "${flowId}" (${actionCount} actions, ${triggerCount} triggers)`
             );
             return new vscode.LanguageModelToolResult([
@@ -3148,7 +3183,7 @@ class PlanningStoreAzureComponentsTool implements vscode.LanguageModelTool<Plann
                 }))
             );
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_planning_storeAzureComponents: stored ${components.length} components for "${flowId}"`
             );
             return new vscode.LanguageModelToolResult([
@@ -3262,7 +3297,7 @@ class PlanningStoreActionMappingsTool implements vscode.LanguageModelTool<Planni
                 }))
             );
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_planning_storeActionMappings: stored ${mappings.length} mappings for "${flowId}"`
             );
             return new vscode.LanguageModelToolResult([
@@ -3362,7 +3397,7 @@ class PlanningStoreGapsTool implements vscode.LanguageModelTool<PlanningStoreGap
                 }))
             );
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_planning_storeGaps: stored ${gaps.length} gaps for "${flowId}"`
             );
             return new vscode.LanguageModelToolResult([
@@ -3465,7 +3500,7 @@ class PlanningStorePatternsTool implements vscode.LanguageModelTool<PlanningStor
                 }))
             );
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_planning_storePatterns: stored ${patterns.length} patterns for "${flowId}"`
             );
             return new vscode.LanguageModelToolResult([
@@ -3619,7 +3654,7 @@ class PlanningStoreArtifactDispositionsTool implements vscode.LanguageModelTool<
                 ).length,
             };
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_planning_storeArtifactDispositions: stored ${dispositions.length} dispositions for "${flowId}" (${conversionCount} need conversion)`
             );
             return new vscode.LanguageModelToolResult([
@@ -4001,12 +4036,23 @@ class PlanningFinalizeTool implements vscode.LanguageModelTool<PlanningFinalizeI
                     vscode.Uri.file(__dirname);
                 PlanningWebviewPanel.createOrShow(extensionUri2);
             } catch (vizErr) {
-                logger.warn(`[LMTool] Failed to auto-open planning view: ${vizErr}`);
+                logger.debug(`[LMTool] Failed to auto-open planning view: ${vizErr}`);
             }
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_planning_finalize: finalized plan for "${flowId}" (${result.workflows.length} workflows, ${gaps.length} gaps, ${patterns.length} patterns, ${artifactDispositions.length} artifact dispositions)`
             );
+
+            TelemetryService.getInstance().logStep('planning.completed', {
+                flowId,
+                flowName: resolvedName,
+                workflowCount: result.workflows.length,
+                azureComponentCount: azureComponents.length,
+                actionMappingCount: actionMappings.length,
+                gapCount: gaps.length,
+                patternCount: patterns.length,
+                durationMs: TelemetryService.getInstance().endTimer(`planning:${flowId}`),
+            });
 
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
@@ -4030,6 +4076,12 @@ class PlanningFinalizeTool implements vscode.LanguageModelTool<PlanningFinalizeI
                 '[LMTool] migration_planning_finalize failed',
                 error instanceof Error ? error : new Error(String(error))
             );
+            TelemetryService.getInstance().logStep('planning.failed', {
+                flowId,
+                flowName: flowName ?? flowId,
+                errorMessage: error instanceof Error ? error.message : String(error),
+                durationMs: TelemetryService.getInstance().endTimer(`planning:${flowId}`),
+            });
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
@@ -4087,7 +4139,7 @@ class ConversionGetPlanningResultsTool implements vscode.LanguageModelTool<Conve
                 ]);
             }
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_conversion_getPlanningResults: returning plan for "${flowId}" (${result.workflows.length} workflows)`
             );
             return new vscode.LanguageModelToolResult([
@@ -4324,12 +4376,21 @@ class ConversionStoreTaskPlanTool implements vscode.LanguageModelTool<Conversion
                     vscode.Uri.file(__dirname);
                 ConversionWebviewPanel.createOrShow(extensionUri3);
             } catch (vizErr) {
-                logger.warn(`[LMTool] Failed to auto-open conversion view: ${vizErr}`);
+                logger.debug(`[LMTool] Failed to auto-open conversion view: ${vizErr}`);
             }
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_conversion_storeTaskPlan: stored ${tasks.length} tasks for "${flowId}"`
             );
+            TelemetryService.getInstance().logStep('conversion.tasklist.completed', {
+                flowId,
+                flowName: flowName ?? flowId,
+                taskCount: tasks.length,
+                tasks: tasks
+                    .map((t) => `${t.id}|${t.name}|${t.type}`)
+                    .join('; ')
+                    .slice(0, 1024),
+            });
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
@@ -4394,6 +4455,16 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
         const taskContextLower =
             `${task?.id || ''} ${task?.name || ''} ${task?.type || ''} ${task?.description || ''}`.toLowerCase();
 
+        // Emit a 'conversion.task.rejected' metric for any validation rejection below.
+        const logTaskRejected = (reason: string): void => {
+            TelemetryService.getInstance().logStep('conversion.task.rejected', {
+                flowId,
+                taskId,
+                taskType: task?.type,
+                reason,
+            });
+        };
+
         // Reject summaries that explicitly admit incomplete implementation.
         const admittedIncompletePhrases = [
             'took a shortcut',
@@ -4411,6 +4482,7 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
             logger.warn(
                 `[LMTool] migration_conversion_storeTaskOutput: REJECTED task output — summary admits incomplete implementation for task "${taskId}"`
             );
+            logTaskRejected('incomplete-implementation');
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
@@ -4507,6 +4579,7 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                 logger.warn(
                     `[LMTool] migration_conversion_storeTaskOutput: REJECTED test-workflows task — summary does not contain test results`
                 );
+                logTaskRejected('test-no-results');
                 return new vscode.LanguageModelToolResult([
                     new vscode.LanguageModelTextPart(
                         JSON.stringify({
@@ -4528,6 +4601,7 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                 logger.warn(
                     `[LMTool] migration_conversion_storeTaskOutput: REJECTED test-workflows — only happy path tested, missing error/chain/timeout paths`
                 );
+                logTaskRejected('test-happy-path-only');
                 return new vscode.LanguageModelToolResult([
                     new vscode.LanguageModelTextPart(
                         JSON.stringify({
@@ -4548,6 +4622,7 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                 logger.warn(
                     `[LMTool] migration_conversion_storeTaskOutput: REJECTED test-workflows — TEST-REPORT.md evidence missing`
                 );
+                logTaskRejected('test-report-missing');
                 return new vscode.LanguageModelToolResult([
                     new vscode.LanguageModelTextPart(
                         JSON.stringify({
@@ -4591,6 +4666,7 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                 logger.warn(
                     `[LMTool] migration_conversion_storeTaskOutput: REJECTED SQL task — summary indicates Docker/SQL deferral for task "${taskId}"`
                 );
+                logTaskRejected('sql-docker-deferral');
                 return new vscode.LanguageModelToolResult([
                     new vscode.LanguageModelTextPart(
                         JSON.stringify({
@@ -4607,6 +4683,7 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                 logger.warn(
                     `[LMTool] migration_conversion_storeTaskOutput: REJECTED SQL task — missing Docker availability check evidence for task "${taskId}"`
                 );
+                logTaskRejected('sql-no-docker-check');
                 return new vscode.LanguageModelToolResult([
                     new vscode.LanguageModelTextPart(
                         JSON.stringify({
@@ -4620,6 +4697,7 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                 logger.warn(
                     `[LMTool] migration_conversion_storeTaskOutput: REJECTED SQL task — no provisioning evidence for task "${taskId}"`
                 );
+                logTaskRejected('sql-no-provisioning');
                 return new vscode.LanguageModelToolResult([
                     new vscode.LanguageModelTextPart(
                         JSON.stringify({
@@ -4645,6 +4723,7 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                 logger.warn(
                     `[LMTool] migration_conversion_storeTaskOutput: REJECTED validate-runtime task — summary does not contain runtime validation results`
                 );
+                logTaskRejected('runtime-no-result');
                 return new vscode.LanguageModelToolResult([
                     new vscode.LanguageModelTextPart(
                         JSON.stringify({
@@ -4683,6 +4762,7 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                 logger.warn(
                     `[LMTool] migration_conversion_storeTaskOutput: REJECTED cloud-deploy-test — no cloud deployment evidence`
                 );
+                logTaskRejected('cloud-no-deployment');
                 return new vscode.LanguageModelToolResult([
                     new vscode.LanguageModelTextPart(
                         JSON.stringify({
@@ -4700,6 +4780,7 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                 logger.warn(
                     `[LMTool] migration_conversion_storeTaskOutput: REJECTED cloud-deploy-test — CLOUD-TEST-REPORT.md evidence missing`
                 );
+                logTaskRejected('cloud-report-missing');
                 return new vscode.LanguageModelToolResult([
                     new vscode.LanguageModelTextPart(
                         JSON.stringify({
@@ -4726,6 +4807,7 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                 logger.warn(
                     `[LMTool] migration_conversion_storeTaskOutput: REJECTED local-blackbox-test — agent cannot self-skip this task`
                 );
+                logTaskRejected('blackbox-self-skip');
                 return new vscode.LanguageModelToolResult([
                     new vscode.LanguageModelTextPart(
                         JSON.stringify({
@@ -4753,6 +4835,7 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                 logger.warn(
                     `[LMTool] migration_conversion_storeTaskOutput: REJECTED local-blackbox-test — BLACKBOX-TEST-REPORT.md evidence missing`
                 );
+                logTaskRejected('blackbox-report-missing');
                 return new vscode.LanguageModelToolResult([
                     new vscode.LanguageModelTextPart(
                         JSON.stringify({
@@ -4789,9 +4872,18 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
             const updatedTask = taskPlan2?.tasks.find((t) => t.id === taskId);
             const actualStatus = updatedTask?.status || 'completed';
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_conversion_storeTaskOutput: stored output for task "${taskId}" in flow "${flowId}" (status: ${actualStatus})`
             );
+            TelemetryService.getInstance().logStep('conversion.task.completed', {
+                flowId,
+                flowName: taskPlan?.flowName ?? flowId,
+                taskId,
+                taskType: task?.type,
+                status: actualStatus,
+                generatedFileCount: generatedFiles?.length ?? 0,
+                durationMs: TelemetryService.getInstance().endTimer(`task:${flowId}:${taskId}`),
+            });
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
@@ -4828,6 +4920,123 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
 }
 
 // --------------- migration_conversion_finalize ---------------
+
+/**
+ * Deterministically stamp every generated workflow.json for a flow with a
+ * `definition.metadata.MigrationMetadata` block (correlation id + timestamp).
+ * This is machine-generated data, so finalize writes it itself rather than
+ * relying on the agent — guaranteeing presence with no rejection/retry loop.
+ * An already-valid block is preserved (idempotent on re-finalize).
+ */
+async function applyWorkflowMigrationMetadata(
+    plan: ConversionTaskPlan,
+    logger: LoggingService
+): Promise<number> {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+    const resolveUri = (rel: string): vscode.Uri => {
+        const clean = rel.replace(/\\/g, '/').replace(/^\.\//, '');
+        const abs =
+            path.isAbsolute(clean) || !workspaceRoot ? clean : path.join(workspaceRoot, clean);
+        return vscode.Uri.file(abs);
+    };
+
+    // Collect workflow.json files listed in task outputs, plus the
+    // out/<LogicApp> roots so we can scan for any that weren't listed.
+    const outRoots = new Set<string>();
+    const found = new Map<string, vscode.Uri>();
+    for (const task of plan.tasks) {
+        for (const f of task.output?.generatedFiles ?? []) {
+            const clean = (f || '').replace(/\\/g, '/').replace(/^\.\//, '');
+            if (clean.toLowerCase().endsWith('workflow.json')) {
+                const uri = resolveUri(clean);
+                found.set(uri.fsPath, uri);
+            }
+            const outMatch = clean.match(/^out\/[^/]+/);
+            if (outMatch) {
+                outRoots.add(outMatch[0]);
+            }
+        }
+    }
+
+    const walk = async (dir: vscode.Uri): Promise<void> => {
+        let entries: [string, vscode.FileType][];
+        try {
+            entries = await vscode.workspace.fs.readDirectory(dir);
+        } catch {
+            return;
+        }
+        for (const [name, type] of entries) {
+            const child = vscode.Uri.joinPath(dir, name);
+            if (type === vscode.FileType.Directory) {
+                await walk(child);
+            } else if (name.toLowerCase() === 'workflow.json') {
+                found.set(child.fsPath, child);
+            }
+        }
+    };
+    for (const root of outRoots) {
+        await walk(resolveUri(root));
+    }
+
+    // One correlation id + timestamp for the whole flow's finalize run.
+    const correlationId = randomUUID();
+    const migrationDate = new Date().toISOString().slice(0, 19);
+
+    let stamped = 0;
+    for (const uri of found.values()) {
+        let parsed: Record<string, unknown>;
+        try {
+            const raw = Buffer.from(await vscode.workspace.fs.readFile(uri)).toString('utf-8');
+            parsed = JSON.parse(raw);
+        } catch {
+            continue; // Skip unreadable/invalid JSON.
+        }
+
+        const definition = (
+            parsed.definition && typeof parsed.definition === 'object' ? parsed.definition : parsed
+        ) as Record<string, unknown>;
+
+        const metadata = (
+            definition.metadata && typeof definition.metadata === 'object'
+                ? definition.metadata
+                : {}
+        ) as Record<string, unknown>;
+
+        const existing = metadata.MigrationMetadata as
+            | { MigrationCorrelationId?: unknown; MigrationDate?: unknown }
+            | undefined;
+        const hasValid =
+            !!existing &&
+            typeof existing.MigrationCorrelationId === 'string' &&
+            existing.MigrationCorrelationId.trim().length > 0 &&
+            typeof existing.MigrationDate === 'string' &&
+            existing.MigrationDate.trim().length > 0;
+        if (hasValid) {
+            continue; // Preserve an already-valid block.
+        }
+
+        metadata.MigrationMetadata = {
+            MigrationCorrelationId: correlationId,
+            MigrationDate: migrationDate,
+        };
+        definition.metadata = metadata;
+
+        try {
+            await vscode.workspace.fs.writeFile(
+                uri,
+                Buffer.from(JSON.stringify(parsed, null, 2) + '\n', 'utf-8')
+            );
+            stamped++;
+        } catch (err) {
+            logger.warn(
+                `[LMTool] migration_conversion_finalize: failed to stamp MigrationMetadata into ${uri.fsPath}: ${err instanceof Error ? err.message : String(err)}`
+            );
+        }
+    }
+
+    return stamped;
+}
 
 class ConversionFinalizeTool implements vscode.LanguageModelTool<ConversionFinalizeInput> {
     async invoke(
@@ -4876,6 +5085,10 @@ class ConversionFinalizeTool implements vscode.LanguageModelTool<ConversionFinal
                 ]);
             }
 
+            // Deterministically stamp MigrationMetadata into every generated workflow.json.
+            // Machine-generated data — no agent involvement, no rejection/retry loop.
+            const stampedCount = await applyWorkflowMigrationMetadata(plan, logger);
+
             // Mark the flow as completed
             const flow = conversionService.getFlows().find((f) => f.id === flowId);
             if (flow) {
@@ -4908,7 +5121,7 @@ class ConversionFinalizeTool implements vscode.LanguageModelTool<ConversionFinal
             // Open conversion webview
             void vscode.commands.executeCommand('logicAppsMigrationAgent.openConversionView');
 
-            logger.info(
+            logger.debug(
                 `[LMTool] migration_conversion_finalize: flow "${flowId}" conversion completed (${plan.tasks.length} tasks)`
             );
             return new vscode.LanguageModelToolResult([
@@ -4917,6 +5130,7 @@ class ConversionFinalizeTool implements vscode.LanguageModelTool<ConversionFinal
                         success: true,
                         flowId,
                         totalTasks: plan.tasks.length,
+                        migrationMetadataStamped: stampedCount,
                         message: `Conversion finalized for flow "${flowId}". All ${plan.tasks.length} tasks completed. The Conversion webview has been refreshed.`,
                     })
                 ),
@@ -4959,6 +5173,12 @@ class ConversionFinalizeTool implements vscode.LanguageModelTool<ConversionFinal
 export function registerMigrationLMTools(context: vscode.ExtensionContext): vscode.Disposable[] {
     const logger = LoggingService.getInstance();
     const disposables: vscode.Disposable[] = [];
+
+    // Initialize the reference registries with the extension URI up front so that
+    // the reference doc/workflow tools never hit the "extensionUri is required on
+    // first call" path (the LM tool would otherwise be the first caller with no URI).
+    ReferenceDocRegistry.getInstance(context.extensionUri);
+    ReferenceWorkflowRegistry.getInstance(context.extensionUri);
 
     disposables.push(vscode.lm.registerTool('migration_listArtifacts', new ListArtifactsTool()));
     disposables.push(
@@ -5104,6 +5324,6 @@ export function registerMigrationLMTools(context: vscode.ExtensionContext): vsco
         context.subscriptions.push(d);
     }
 
-    logger.info('[LMTools] Registered 25 migration language model tools');
+    logger.debug('[LMTools] Registered 25 migration language model tools');
     return disposables;
 }

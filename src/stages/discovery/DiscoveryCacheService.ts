@@ -113,7 +113,7 @@ export class DiscoveryCacheService {
         };
 
         await this.saveFlowGroupsToDisk();
-        this.logger.info(`[DiscoveryCache] Stored ${discoveryGroups.length} flow groups`);
+        this.logger.debug(`[DiscoveryCache] Stored ${discoveryGroups.length} flow groups`);
     }
 
     /**
@@ -153,7 +153,7 @@ export class DiscoveryCacheService {
         if (group) {
             group.discovered = true;
             await this.saveFlowGroupsToDisk();
-            this.logger.info(`[DiscoveryCache] Marked flow "${flowId}" as discovered`);
+            this.logger.debug(`[DiscoveryCache] Marked flow "${flowId}" as discovered`);
         }
     }
 
@@ -170,7 +170,7 @@ export class DiscoveryCacheService {
         if (group) {
             group.planned = true;
             await this.saveFlowGroupsToDisk();
-            this.logger.info(`[DiscoveryCache] Marked flow "${flowId}" as planned`);
+            this.logger.debug(`[DiscoveryCache] Marked flow "${flowId}" as planned`);
         }
     }
 
@@ -187,7 +187,7 @@ export class DiscoveryCacheService {
         if (group) {
             group.tasksCreated = true;
             await this.saveFlowGroupsToDisk();
-            this.logger.info(`[DiscoveryCache] Marked flow "${flowId}" as tasksCreated`);
+            this.logger.debug(`[DiscoveryCache] Marked flow "${flowId}" as tasksCreated`);
         }
     }
 
@@ -204,7 +204,7 @@ export class DiscoveryCacheService {
         if (group) {
             group.converted = true;
             await this.saveFlowGroupsToDisk();
-            this.logger.info(`[DiscoveryCache] Marked flow "${flowId}" as converted`);
+            this.logger.debug(`[DiscoveryCache] Marked flow "${flowId}" as converted`);
         }
     }
 
@@ -228,7 +228,7 @@ export class DiscoveryCacheService {
 
         const dir = this.getDiscoveryDir();
         if (!dir) {
-            this.logger.warn('[DiscoveryCache] No workspace folder — cannot persist to disk');
+            this.logger.debug('[DiscoveryCache] No workspace folder — cannot persist to disk');
             return;
         }
 
@@ -240,9 +240,9 @@ export class DiscoveryCacheService {
 
             const filePath = path.join(flowDir, ANALYSIS_FILENAME);
             fs.writeFileSync(filePath, JSON.stringify(result, null, 2), 'utf-8');
-            this.logger.info(`[DiscoveryCache] Saved analysis for flow "${flowId}" → ${filePath}`);
+            this.logger.debug(`[DiscoveryCache] Saved analysis for flow "${flowId}" → ${filePath}`);
         } catch (error) {
-            this.logger.error('[DiscoveryCache] Failed to save analysis', error as Error);
+            this.logger.warn('[DiscoveryCache] Failed to save analysis', error as Error);
         }
 
         // Also mark as discovered in flow groups
@@ -313,7 +313,7 @@ export class DiscoveryCacheService {
         try {
             if (fs.existsSync(flowDir)) {
                 fs.rmSync(flowDir, { recursive: true, force: true });
-                this.logger.info(`[DiscoveryCache] Removed analysis for flow "${flowId}"`);
+                this.logger.debug(`[DiscoveryCache] Removed analysis for flow "${flowId}"`);
             }
         } catch (error) {
             this.logger.warn(`[DiscoveryCache] Failed to remove analysis: ${error}`);
@@ -347,7 +347,7 @@ export class DiscoveryCacheService {
             await this.saveFlowGroupsToDisk();
         }
 
-        this.logger.info(`[DiscoveryCache] Reset all progress for flow "${flowId}"`);
+        this.logger.debug(`[DiscoveryCache] Reset all progress for flow "${flowId}"`);
     }
 
     // =========================================================================
@@ -368,7 +368,7 @@ export class DiscoveryCacheService {
         }
         const filePath = path.join(flowDir, filename);
         fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-        this.logger.info(`[DiscoveryCache] Stored partial ${filename} for flow "${flowId}"`);
+        this.logger.debug(`[DiscoveryCache] Stored partial ${filename} for flow "${flowId}"`);
     }
 
     /**
@@ -412,7 +412,7 @@ export class DiscoveryCacheService {
         }
         const filePath = path.join(flowDir, ARCHITECTURE_FILENAME);
         fs.writeFileSync(filePath, mermaid, 'utf-8');
-        this.logger.info(`[DiscoveryCache] Stored architecture.mmd for flow "${flowId}"`);
+        this.logger.debug(`[DiscoveryCache] Stored architecture.mmd for flow "${flowId}"`);
     }
 
     /** Read architecture Mermaid diagram from .mmd file. */
@@ -687,7 +687,7 @@ export class DiscoveryCacheService {
         if (dir && fs.existsSync(dir)) {
             try {
                 fs.rmSync(dir, { recursive: true, force: true });
-                this.logger.info('[DiscoveryCache] Cleared all discovery cache');
+                this.logger.debug('[DiscoveryCache] Cleared all discovery cache');
             } catch (error) {
                 this.logger.warn(`[DiscoveryCache] Failed to clear cache: ${error}`);
             }
@@ -786,7 +786,7 @@ export class DiscoveryCacheService {
             if (fs.existsSync(flowGroupsPath)) {
                 const data = JSON.parse(fs.readFileSync(flowGroupsPath, 'utf-8'));
                 this.flowGroupsCache = data;
-                this.logger.info(
+                this.logger.debug(
                     `[DiscoveryCache] Loaded flow groups from disk (${data?.groups?.length ?? 0} groups)`
                 );
             }
@@ -812,7 +812,7 @@ export class DiscoveryCacheService {
                     }
                 }
                 if (this.analysisCache.size > 0) {
-                    this.logger.info(
+                    this.logger.debug(
                         `[DiscoveryCache] Loaded ${this.analysisCache.size} flow analyses from disk`
                     );
                 }
@@ -839,7 +839,7 @@ export class DiscoveryCacheService {
             const filePath = path.join(dir, FLOW_GROUPS_FILENAME);
             fs.writeFileSync(filePath, JSON.stringify(this.flowGroupsCache, null, 2), 'utf-8');
         } catch (error) {
-            this.logger.error('[DiscoveryCache] Failed to save flow groups', error as Error);
+            this.logger.warn('[DiscoveryCache] Failed to save flow groups', error as Error);
         }
     }
 

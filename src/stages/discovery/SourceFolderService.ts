@@ -122,7 +122,7 @@ export class SourceFolderService implements vscode.Disposable {
                 const result = await this.validateFolder(savedPath);
                 if (result.hasIntegrationFiles) {
                     this.currentFolder = result;
-                    this.logger.info('Restored source folder', { path: savedPath });
+                    this.logger.debug('Restored source folder', { path: savedPath });
                 }
             }
         } catch (error) {
@@ -158,7 +158,7 @@ export class SourceFolderService implements vscode.Disposable {
      * Set source folder programmatically.
      */
     public async setSourceFolder(folderPath: string): Promise<SourceFolderResult | undefined> {
-        this.logger.info('Setting source folder', { path: folderPath });
+        this.logger.debug('Setting source folder', { path: folderPath });
 
         // Validate the folder
         const result = await this.validateFolder(folderPath);
@@ -198,7 +198,7 @@ export class SourceFolderService implements vscode.Disposable {
             quickScan: result.quickScan,
         });
 
-        this.logger.info('Source folder set successfully', {
+        this.logger.debug('Source folder set successfully', {
             path: folderPath,
             hasIntegrationFiles: result.hasIntegrationFiles,
             indicators: result.quickScan.platformIndicators.length,
@@ -297,7 +297,7 @@ export class SourceFolderService implements vscode.Disposable {
                 }
             }
         } catch (error) {
-            this.logger.error('Error during quick scan', error as Error, { folderPath });
+            this.logger.warn('Error during quick scan', error as Error, { folderPath });
         }
 
         return {
@@ -328,7 +328,7 @@ export class SourceFolderService implements vscode.Disposable {
             });
         }
 
-        this.logger.info('Source folder cleared');
+        this.logger.debug('Source folder cleared');
     }
 
     /**
@@ -474,8 +474,7 @@ export class SourceFolderService implements vscode.Disposable {
         const selection = await vscode.window.showWarningMessage(
             UserPrompts.CHANGE_FOLDER_CONFIRM,
             { modal: true },
-            UserPrompts.BUTTON_YES_CHANGE_FOLDER,
-            UserPrompts.BUTTON_CANCEL
+            UserPrompts.BUTTON_YES_CHANGE_FOLDER
         );
 
         return selection === UserPrompts.BUTTON_YES_CHANGE_FOLDER;

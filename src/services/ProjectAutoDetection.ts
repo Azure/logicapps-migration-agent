@@ -99,19 +99,19 @@ export class ProjectAutoDetection implements vscode.Disposable {
      */
     private async detectAndNotify(folderPath: string): Promise<void> {
         try {
-            this.logger.info('Running auto-detection for workspace', { folderPath });
+            this.logger.debug('Running auto-detection for workspace', { folderPath });
 
             const detector = PlatformDetector.getInstance();
             const result = await detector.detect(folderPath);
 
             // Only show notification if confidence is above threshold
             if (result.confidence >= 50 && result.platform !== 'generic') {
-                this.logger.info('Showing detection notification', {
+                this.logger.debug('Showing detection notification', {
                     platform: result.platform,
                     confidence: result.confidence.toString(),
                 });
                 await this.showDetectionNotification(folderPath, result);
-                this.logger.info('Detection notification dismissed');
+                this.logger.debug('Detection notification dismissed');
             } else {
                 this.logger.debug('No platform detected with sufficient confidence', {
                     confidence: result.confidence.toString(),
@@ -119,7 +119,7 @@ export class ProjectAutoDetection implements vscode.Disposable {
                 });
             }
         } catch (err) {
-            this.logger.error(
+            this.logger.warn(
                 'Auto-detection failed',
                 err instanceof Error ? err : new Error(String(err)),
                 { folderPath }
@@ -137,7 +137,7 @@ export class ProjectAutoDetection implements vscode.Disposable {
         const platformName = this.getPlatformDisplayName(detection.platform);
 
         // Auto-start migration directly — no confirmation popup
-        this.logger.info(
+        this.logger.debug(
             `Auto-detected ${platformName} project, starting migration automatically`,
             { folderPath, confidence: detection.confidence }
         );

@@ -1,0 +1,17 @@
+{
+    "archive": "BTS2016-Samples (1).zip",
+    "archiveSha256": "a701254dbb727a81d83b182795a6ea797777e64905f7481d0541f8e954a53669",
+    "sourceDirectory": "Samples/ApplicationDeployment/CreateApp/HelloApplicationDeployment",
+    "selection": "Unmodified solution, BizTalk projects, orchestration, map, and schemas. Build scripts, assemblies, and generated artifacts are intentionally excluded.",
+    "scenario": "Receive a purchase order, transform it to an invoice, and send the invoice.",
+    "files": [
+        "HelloApplicationDeployment.sln",
+        "Maps/Maps.btproj",
+        "Maps/POToInvoice.btm",
+        "Orchestrations/Orchestration.odx",
+        "Orchestrations/Orchestrations.btproj",
+        "Schemas/InvoiceSchema.xsd",
+        "Schemas/POSchema.xsd",
+        "Schemas/Schemas.btproj"
+    ]
+}

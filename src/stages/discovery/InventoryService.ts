@@ -67,7 +67,7 @@ export class InventoryBuilder {
         projectName: string,
         platformVersion?: string
     ): ArtifactInventory {
-        this.logger.info('Building inventory', {
+        this.logger.debug('Building inventory', {
             artifacts: scanResult.parsedArtifacts.length,
             errors: scanResult.parseErrors.length,
         });
@@ -347,7 +347,7 @@ export class InventoryService implements vscode.Disposable {
             const saved = await this.loadFromStorage();
             if (saved) {
                 this.inventory = saved;
-                this.logger.info('Restored inventory', {
+                this.logger.debug('Restored inventory', {
                     itemCount: saved.items.length,
                 });
 
@@ -400,7 +400,7 @@ export class InventoryService implements vscode.Disposable {
             changeType: 'created',
         });
 
-        this.logger.info('Inventory created', {
+        this.logger.debug('Inventory created', {
             itemCount: this.inventory.items.length,
         });
 
@@ -704,7 +704,7 @@ export class InventoryService implements vscode.Disposable {
             changeType: 'cleared',
         });
 
-        this.logger.info('Inventory cleared');
+        this.logger.debug('Inventory cleared');
     }
 
     /**
@@ -749,7 +749,7 @@ export class InventoryService implements vscode.Disposable {
 
             this.logger.debug('Inventory saved to storage');
         } catch (error) {
-            this.logger.error('Failed to save inventory', error as Error);
+            this.logger.warn('Failed to save inventory', error as Error);
         }
     }
 
@@ -781,7 +781,7 @@ export class InventoryService implements vscode.Disposable {
 
             this.logger.debug('IR cache saved to storage', { count: this.irCache.size });
         } catch (error) {
-            this.logger.error('Failed to save IR cache', error as Error);
+            this.logger.warn('Failed to save IR cache', error as Error);
         }
     }
 
@@ -816,7 +816,7 @@ export class InventoryService implements vscode.Disposable {
                 this.irCache.set(key, value);
             }
 
-            this.logger.info('IR cache restored from storage', { count: this.irCache.size });
+            this.logger.debug('IR cache restored from storage', { count: this.irCache.size });
         } catch (error) {
             this.logger.warn('Failed to load IR cache from storage', {
                 error: error instanceof Error ? error.message : String(error),

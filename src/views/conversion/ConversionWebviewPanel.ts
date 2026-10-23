@@ -111,14 +111,14 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                 ? this.conversionService.getTaskPlan(selectedFlowId)
                 : undefined;
 
-            this.logger.info(
+            this.logger.debug(
                 `[ConversionWebview] update: selectedFlowId=${selectedFlowId}, hasTaskPlan=${!!taskPlan}, flowCount=${flows.length}`
             );
 
             // Update tab title with flow name
             const selectedFlowName2 =
                 taskPlan?.flowName || flows.find((f) => f.id === selectedFlowId)?.name;
-            this.panel.title = selectedFlowName2 ? `⚙️ ${selectedFlowName2}` : 'Conversion';
+            this.panel.title = selectedFlowName2 ? `⚙️ Conversion: ${selectedFlowName2}` : 'Conversion';
 
             this.panel.webview.html = this.getHtmlContent(flows, selectedFlowId, taskPlan);
         } catch (err) {
@@ -134,7 +134,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
      * Handle messages from webview.
      */
     private handleMessage(message: { command: string; data?: unknown }): void {
-        this.logger.info(
+        this.logger.debug(
             `[ConversionWebview] message received: ${message.command} data=${JSON.stringify(message.data)}`
         );
         switch (message.command) {
@@ -142,7 +142,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                 const flowId = message.data as string;
                 if (flowId) {
                     void this.conversionService.selectFlow(flowId);
-                    this.logger.info(`Flow selected for conversion: ${flowId}`);
+                    this.logger.debug(`Flow selected for conversion: ${flowId}`);
                 }
                 break;
             }
@@ -158,15 +158,12 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                         flow.status = 'thinking';
                         this.update();
                     }
-                    this.logger.info(`Conversion started for flow: ${flowId}`);
+                    this.logger.debug(`Conversion started for flow: ${flowId}`);
                     vscode.commands
-                        .executeCommand(
-                            'logicAppsMigrationAgent.generateConversionForFlow',
-                            flowId
-                        )
+                        .executeCommand('logicAppsMigrationAgent.generateConversionForFlow', flowId)
                         .then(
                             () =>
-                                this.logger.info(
+                                this.logger.debug(
                                     `Conversion command completed for flow: ${flowId}`
                                 ),
                             (err) => {
@@ -185,7 +182,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             case 'reconvert': {
                 const flowId = message.data as string;
                 if (flowId) {
-                    this.logger.info(`Reconvert requested for flow: ${flowId}`);
+                    this.logger.debug(`Reconvert requested for flow: ${flowId}`);
 
                     // Kill func processes before deleting output
                     void vscode.commands.executeCommand(
@@ -233,7 +230,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                             const outPath = path.join(wsFolder.uri.fsPath, 'out', candidate);
                             if (fs.existsSync(outPath)) {
                                 fs.rmSync(outPath, { recursive: true, force: true });
-                                this.logger.info(`[Reconvert] Deleted output folder: ${outPath}`);
+                                this.logger.debug(`[Reconvert] Deleted output folder: ${outPath}`);
                             }
                         }
                     }
@@ -250,16 +247,19 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                         delete state.taskPlans[flowId];
                     }
 
+                    // Clear any stale Execute All orchestration state so the regenerated
+                    // task list starts clean and isn't stuck showing "Executing...".
+                    void this.conversionService.setExecuteAllActive(flowId, false);
+
                     void this.conversionService.selectFlow(flowId);
                     this.update();
                     vscode.commands
-                        .executeCommand(
-                            'logicAppsMigrationAgent.generateConversionForFlow',
-                            flowId
-                        )
+                        .executeCommand('logicAppsMigrationAgent.generateConversionForFlow', flowId)
                         .then(
                             () =>
-                                this.logger.info(`Reconvert command completed for flow: ${flowId}`),
+                                this.logger.debug(
+                                    `Reconvert command completed for flow: ${flowId}`
+                                ),
                             (err) => {
                                 this.logger.error(
                                     `Reconvert command failed for flow: ${flowId} — ${err}`
@@ -288,7 +288,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             case 'executeTask': {
                 const payload = message.data as { flowId: string; taskId: string };
                 if (payload?.flowId && payload?.taskId) {
-                    this.logger.info(
+                    this.logger.debug(
                         `Execute task requested: flow=${payload.flowId} task=${payload.taskId}`
                     );
                     vscode.commands
@@ -300,7 +300,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                         )
                         .then(
                             () =>
-                                this.logger.info(
+                                this.logger.debug(
                                     `Execute task command completed: ${payload.taskId}`
                                 ),
                             (err) => {
@@ -319,7 +319,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             case 'executeBlackBoxTest': {
                 const bbPayload = message.data as { flowId: string; taskId: string };
                 if (bbPayload?.flowId && bbPayload?.taskId) {
-                    this.logger.info(
+                    this.logger.debug(
                         `Black box test requested: flow=${bbPayload.flowId} task=${bbPayload.taskId}`
                     );
                     vscode.commands
@@ -330,7 +330,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                         )
                         .then(
                             () =>
-                                this.logger.info(
+                                this.logger.debug(
                                     `Black box test command completed: ${bbPayload.taskId}`
                                 ),
                             (err) => {
@@ -349,15 +349,12 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             case 'convertAll': {
                 const flowId = message.data as string;
                 if (flowId) {
-                    this.logger.info(`Convert all tasks requested for flow: ${flowId}`);
+                    this.logger.debug(`Convert all tasks requested for flow: ${flowId}`);
                     vscode.commands
-                        .executeCommand(
-                            'logicAppsMigrationAgent.executeAllConversionTasks',
-                            flowId
-                        )
+                        .executeCommand('logicAppsMigrationAgent.executeAllConversionTasks', flowId)
                         .then(
                             () =>
-                                this.logger.info(
+                                this.logger.debug(
                                     `Convert all command completed for flow: ${flowId}`
                                 ),
                             (err) => {
@@ -374,7 +371,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             case 'skipTask': {
                 const skipPayload = message.data as { flowId: string; taskId: string };
                 if (skipPayload?.flowId && skipPayload?.taskId) {
-                    this.logger.info(
+                    this.logger.debug(
                         `Skip task requested: flow=${skipPayload.flowId} task=${skipPayload.taskId}`
                     );
                     const cs = ConversionService.getInstance();
@@ -385,12 +382,46 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                             summary: 'Skipped by user — optional task',
                         },
                     }).then(
-                        () => this.logger.info(`Task skipped: ${skipPayload.taskId}`),
+                        () => this.logger.debug(`Task skipped: ${skipPayload.taskId}`),
                         (err) => this.logger.error(`Skip task failed: ${err}`)
                     );
                     // Also persist to disk
                     const cfs = ConversionFileService.getInstance();
                     cfs.updateTaskStatus(skipPayload.flowId, skipPayload.taskId, 'skipped');
+                }
+                break;
+            }
+
+            case 'stopExecution': {
+                const stopFlowId = message.data as string;
+                if (stopFlowId) {
+                    this.logger.debug(`Stop execution requested for flow: ${stopFlowId}`);
+                    // Cancel the running Copilot agent turn so the chat actually stops,
+                    // not just the extension's task state. Focus the chat first so the
+                    // cancel command targets the active request.
+                    void (async () => {
+                        try {
+                            await vscode.commands.executeCommand('workbench.action.chat.open');
+                            await vscode.commands.executeCommand('workbench.action.chat.cancel');
+                        } catch (err) {
+                            this.logger.debug(`Chat cancel not available: ${err}`);
+                        }
+                    })();
+                    this.conversionService.stopExecution(stopFlowId).then(
+                        () => {
+                            // Clear the Home flow-group "executing" flag so both views agree.
+                            void import('../discovery/SourceFlowVisualizer')
+                                .then(({ SourceFlowVisualizer }) => {
+                                    SourceFlowVisualizer.executingGroupIds.delete(stopFlowId);
+                                    SourceFlowVisualizer.refreshFlowGroupSelectorIfOpen();
+                                })
+                                .catch(() => {
+                                    /* non-critical */
+                                });
+                            this.update();
+                        },
+                        (err) => this.logger.error(`Stop execution failed: ${stopFlowId} — ${err}`)
+                    );
                 }
                 break;
             }
@@ -548,6 +579,16 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             color: var(--vscode-button-secondaryForeground);
         }
         .btn-disabled:hover { background: var(--vscode-button-secondaryBackground); }
+        .btn-danger {
+            background: transparent;
+            color: var(--vscode-errorForeground);
+            border: 1px solid var(--vscode-errorForeground);
+            margin-left: 6px;
+        }
+        .btn-danger:hover {
+            background: var(--vscode-errorForeground);
+            color: var(--vscode-button-foreground);
+        }
         .btn-icon {
             background: transparent;
             border: 1px solid var(--vscode-button-background);
@@ -947,6 +988,10 @@ export class ConversionWebviewPanel implements vscode.Disposable {
         function convertAll(flowId) {
             vscode.postMessage({ command: 'convertAll', data: flowId });
         }
+
+        function stopExecution(flowId) {
+            vscode.postMessage({ command: 'stopExecution', data: flowId });
+        }
     </script>
 </body>
 </html>`;
@@ -1113,7 +1158,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
         if (allDone) {
             convertAllBtnHtml = `<span class="task-done-label" style="font-size: 13px;">✓ All tasks complete</span>`;
         } else if (hasRunningTask || flowInProgress) {
-            convertAllBtnHtml = `<button class="btn btn-sm btn-disabled" disabled>Executing...</button>`;
+            convertAllBtnHtml = `<button class="btn btn-sm btn-disabled" disabled>Executing...</button> <button class="btn btn-sm btn-danger" onclick="stopExecution('${this.escapeHtml(plan.flowId)}')" title="Stopped Copilot? Reset execution so you can run again">■ Stop</button>`;
         } else if (hasPendingTasks) {
             convertAllBtnHtml = `<button class="btn btn-sm btn-primary" onclick="convertAll('${this.escapeHtml(plan.flowId)}')">▶ Execute All</button>`;
         }
@@ -1375,7 +1420,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
 
         if (workspaceFile) {
             const workspaceUri = vscode.Uri.file(path.join(projectDir, workspaceFile));
-            this.logger.info(`[ConversionWebview] Opening workspace file: ${workspaceUri.fsPath}`);
+            this.logger.debug(`[ConversionWebview] Opening workspace file: ${workspaceUri.fsPath}`);
             vscode.commands.executeCommand('vscode.openFolder', workspaceUri, {
                 forceNewWindow: true,
             });
@@ -1386,14 +1431,14 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             const wsFilePath = path.join(projectDir, wsFileName);
             const wsContent = JSON.stringify({ folders: [{ path: '.' }], settings: {} }, null, 2);
             fs.writeFileSync(wsFilePath, wsContent, 'utf-8');
-            this.logger.info(
+            this.logger.debug(
                 `[ConversionWebview] Created ${wsFileName} and opening workspace: ${wsFilePath}`
             );
             vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFilePath), {
                 forceNewWindow: true,
             });
         } else {
-            this.logger.warn(`[ConversionWebview] Project folder not found: ${fullPath.fsPath}`);
+            this.logger.debug(`[ConversionWebview] Project folder not found: ${fullPath.fsPath}`);
             vscode.window.showWarningMessage(UserPrompts.projectFolderNotFound(projectPath));
         }
     }

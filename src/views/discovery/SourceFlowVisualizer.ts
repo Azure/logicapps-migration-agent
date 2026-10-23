@@ -16,6 +16,7 @@
 
 import * as vscode from 'vscode';
 import { LoggingService } from '../../services/LoggingService';
+import { TelemetryService } from '../../services/TelemetryService';
 import { ParsedArtifact } from '../../stages/discovery/types';
 import { InventoryService } from '../../stages/discovery/InventoryService';
 import { GeneratedFlowResult, FlowGroupsResult } from '../../services/LLMFlowGenerator';
@@ -348,14 +349,19 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                     const resetBtn =
                         hasProgress && !isThisFlowBusy
                             ? `<button class="btn btn-reset" onclick="event.stopPropagation(); resetFlow('${g.id}')"
-                            title="Reset all progress for this flow group">↺ Reset Progress</button>`
+                            title="Reset all progress for this flow and start over">↺ Start Over</button>`
                             : '';
+
+                    // Stop button — shown while any process (analyse/plan/create/execute) runs on this flow
+                    const stopBtn = isThisFlowBusy
+                        ? `<button class="btn btn-stop-flow" onclick="event.stopPropagation(); stopFlow('${g.id}')" title="Stop the running process for this flow (use if you stopped Copilot)">■ Stop</button>`
+                        : '';
 
                     return `
                     <div class="flow-card">
                         <div class="flow-card-header">
                             <span class="flow-name">${escapeHtml(g.name)}</span>
-                            ${resetBtn}
+                            ${resetBtn}${stopBtn}
                         </div>
                         <div class="flow-desc">${escapeHtml(g.description)}</div>
                         <div class="flow-meta">
@@ -430,6 +436,23 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             color: #fff;
         }
         .btn-reset:active {
+            transform: scale(0.97);
+        }
+        .btn-stop-flow {
+            font-size: 11px;
+            padding: 4px 12px;
+            border: 1px solid var(--vscode-errorForeground);
+            background: transparent;
+            color: var(--vscode-errorForeground);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .btn-stop-flow:hover {
+            background: var(--vscode-errorForeground);
+            color: var(--vscode-button-foreground);
+        }
+        .btn-stop-flow:active {
             transform: scale(0.97);
         }
         .flow-desc { font-size: 13px; color: var(--vscode-descriptionForeground); margin-bottom: 8px; }
@@ -644,6 +667,9 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         function executeFlow(flowId) {
             vscode.postMessage({ command: 'executeFlowFromSelector', data: flowId });
         }
+        function stopFlow(flowId) {
+            vscode.postMessage({ command: 'stopFlowFromSelector', data: flowId });
+        }
         function openProject(flowId) {
             vscode.postMessage({ command: 'openProjectFromSelector', data: flowId });
         }
@@ -691,7 +717,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         } else {
             panel = vscode.window.createWebviewPanel(
                 'logicAppsMigrationAgent.flowAnalysis',
-                `🔍 ${title}`,
+                `🔍 Analysis: ${title}`,
                 vscode.ViewColumn.Active,
                 {
                     enableScripts: true,
@@ -901,7 +927,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         }
 
         this.cachedFlowGroupsResult = { ...flowGroups, groups: mergedGroups };
-        LoggingService.getInstance().info(
+        LoggingService.getInstance().debug(
             `[FlowViz] Cached ${this.cachedFlowGroupsResult.groups.length} flow groups statically`
         );
 
@@ -1045,7 +1071,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             import('../../stages/discovery/DiscoveryCacheService').then(
                 async ({ DiscoveryCacheService }) => {
                     await DiscoveryCacheService.getInstance().removeAnalysis(currentGroupId);
-                    this.logger.info(
+                    this.logger.debug(
                         `[FlowViz] Cleared discovery data for regeneration: ${currentGroupId}`
                     );
                 }
@@ -1081,7 +1107,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 break;
 
             case 'backToFlowGroups':
-                this.logger.info('[FlowViz] User navigating back to flow group selector');
+                this.logger.debug('[FlowViz] User navigating back to flow group selector');
                 SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
                 break;
 
@@ -1096,7 +1122,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
 
             case 'requestCorrection':
                 // Open agent chat with the broken Mermaid code for correction
-                this.logger.info('User requested Mermaid correction via Agent chat');
+                this.logger.debug('User requested Mermaid correction via Agent chat');
                 this.askAnalyserAgent({
                     userMessage:
                         'This Mermaid diagram has a rendering error. Please fix the syntax and call migration_discovery_storeAnalysis with the corrected diagram.',
@@ -1104,7 +1130,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 break;
 
             case 'regenerate':
-                this.logger.info('User requested regeneration');
+                this.logger.debug('User requested regeneration');
                 vscode.window.withProgress(
                     {
                         location: vscode.ProgressLocation.Notification,
@@ -1121,15 +1147,21 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 const chatData = message.data as {
                     userMessage?: string;
                 };
-                this.logger.info('User requested ask/suggest via chat');
+                this.logger.debug('User requested ask/suggest via chat');
                 if (chatData.userMessage) {
+                    TelemetryService.getInstance().logStep('suggestion.requested', {
+                        stage: 'analysis',
+                        flowId: this.currentGroupId ?? '',
+                        message: chatData.userMessage.trim().slice(0, 1000),
+                        messageLength: chatData.userMessage.trim().length,
+                    });
                     this.askAnalyserAgent({ userMessage: chatData.userMessage });
                 }
                 break;
             }
 
             case 'exportAnalysisReport': {
-                this.logger.info('[FlowViz] User requested analysis report export');
+                this.logger.debug('[FlowViz] User requested analysis report export');
                 if (this.currentLLMResult && this.currentGroupId) {
                     void vscode.commands.executeCommand(
                         'logicAppsMigrationAgent.exportAnalysisReport',
@@ -1147,13 +1179,13 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 const selectedGroupId = message.data as string;
                 // Block if THIS specific group is already being generated
                 if (SourceFlowVisualizer.generatingGroupIds.has(selectedGroupId)) {
-                    this.logger.info(
+                    this.logger.debug(
                         `[FlowViz] Group "${selectedGroupId}" already generating — ignoring`
                     );
                     vscode.window.showInformationMessage(UserPrompts.FLOW_GROUP_ALREADY_GENERATING);
                     break;
                 }
-                this.logger.info('User selected flow group', { groupId: selectedGroupId });
+                this.logger.debug('User selected flow group', { groupId: selectedGroupId });
                 if (selectedGroupId === 'all') {
                     // Show all artifacts
                     if (this.currentLLMResult && this.currentTitle) {
@@ -1172,7 +1204,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                             selectedGroupId
                         );
                         if (cached) {
-                            this.logger.info(`[FlowViz] Group cache hit for "${selectedGroupId}"`);
+                            this.logger.debug(`[FlowViz] Group cache hit for "${selectedGroupId}"`);
                             this.currentGroupId = selectedGroupId;
                             const group = this.currentFlowGroups?.groups.find(
                                 (g) => g.id === selectedGroupId
@@ -1194,7 +1226,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             case 'selectFlowFromSelector': {
                 // User clicked "✓ Analysed" — open analysis in a separate panel (keep flow group page open)
                 const flowId = message.data as string;
-                this.logger.info(`[FlowViz] User selected flow from selector: ${flowId}`);
+                this.logger.debug(`[FlowViz] User selected flow from selector: ${flowId}`);
 
                 import('../../stages/discovery/DiscoveryCacheService').then(
                     async ({ DiscoveryCacheService }) => {
@@ -1202,7 +1234,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                         const cachedAnalysis = discoveryCacheService.getAnalysis(flowId);
 
                         if (cachedAnalysis) {
-                            this.logger.info(
+                            this.logger.debug(
                                 `[FlowViz] Flow "${flowId}" already discovered — opening in separate tab`
                             );
                             const { InventoryService } =
@@ -1234,7 +1266,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             case 'analyseFlowFromSelector': {
                 // User clicked Analyse / Re-Analyse button on a flow card
                 const flowId = message.data as string;
-                this.logger.info(`[FlowViz] User requested analysis for flow: ${flowId}`);
+                this.logger.debug(`[FlowViz] User requested analysis for flow: ${flowId}`);
 
                 // Block if any flow is already generating
                 if (SourceFlowVisualizer.generatingGroupIds.size > 0) {
@@ -1246,28 +1278,38 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 SourceFlowVisualizer.generatingGroupIds.add(flowId);
                 SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
 
-                this.logger.info(`[FlowViz] Starting agent analysis for flow: ${flowId}`);
+                this.logger.debug(`[FlowViz] Starting agent analysis for flow: ${flowId}`);
 
                 // Use void IIFE since handleMessage is not async
                 void (async () => {
                     const { DiscoveryCacheService } =
                         await import('../../stages/discovery/DiscoveryCacheService');
 
+                    // Detect re-analysis: existing analysis present before we clear it.
+                    const isReanalysis = DiscoveryCacheService.getInstance().hasAnalysis(flowId);
+
                     // Clear existing discovery data for this flow before re-analysing
                     await DiscoveryCacheService.getInstance().removeAnalysis(flowId);
-                    this.logger.info(
+                    this.logger.debug(
                         `[FlowViz] Cleared existing discovery data for flow: ${flowId}`
                     );
 
                     const group = DiscoveryCacheService.getInstance().getFlowGroup(flowId);
                     const name = group?.name || flowId;
 
+                    TelemetryService.getInstance().startTimer(`analysis:${flowId}`);
+                    TelemetryService.getInstance().logStep('analysis.started', {
+                        flowId,
+                        flowName: name,
+                        trigger: isReanalysis ? 'reanalyse' : 'initial',
+                    });
+
                     try {
                         await vscode.commands.executeCommand('workbench.action.chat.open', {
                             mode: 'agent',
                             query: SourceFlowVisualizer.buildFlowAnalysisPrompt(name, flowId),
                         });
-                        this.logger.info(`[FlowViz] Agent chat opened for flow: ${flowId}`);
+                        this.logger.debug(`[FlowViz] Agent chat opened for flow: ${flowId}`);
                     } catch (err) {
                         SourceFlowVisualizer.generatingGroupIds.delete(flowId);
                         SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
@@ -1284,7 +1326,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             case 'planFlowFromSelector': {
                 // User clicked Plan button — mark as planning and start agent chat
                 const flowId = message.data as string;
-                this.logger.info(`[FlowViz] User requested planning for flow: ${flowId}`);
+                this.logger.debug(`[FlowViz] User requested planning for flow: ${flowId}`);
 
                 // Mark as planning and refresh UI
                 SourceFlowVisualizer.planningGroupIds.add(flowId);
@@ -1319,7 +1361,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             case 'viewPlanFromSelector': {
                 // User clicked "✓ Planned" — open Planning webview for this flow
                 const flowId = message.data as string;
-                this.logger.info(`[FlowViz] User viewing plan for flow: ${flowId}`);
+                this.logger.debug(`[FlowViz] User viewing plan for flow: ${flowId}`);
                 void (async () => {
                     try {
                         // Ensure planning service has flows
@@ -1345,7 +1387,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             case 'convertFlowFromSelector': {
                 // User clicked Convert button — mark as converting and start agent chat
                 const flowId = message.data as string;
-                this.logger.info(`[FlowViz] User requested conversion for flow: ${flowId}`);
+                this.logger.debug(`[FlowViz] User requested conversion for flow: ${flowId}`);
 
                 // Mark as converting and refresh UI to show Converting... state
                 SourceFlowVisualizer.convertingGroupIds.add(flowId);
@@ -1377,7 +1419,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             case 'viewConversionFromSelector': {
                 // User clicked "✓ Converted" — open Conversion webview for this flow
                 const flowId = message.data as string;
-                this.logger.info(`[FlowViz] User viewing conversion for flow: ${flowId}`);
+                this.logger.debug(`[FlowViz] User viewing conversion for flow: ${flowId}`);
                 void (async () => {
                     try {
                         // Ensure conversion service is initialized (loads persisted state from disk)
@@ -1404,7 +1446,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             case 'executeFlowFromSelector': {
                 // User clicked Execute button — mark as executing, open Conversion webview, trigger Execute All
                 const flowId = message.data as string;
-                this.logger.info(`[FlowViz] User requested execute all for flow: ${flowId}`);
+                this.logger.debug(`[FlowViz] User requested execute all for flow: ${flowId}`);
 
                 // Mark as executing and refresh UI
                 SourceFlowVisualizer.executingGroupIds.add(flowId);
@@ -1446,7 +1488,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             case 'openProjectFromSelector': {
                 // User clicked Open in VS Code — open the generated project workspace
                 const flowId = message.data as string;
-                this.logger.info(`[FlowViz] User requested open project for flow: ${flowId}`);
+                this.logger.debug(`[FlowViz] User requested open project for flow: ${flowId}`);
                 void (async () => {
                     try {
                         const fs = await import('fs');
@@ -1523,15 +1565,47 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 break;
             }
 
+            case 'stopFlowFromSelector': {
+                const stopFlowId = message.data as string;
+                if (stopFlowId) {
+                    this.logger.debug(`[FlowViz] Stop requested for flow ${stopFlowId}`);
+                    // Cancel the running Copilot agent turn so the chat actually stops.
+                    void (async () => {
+                        try {
+                            await vscode.commands.executeCommand('workbench.action.chat.open');
+                            await vscode.commands.executeCommand('workbench.action.chat.cancel');
+                        } catch (err) {
+                            this.logger.debug(`[FlowViz] Chat cancel not available: ${err}`);
+                        }
+                    })();
+                    // Clear every busy flag for this flow so its step buttons revert.
+                    SourceFlowVisualizer.generatingGroupIds.delete(stopFlowId);
+                    SourceFlowVisualizer.planningGroupIds.delete(stopFlowId);
+                    SourceFlowVisualizer.convertingGroupIds.delete(stopFlowId);
+                    SourceFlowVisualizer.executingGroupIds.delete(stopFlowId);
+                    // Reset any in-progress conversion tasks (no-op if not executing).
+                    void (async () => {
+                        try {
+                            const { ConversionService } = await import('../../stages/conversion');
+                            await ConversionService.getInstance().stopExecution(stopFlowId);
+                        } catch (err) {
+                            this.logger.debug(`[FlowViz] stopExecution failed: ${err}`);
+                        }
+                    })();
+                    SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
+                }
+                break;
+            }
+
             case 'refreshFlowGroupSelector': {
-                this.logger.info('[FlowViz] User requested refresh of flow group selector');
+                this.logger.debug('[FlowViz] User requested refresh of flow group selector');
                 SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
                 break;
             }
 
             case 'resetFlowFromSelector': {
                 const resetFlowId = message.data as string;
-                this.logger.info(`[FlowViz] User requested reset for flow: ${resetFlowId}`);
+                this.logger.debug(`[FlowViz] User requested reset for flow: ${resetFlowId}`);
                 (async () => {
                     // Confirm via VS Code dialog
                     const confirm = await vscode.window.showWarningMessage(
@@ -1625,6 +1699,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                             }
 
                             // Try deleting each candidate
+                            const failedDeletions: string[] = [];
                             for (const candidate of outCandidates) {
                                 const outPath = pathMod.join(
                                     workspaceFolder.uri.fsPath,
@@ -1632,9 +1707,30 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                                     candidate
                                 );
                                 if (fs.existsSync(outPath)) {
-                                    fs.rmSync(outPath, { recursive: true, force: true });
-                                    this.logger.info(`[FlowViz] Deleted output folder: ${outPath}`);
+                                    try {
+                                        // maxRetries/retryDelay handle transient Windows EPERM/EBUSY locks
+                                        fs.rmSync(outPath, {
+                                            recursive: true,
+                                            force: true,
+                                            maxRetries: 5,
+                                            retryDelay: 200,
+                                        });
+                                        this.logger.debug(
+                                            `[FlowViz] Deleted output folder: ${outPath}`
+                                        );
+                                    } catch (delErr) {
+                                        failedDeletions.push(outPath);
+                                        this.logger.warn(
+                                            `[FlowViz] Could not delete output folder (likely locked by a running process): ${outPath} — ${delErr instanceof Error ? delErr.message : String(delErr)}`
+                                        );
+                                    }
                                 }
+                            }
+                            if (failedDeletions.length > 0) {
+                                vscode.window.showWarningMessage(
+                                    `Progress was reset, but ${failedDeletions.length} generated output folder(s) could not be deleted because files are in use ` +
+                                        `(e.g. a running func host or an open terminal in that folder). Stop those processes and delete manually: ${failedDeletions.join(', ')}`
+                                );
                             }
                         }
 
@@ -1650,7 +1746,14 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                             SourceFlowVisualizer.clearGroupCache(this.currentCacheKey, resetFlowId);
                         }
 
-                        this.logger.info(`[FlowViz] Reset complete for flow: ${resetFlowId}`);
+                        this.logger.debug(`[FlowViz] Reset complete for flow: ${resetFlowId}`);
+                        TelemetryService.getInstance().logStep('migration.flow.reset', {
+                            flowId: resetFlowId,
+                            flowName:
+                                SourceFlowVisualizer.getStaticCachedFlowGroups()?.groups.find(
+                                    (g) => g.id === resetFlowId
+                                )?.name ?? resetFlowId,
+                        });
                         vscode.window.showInformationMessage(
                             `Progress reset for flow group. Ready for re-analysis.`
                         );
@@ -1697,7 +1800,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         }
 
         if (!groupName) {
-            this.logger.warn(`[FlowViz] Flow group not found: ${groupId}`);
+            this.logger.debug(`[FlowViz] Flow group not found: ${groupId}`);
             return;
         }
 
@@ -1709,7 +1812,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             return;
         }
 
-        this.logger.info(
+        this.logger.debug(
             `[FlowViz] Triggering NEW agent chat for group "${groupName}" (${groupArtifactCount} artifacts)`
         );
 
@@ -1986,58 +2089,57 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         const sourcePlatform = ConfigurationService.getInstance().getSourcePlatform();
 
         // Component type explanations for education (platform-aware)
-        const componentExplanations: Record<string, string> = sourcePlatform === 'tibco' ? {
-            'Process':
-                'A TIBCO BusinessWorks process that defines the execution flow using activities, transitions, and groups.',
-            'Starter':
-                'Entry point activity that triggers process execution (e.g., HTTP Receiver, JMS Queue Receiver, Timer).',
-            'Activity':
-                'A unit of work within a process (e.g., JDBC Query, Write File, Send HTTP Request, Transform XML).',
-            'Connection':
-                'Shared resource defining connectivity to external systems (e.g., JDBC Connection, JMS Connection, HTTP Connection).',
-            'Sub-Process':
-                'A reusable process invoked from other processes, enabling modular design.',
-            'Transition':
-                'Control flow between activities defining execution order and conditional routing.',
-            'Group':
-                'A container for activities that can apply iteration, transaction, or error handling scope.',
-            'Schema':
-                'XSD definition that describes the structure of messages (elements, attributes, data types).',
-            'XSLT':
-                'XSLT-based transformation that converts messages from one schema format to another.',
-        } : sourcePlatform === 'mulesoft' ? {
-            'Flow':
-                'A MuleSoft flow defining message processing from source to one or more processors.',
-            'Source':
-                'Entry point that triggers flow execution (e.g., HTTP Listener, Scheduler, JMS Subscriber).',
-            'Processor':
-                'A component that processes, transforms, or routes messages within a flow.',
-            'Connector':
-                'Configuration for connecting to external systems (e.g., Database, HTTP, Salesforce).',
-            'Transform':
-                'DataWeave transformation for converting message payloads between formats.',
-            'Sub-Flow':
-                'A reusable set of processors that can be referenced from other flows.',
-            'Error Handler':
-                'Defines how errors are caught and handled within a flow.',
-        } : {
-            'Receive Location':
-                'Entry point where messages enter BizTalk. Configured with an adapter (FILE, HTTP, etc.) to poll or listen for incoming data.',
-            'Receive Port':
-                'Container for one or more Receive Locations. Defines the message type and optional pipeline processing.',
-            'Receive Pipeline':
-                'Processes incoming messages - decodes, disassembles, validates XML, and promotes properties for routing.',
-            'Message Box':
-                'Central SQL Server database that stores all messages. Uses publish/subscribe pattern to route messages to subscribers.',
-            Orchestration:
-                'Visual workflow that coordinates business processes. Contains shapes for receiving, sending, transforming, and making decisions.',
-            Map: 'XSLT-based transformation that converts messages from one schema format to another.',
-            Schema: 'XSD definition that describes the structure of messages (elements, attributes, data types).',
-            'Send Pipeline':
-                'Processes outgoing messages - assembles, encodes, and signs/encrypts as needed.',
-            'Send Port':
-                'Exit point that delivers messages to external systems. Can be static (fixed destination) or dynamic (runtime routing).',
-        };
+        const componentExplanations: Record<string, string> =
+            sourcePlatform === 'tibco'
+                ? {
+                      Process:
+                          'A TIBCO BusinessWorks process that defines the execution flow using activities, transitions, and groups.',
+                      Starter:
+                          'Entry point activity that triggers process execution (e.g., HTTP Receiver, JMS Queue Receiver, Timer).',
+                      Activity:
+                          'A unit of work within a process (e.g., JDBC Query, Write File, Send HTTP Request, Transform XML).',
+                      Connection:
+                          'Shared resource defining connectivity to external systems (e.g., JDBC Connection, JMS Connection, HTTP Connection).',
+                      'Sub-Process':
+                          'A reusable process invoked from other processes, enabling modular design.',
+                      Transition:
+                          'Control flow between activities defining execution order and conditional routing.',
+                      Group: 'A container for activities that can apply iteration, transaction, or error handling scope.',
+                      Schema: 'XSD definition that describes the structure of messages (elements, attributes, data types).',
+                      XSLT: 'XSLT-based transformation that converts messages from one schema format to another.',
+                  }
+                : sourcePlatform === 'mulesoft'
+                  ? {
+                        Flow: 'A MuleSoft flow defining message processing from source to one or more processors.',
+                        Source: 'Entry point that triggers flow execution (e.g., HTTP Listener, Scheduler, JMS Subscriber).',
+                        Processor:
+                            'A component that processes, transforms, or routes messages within a flow.',
+                        Connector:
+                            'Configuration for connecting to external systems (e.g., Database, HTTP, Salesforce).',
+                        Transform:
+                            'DataWeave transformation for converting message payloads between formats.',
+                        'Sub-Flow':
+                            'A reusable set of processors that can be referenced from other flows.',
+                        'Error Handler': 'Defines how errors are caught and handled within a flow.',
+                    }
+                  : {
+                        'Receive Location':
+                            'Entry point where messages enter BizTalk. Configured with an adapter (FILE, HTTP, etc.) to poll or listen for incoming data.',
+                        'Receive Port':
+                            'Container for one or more Receive Locations. Defines the message type and optional pipeline processing.',
+                        'Receive Pipeline':
+                            'Processes incoming messages - decodes, disassembles, validates XML, and promotes properties for routing.',
+                        'Message Box':
+                            'Central SQL Server database that stores all messages. Uses publish/subscribe pattern to route messages to subscribers.',
+                        Orchestration:
+                            'Visual workflow that coordinates business processes. Contains shapes for receiving, sending, transforming, and making decisions.',
+                        Map: 'XSLT-based transformation that converts messages from one schema format to another.',
+                        Schema: 'XSD definition that describes the structure of messages (elements, attributes, data types).',
+                        'Send Pipeline':
+                            'Processes outgoing messages - assembles, encodes, and signs/encrypts as needed.',
+                        'Send Port':
+                            'Exit point that delivers messages to external systems. Can be static (fixed destination) or dynamic (runtime routing).',
+                    };
         const explanationsJson = JSON.stringify(componentExplanations);
 
         const cachedBadge = isCached ? '<span class="badge badge-cached">Cached</span>' : '';
@@ -2046,13 +2148,26 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         const depAnalysis = result.dependencyAnalysis;
         let depTabBadge = '';
         if (depAnalysis && depAnalysis.missingDependencies.length > 0) {
-            const total = depAnalysis.missingDependencies.length;
-            if (depAnalysis.counts.critical > 0) {
-                depTabBadge = `<span class="tab-badge critical">${total}</span>`;
-            } else if (depAnalysis.counts.warning > 0) {
-                depTabBadge = `<span class="tab-badge warning">${total}</span>`;
+            // Only critical/warning entries are genuinely missing. Standard runtime
+            // assemblies (info severity) are listed for completeness, not missing —
+            // so they must not inflate the badge. Counts may be absent/partial in
+            // older cached analyses, so fall back to counting severities.
+            const deps = depAnalysis.missingDependencies;
+            const criticalCount =
+                typeof depAnalysis.counts?.critical === 'number'
+                    ? depAnalysis.counts.critical
+                    : deps.filter((d) => d.severity === 'critical').length;
+            const warningCount =
+                typeof depAnalysis.counts?.warning === 'number'
+                    ? depAnalysis.counts.warning
+                    : deps.filter((d) => d.severity === 'warning').length;
+            const actionable = criticalCount + warningCount;
+            if (criticalCount > 0) {
+                depTabBadge = `<span class="tab-badge critical">${actionable}</span>`;
+            } else if (warningCount > 0) {
+                depTabBadge = `<span class="tab-badge warning">${actionable}</span>`;
             } else {
-                depTabBadge = `<span class="tab-badge clear">${total}</span>`;
+                depTabBadge = '<span class="tab-badge clear">0</span>';
             }
         } else {
             depTabBadge = '<span class="tab-badge clear">0</span>';
@@ -2380,31 +2495,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         }
         
         /* Message Flow Timeline */
-        .migration-banner {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 16px;
-            padding: 12px 20px;
-            margin-bottom: 20px;
-            background: var(--vscode-editor-inactiveSelectionBackground);
-            border: 1px solid var(--vscode-panel-border);
-            border-radius: 8px;
-        }
-        .migration-platform {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .migration-label {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--vscode-foreground);
-        }
-        .migration-arrow {
-            display: flex;
-            align-items: center;
-        }
+        ${SourceFlowVisualizer.getMigrationBannerCss()}
 
         .flow-timeline {
             position: relative;
@@ -3477,7 +3568,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     <!-- Missing Dependencies Tab -->
     <div id="tab-dependencies" class="tab-content">
         <h2 style="margin-bottom: 8px;">Missing Dependencies</h2>
-        <p style="margin-bottom: 24px; opacity: 0.8;">Dependencies (DLLs, schemas, maps, etc.) that are referenced but not found in the scanned source files. Resolve these before proceeding to the next stage.</p>
+        <p style="margin-bottom: 24px; opacity: 0.8;">Dependencies referenced by the source flows. Entries under <strong>Custom</strong>, <strong>Unknown Origin</strong>, and <strong>Third-Party</strong> are genuinely missing (no source code or decompiled code was found) and must be resolved before proceeding. Standard framework, runtime, and platform assemblies are listed for completeness only &mdash; they are provided at runtime and are not missing. Referenced code whose source IS present is not missing either: the converter reuses it as a local function.</p>
         <div id="dependenciesContainer">
             <!-- Populated by JavaScript -->
         </div>
@@ -3503,7 +3594,9 @@ export class SourceFlowVisualizer implements vscode.Disposable {
 
     <!-- Learn Tab -->
     <div id="tab-learn" class="tab-content">
-        ${sourcePlatform === 'tibco' ? `
+        ${
+            sourcePlatform === 'tibco'
+                ? `
         <h2 style="margin-bottom: 24px;">Understanding TIBCO BusinessWorks Architecture</h2>
         
         <div class="education-section">
@@ -3600,7 +3693,8 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 </div>
             </div>
         </div>
-        ` : `
+        `
+                : `
         <h2 style="margin-bottom: 24px;">Understanding BizTalk Architecture</h2>
         
         <div class="education-section">
@@ -3684,7 +3778,8 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 </div>
             </div>
         </div>
-        `}
+        `
+        }
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -4167,7 +4262,15 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             }
             
             const deps = dependencyAnalysis.missingDependencies;
-            const counts = dependencyAnalysis.counts;
+            // counts may be absent or partial in cached analyses — derive any
+            // missing field from the actual dependency severities so the UI never
+            // shows "undefined".
+            const rawCounts = dependencyAnalysis.counts || {};
+            const counts = {
+                critical: typeof rawCounts.critical === 'number' ? rawCounts.critical : deps.filter(d => d.severity === 'critical').length,
+                warning: typeof rawCounts.warning === 'number' ? rawCounts.warning : deps.filter(d => d.severity === 'warning').length,
+                info: typeof rawCounts.info === 'number' ? rawCounts.info : deps.filter(d => d.severity === 'info').length,
+            };
             const hasCritical = counts.critical > 0;
             const hasWarnings = counts.warning > 0;
             const bannerClass = hasCritical ? 'has-critical' : (hasWarnings ? 'has-warnings' : 'all-clear');
@@ -4649,7 +4752,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 (a) => !EXCLUDED_CATEGORIES.has(a.type)
             );
 
-            logger.info('Flow visualization cache hit via DiscoveryCacheService', {
+            logger.debug('Flow visualization cache hit via DiscoveryCacheService', {
                 flowId: firstDiscovered.id,
             });
             return { result: analysis as GeneratedFlowResult, artifacts: integrationArtifacts };

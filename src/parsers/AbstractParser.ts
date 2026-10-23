@@ -483,7 +483,7 @@ export abstract class AbstractParser implements IParser, IArtifactParser {
             };
 
             if (parseError.severity === 'error') {
-                this.logger.error(`[Parser] ${parseError.message}`, parseError.cause, metadata);
+                this.logger.warn(`[Parser] ${parseError.message}`, metadata);
                 continue;
             }
 
@@ -492,7 +492,7 @@ export abstract class AbstractParser implements IParser, IArtifactParser {
                 continue;
             }
 
-            this.logger.info(`[Parser] ${parseError.message}`, metadata);
+            this.logger.debug(`[Parser] ${parseError.message}`, metadata);
         }
     }
 

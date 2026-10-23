@@ -6,6 +6,7 @@
  */
 
 import * as vscode from 'vscode';
+import { TelemetryService } from './TelemetryService';
 
 /**
  * Log levels supported by the logging service
@@ -17,6 +18,9 @@ export enum LogLevel {
     Error = 3,
 }
 
+/** Human-readable names for each log level, indexed by LogLevel value. */
+const LEVEL_NAMES = ['DEBUG', 'INFO', 'WARN', 'ERROR'] as const;
+
 /**
  * Log entry metadata
  */
@@ -27,9 +31,9 @@ type LogMetadata = Record<string, string | number | boolean | undefined>;
  */
 export class LoggingService implements vscode.Disposable {
     private static instance: LoggingService | undefined;
-    private outputChannel: vscode.OutputChannel | undefined;
-    private logLevel: LogLevel = LogLevel.Info;
+    private outputChannel: vscode.LogOutputChannel | undefined;
     private readonly channelName = 'Logic Apps Migration Agent';
+    private forwardingToTelemetry = false;
 
     private constructor() {}
 
@@ -47,113 +51,119 @@ export class LoggingService implements vscode.Disposable {
      * Initialize the logging service
      */
     public initialize(_context: vscode.ExtensionContext): void {
+        // Create the channel as a LogOutputChannel so VS Code controls the
+        // visible log level natively (the Output panel's filter icon, or the
+        // "Developer: Set Log Level…" command). The channel's own level is the
+        // single source of truth — there is no extension-level log-level setting.
         this.outputChannel = vscode.window.createOutputChannel(this.channelName, { log: true });
 
-        // Read log level from configuration
-        this.updateLogLevel();
-
-        // Listen for configuration changes
-        vscode.workspace.onDidChangeConfiguration((event) => {
-            if (event.affectsConfiguration('logicAppsMigrationAgent.logLevel')) {
-                this.updateLogLevel();
-            }
-        });
-
-        this.info('Logging service initialized');
+        this.debug('Logging service initialized');
     }
 
     /**
-     * Update log level from configuration
+     * Append metadata (if any) to a message. The level and timestamp are added
+     * by the VS Code LogOutputChannel itself, so we don't duplicate them here.
      */
-    private updateLogLevel(): void {
-        const config = vscode.workspace.getConfiguration('logicAppsMigration');
-        const levelString = config.get<string>('logLevel', 'info');
-
-        switch (levelString.toLowerCase()) {
-            case 'debug':
-                this.logLevel = LogLevel.Debug;
-                break;
-            case 'info':
-                this.logLevel = LogLevel.Info;
-                break;
-            case 'warn':
-                this.logLevel = LogLevel.Warn;
-                break;
-            case 'error':
-                this.logLevel = LogLevel.Error;
-                break;
-            default:
-                this.logLevel = LogLevel.Info;
-        }
-    }
-
-    /**
-     * Format a log message with timestamp and level
-     */
-    private formatMessage(level: string, message: string, metadata?: LogMetadata): string {
-        const timestamp = new Date().toISOString();
-        let formattedMessage = `[${level}] [${timestamp}] ${message}`;
-
+    private composeMessage(message: string, metadata?: LogMetadata): string {
         if (metadata && Object.keys(metadata).length > 0) {
-            formattedMessage += ` ${JSON.stringify(metadata)}`;
+            return `${message} ${JSON.stringify(metadata)}`;
         }
-
-        return formattedMessage;
+        return message;
     }
 
     /**
      * Log a debug message
      */
     public debug(message: string, metadata?: LogMetadata): void {
-        if (this.logLevel <= LogLevel.Debug) {
-            this.log(LogLevel.Debug, message, metadata);
-        }
+        this.log(LogLevel.Debug, message, metadata);
     }
 
     /**
      * Log an info message
      */
     public info(message: string, metadata?: LogMetadata): void {
-        if (this.logLevel <= LogLevel.Info) {
-            this.log(LogLevel.Info, message, metadata);
-        }
+        this.log(LogLevel.Info, message, metadata);
     }
 
     /**
-     * Log a warning message
+     * Log a warning message.
+     *
+     * Accepts an optional `Error` (whose name/message/stack are merged into the
+     * metadata, like `error()`) so a handled failure can be logged at WARN
+     * without losing the error detail.
      */
-    public warn(message: string, metadata?: LogMetadata): void {
-        if (this.logLevel <= LogLevel.Warn) {
-            this.log(LogLevel.Warn, message, metadata);
-        }
+    public warn(message: string, metadata?: LogMetadata): void;
+    public warn(message: string, error?: Error, metadata?: LogMetadata): void;
+    public warn(
+        message: string,
+        errorOrMetadata?: Error | LogMetadata,
+        metadata?: LogMetadata
+    ): void {
+        this.log(LogLevel.Warn, message, this.coalesceMetadata(errorOrMetadata, metadata));
     }
 
     /**
      * Log an error message
      */
     public error(message: string, error?: Error, metadata?: LogMetadata): void {
-        if (this.logLevel <= LogLevel.Error) {
-            const errorMetadata: LogMetadata = {
+        this.log(LogLevel.Error, message, this.coalesceMetadata(error, metadata));
+    }
+
+    /**
+     * Merge an optional Error and metadata into a single metadata object.
+     * When an Error is provided, its name/message/stack are attached.
+     */
+    private coalesceMetadata(
+        errorOrMetadata?: Error | LogMetadata,
+        metadata?: LogMetadata
+    ): LogMetadata {
+        if (errorOrMetadata instanceof Error) {
+            return {
                 ...metadata,
-                errorName: error?.name,
-                errorMessage: error?.message,
-                errorStack: error?.stack,
+                errorName: errorOrMetadata.name,
+                errorMessage: errorOrMetadata.message,
+                errorStack: errorOrMetadata.stack,
             };
-            this.log(LogLevel.Error, message, errorMetadata);
         }
+        return { ...(errorOrMetadata ?? {}), ...metadata };
     }
 
     /**
      * Internal log method
      */
     private log(level: LogLevel, message: string, metadata?: LogMetadata): void {
-        if (!this.outputChannel) {
-            return;
+        if (this.outputChannel) {
+            // Route through the LogOutputChannel's native level methods so VS Code
+            // renders a single, correct severity (and its own timestamp), and so
+            // the channel's native level filter controls visibility.
+            const text = this.composeMessage(message, metadata);
+            switch (level) {
+                case LogLevel.Debug:
+                    this.outputChannel.debug(text);
+                    break;
+                case LogLevel.Info:
+                    this.outputChannel.info(text);
+                    break;
+                case LogLevel.Warn:
+                    this.outputChannel.warn(text);
+                    break;
+                case LogLevel.Error:
+                    this.outputChannel.error(text);
+                    break;
+            }
         }
 
-        const levelNames = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
-        const formattedMessage = this.formatMessage(levelNames[level], message, metadata);
-        this.outputChannel.appendLine(formattedMessage);
+        // Forward INFO and above (info/warn/error) to Application Insights (-> Kusto).
+        // TEMPORARY: lowered from error-only for testing. Debug stays local.
+        // Guard against re-entrancy so telemetry-internal logging cannot recurse.
+        if (level >= LogLevel.Info && !this.forwardingToTelemetry) {
+            this.forwardingToTelemetry = true;
+            try {
+                TelemetryService.getInstance().sendLog(LEVEL_NAMES[level], message, metadata);
+            } finally {
+                this.forwardingToTelemetry = false;
+            }
+        }
     }
 
     /**

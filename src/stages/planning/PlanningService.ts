@@ -73,7 +73,7 @@ export class PlanningService implements vscode.Disposable {
         // Restore planning state from storage
         await this.loadStateFromStorage();
 
-        this.logger.info('Planning service initialized');
+        this.logger.debug('Planning service initialized');
     }
 
     // =========================================================================
@@ -90,7 +90,7 @@ export class PlanningService implements vscode.Disposable {
         const inventory = inventoryService.getInventory();
 
         if (!inventory || inventory.items.length === 0) {
-            this.logger.warn('No inventory available for planning');
+            this.logger.debug('No inventory available for planning');
             return [];
         }
 
@@ -143,7 +143,7 @@ export class PlanningService implements vscode.Disposable {
             // but we already have flows persisted in state (from a previous session).
             // Preserve them instead of falling back to raw inventory items which
             // would have different IDs and lose all status / plan associations.
-            this.logger.info(
+            this.logger.debug(
                 `[PlanningService] Reusing ${this.state.flows.length} persisted flows (flow groups not in memory)`
             );
             flows.push(...this.state.flows);
@@ -207,7 +207,7 @@ export class PlanningService implements vscode.Disposable {
                 (hasPlanInState || hasPlanOnDisk) &&
                 (flow.status === 'in-progress' || flow.status === 'not-started')
             ) {
-                this.logger.info(
+                this.logger.debug(
                     `[PlanningService] Correcting flow "${flow.id}" status from "${flow.status}" to "planned" (plan exists: state=${hasPlanInState}, disk=${hasPlanOnDisk})`
                 );
                 flow.status = 'planned';
@@ -217,7 +217,7 @@ export class PlanningService implements vscode.Disposable {
         void this.saveStateToStorage();
         this._onStateChange.fire({ type: 'flows-loaded' });
 
-        this.logger.info(`Built ${flows.length} plannable flows from discovery`);
+        this.logger.debug(`Built ${flows.length} plannable flows from discovery`);
         return flows;
     }
 
@@ -300,7 +300,7 @@ export class PlanningService implements vscode.Disposable {
         this.state = undefined;
         const storage = StorageService.getInstance();
         await storage.setWorkspace(StorageKeys.MIGRATION_PLAN, undefined);
-        this.logger.info('Planning state reset');
+        this.logger.debug('Planning state reset');
     }
 
     // =========================================================================
@@ -317,7 +317,7 @@ export class PlanningService implements vscode.Disposable {
             await storage.setWorkspace(StorageKeys.MIGRATION_PLAN, this.state);
             this.logger.debug('Planning state saved to storage');
         } catch (error) {
-            this.logger.error('Failed to save planning state', error as Error);
+            this.logger.warn('Failed to save planning state', error as Error);
         }
     }
 
@@ -340,7 +340,7 @@ export class PlanningService implements vscode.Disposable {
                         const hasPlanInState = !!(this.state.plans && this.state.plans[flow.id]);
                         const hasPlanOnDisk = cacheService.has(flow.id);
                         if ((hasPlanInState || hasPlanOnDisk) && flow.status === 'in-progress') {
-                            this.logger.info(
+                            this.logger.debug(
                                 `[PlanningService] loadState: correcting flow "${flow.id}" from "in-progress" to "planned" (plan exists: state=${hasPlanInState}, disk=${hasPlanOnDisk})`
                             );
                             flow.status = 'planned';
@@ -351,7 +351,7 @@ export class PlanningService implements vscode.Disposable {
                 this.logger.debug('Planning state restored from storage');
             }
         } catch (error) {
-            this.logger.error('Failed to load planning state', error as Error);
+            this.logger.warn('Failed to load planning state', error as Error);
         }
     }
 

@@ -105,7 +105,7 @@ export class MigrationTreeProvider
             return this.getItemChildren(element);
         } catch (err) {
             const error = err instanceof Error ? err : new Error(String(err));
-            this.logger.error('Error getting tree children', error, { viewType: this.viewType });
+            this.logger.warn('Error getting tree children', error, { viewType: this.viewType });
             return [];
         }
     }

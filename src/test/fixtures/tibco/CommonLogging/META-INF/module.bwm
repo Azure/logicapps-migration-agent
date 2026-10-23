@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sca:composite xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:XMLSchema="http://www.w3.org/2001/XMLSchema" xmlns:compositeext="http://schemas.tibco.com/amx/3.0/compositeext" xmlns:http="http://xsd.tns.tibco.com/bw/models/sharedresource/httpclient" xmlns:sca="http://www.osoa.org/xmlns/sca/1.0" xmlns:scaext="http://xsd.tns.tibco.com/amf/models/sca/extensions" xmi:id="_4V2SkDb6EeiMPZ60yr-cDw" targetNamespace="http://tns.tibco.com/bw/composite/CommonLogging" name="CommonLogging" compositeext:version="1.0.0" compositeext:formatVersion="2">
+  <sca:property xmi:id="_4qDoADb6EeiMPZ60yr-cDw" name="BW.DEPLOYMENTUNIT.TYPE" type="XMLSchema:string" scalable="true"/>
+  <sca:property xmi:id="_4qfF0Db6EeiMPZ60yr-cDw" name="BW.APPNODE.NAME" type="XMLSchema:string" scalable="true"/>
+  <sca:property xmi:id="_4qiwMDb6EeiMPZ60yr-cDw" name="BW.DEPLOYMENTUNIT.NAME" type="XMLSchema:string" scalable="true"/>
+  <sca:property xmi:id="_4qlMcDb6EeiMPZ60yr-cDw" name="BW.HOST.NAME" type="XMLSchema:string" scalable="true"/>
+  <sca:property xmi:id="_4qoPwDb6EeiMPZ60yr-cDw" name="BW.DOMAIN.NAME" type="XMLSchema:string" scalable="true"/>
+  <sca:property xmi:id="_4qqE8Db6EeiMPZ60yr-cDw" name="BW.DEPLOYMENTUNIT.VERSION" type="XMLSchema:string" scalable="true"/>
+  <sca:property xmi:id="_4qshMDb6EeiMPZ60yr-cDw" name="BW.APPSPACE.NAME" type="XMLSchema:string" scalable="true"/>
+  <sca:property xmi:id="_4qvkgDb6EeiMPZ60yr-cDw" name="BW.MODULE.VERSION" type="XMLSchema:string" scalable="true"/>
+  <sca:property xmi:id="_4qxZsDb6EeiMPZ60yr-cDw" name="BW.MODULE.NAME" type="XMLSchema:string" scalable="true"/>
+  <sca:property xmi:id="_EhF1oEj9EeiuraGyOzPDqw" name="CLEHttpClientResource" type="http:HttpClientConfiguration" publicAccess="true" scalable="true"/>
+  <sca:property xmi:id="_s1jiIEFhEeiXoYco-LjBCQ" name="/HTTP-CLIENT/Http.Cleint" type="XMLSchema:string" publicAccess="true" scalable="true"/>
+  <sca:property xmi:id="_6ubWcEFhEeiXoYco-LjBCQ" name="/HTTP-CLIENT/Http.Port" type="XMLSchema:int" scaext:simpleValue="0" publicAccess="true" scalable="true"/>
+</sca:composite>

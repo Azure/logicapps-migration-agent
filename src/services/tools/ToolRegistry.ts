@@ -92,7 +92,7 @@ export class ToolRegistry implements vscode.Disposable {
         // Update VS Code context for tool enablement
         await this.updateVSCodeContext();
 
-        LoggingService.getInstance().info('ToolRegistry initialized', {
+        LoggingService.getInstance().debug('ToolRegistry initialized', {
             currentStage: this.currentStage,
         });
     }
@@ -494,7 +494,7 @@ export class ToolRegistry implements vscode.Disposable {
                         logger.debug(message);
                         break;
                     default:
-                        logger.info(message);
+                        logger.debug(message);
                 }
             },
         };

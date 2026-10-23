@@ -46,7 +46,7 @@ export class DependencyGraphBuilder {
      * Build dependency graph from inventory.
      */
     public async build(inventory: ArtifactInventory): Promise<DependencyGraph> {
-        this.logger.info('Building dependency graph', { itemCount: inventory.items.length });
+        this.logger.debug('Building dependency graph', { itemCount: inventory.items.length });
 
         const nodes = new Map<string, DependencyNode>();
         const edges: DependencyEdge[] = [];
@@ -90,7 +90,7 @@ export class DependencyGraphBuilder {
             }
         }
 
-        this.logger.info('Dependency extraction summary', {
+        this.logger.debug('Dependency extraction summary', {
             totalItems: inventory.items.length,
             itemsWithIrDoc,
             nameMapSize: nameToIds.size,
@@ -135,7 +135,7 @@ export class DependencyGraphBuilder {
         // Identify shared resources
         const sharedResources = this.identifySharedResources(nodes, edges);
 
-        this.logger.info('Dependency graph built', {
+        this.logger.debug('Dependency graph built', {
             nodes: nodes.size,
             edges: edges.length,
             roots: rootNodeIds.length,
@@ -748,14 +748,8 @@ export class DependencyGraphBuilder {
             return exactMatch;
         }
 
-        // 2. Try without extension
-        const withoutExt = path.basename(normalizedRef, path.extname(normalizedRef));
-        const noExtMatch = nameToIds.get(withoutExt);
-        if (noExtMatch) {
-            return noExtMatch;
-        }
-
-        // 3. Try last segment of dotted name (e.g. "Sat.Scade.PagosCore.MyOrch" → "myorch")
+        // Resolve qualified names before stripping an apparent file extension:
+        // "Maps.POToInvoice" must resolve to the map, not the "Maps" project.
         const dotParts = normalizedRef.split('.');
         if (dotParts.length > 1) {
             const lastSegment = dotParts[dotParts.length - 1];
@@ -771,6 +765,13 @@ export class DependencyGraphBuilder {
                     return lastTwoMatch;
                 }
             }
+        }
+
+        // 3. Try without extension
+        const withoutExt = path.basename(normalizedRef, path.extname(normalizedRef));
+        const noExtMatch = nameToIds.get(withoutExt);
+        if (noExtMatch) {
+            return noExtMatch;
         }
 
         // 4. Try extracting name from URI-style references (e.g. "http://schemas.example.com/OrderSchema#Root")
@@ -1290,7 +1291,7 @@ export class DependencyGraphService implements vscode.Disposable {
 
             this.logger.debug('Dependency graph saved to storage');
         } catch (error) {
-            this.logger.error('Failed to save dependency graph', error as Error);
+            this.logger.warn('Failed to save dependency graph', error as Error);
         }
     }
 
