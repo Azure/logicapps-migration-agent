@@ -67,6 +67,13 @@ jobs:
               run: |
                   RELEASE_TYPE="${{ github.event.inputs.release_type }}"
                   CURRENT_VERSION=$(node -p "require('./package.json').version")
+                  VERSION_PATTERN='[0-9]+\.[0-9]+\.[0-9]+'
+                  if [[ "$RELEASE_TYPE" == "patch" ]]; then
+                    IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+                    VERSION_PATTERN="${MAJOR}\.${MINOR}\.[0-9]+"
+                  fi
+                  PREV_TAG=$(git tag --list | sed -nE "/^v(${VERSION_PATTERN})$/p" | sort -V | tail -n 1)
+                  CURRENT_VERSION=$(printf '%s\n' "$CURRENT_VERSION" "${PREV_TAG#v}" | sort -V | tail -n 1)
                   echo "Current version: $CURRENT_VERSION"
 
                   IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
@@ -94,6 +101,7 @@ jobs:
 
                   echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
                   echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+                  echo "previous_tag=$PREV_TAG" >> $GITHUB_OUTPUT
 
             - name: 'Update package.json version'
               run: |
@@ -105,11 +113,11 @@ jobs:
                   git config --global user.name "release-automation-${{ github.actor }}"
                   git config --global user.email "${{ github.actor }}@users.noreply.github.com"
 
-            - name: 'Commit Version Bump'
+            - name: 'Commit Version Bump for Release Tag'
               run: |
-                  git add package.json
+                  # Keep the release commit on the tag; protected branches require pull requests.
+                  git add package.json package-lock.json
                   git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
-                  git push origin ${{ github.ref_name }}
 
             - name: 'Create and Push Tag'
               run: |
@@ -122,7 +130,7 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   # Get the previous tag
-                  PREV_TAG=$(git describe --tags --abbrev=0 ${{ steps.version.outputs.tag_name }}^ 2>/dev/null || echo "")
+                  PREV_TAG="${{ steps.version.outputs.previous_tag }}"
 
                   if [ -z "$PREV_TAG" ]; then
                     echo "No previous tag found, this is the first release"
