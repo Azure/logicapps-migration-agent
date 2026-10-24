@@ -189,6 +189,13 @@ Keep existing required checks and prevent bypasses so direct pushes cannot skip 
 tests. Apply the same rules to `master` if that branch is used. Adding the workflow
 alone does not make its result mandatory for merging.
 
+The manual **Version and Release** workflow keeps its version-bump commit on the
+release tag rather than pushing to the source branch. The build checks out that
+tag, including the updated `package.json` and `package-lock.json`. Major and minor
+releases advance from the highest stable release tag or package version; patch
+releases only consider tags on the source package's major/minor version line.
+The source branch's package version is not updated by a release.
+
 ## Contributing a New Platform
 
 This project is open-source and designed for extensibility. There are **two ways** to add support for a new integration platform:
