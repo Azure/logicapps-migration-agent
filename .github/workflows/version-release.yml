@@ -13,6 +13,11 @@ on:
                     - major
                     - minor
                     - patch
+    push:
+        branches:
+            - main
+            - master
+            - 'hotfix/**'
 
 permissions:
     contents: write
@@ -26,6 +31,7 @@ env:
 
 jobs:
     validation:
+        if: github.event_name == 'workflow_dispatch'
         runs-on: ubuntu-latest
         steps:
             - name: 'Check branch and release type'
@@ -46,14 +52,16 @@ jobs:
                     exit 1
                   fi
 
-    create-release:
+    create-version-pr:
         needs: validation
+        if: github.event_name == 'workflow_dispatch'
         runs-on: ubuntu-latest
         outputs:
             new_version: ${{ steps.version.outputs.new_version }}
-            tag_name: ${{ steps.version.outputs.tag_name }}
         permissions:
             contents: write
+            actions: write
+            pull-requests: write
         steps:
             - name: 'Checkout'
               uses: actions/checkout@v4
@@ -91,58 +99,96 @@ jobs:
                   esac
 
                   NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-                  TAG_NAME="v${NEW_VERSION}"
+                  VERSION_BRANCH="release/v${NEW_VERSION}"
 
                   echo "New version: $NEW_VERSION"
-                  echo "Tag name: $TAG_NAME"
+                  echo "Version branch: $VERSION_BRANCH"
 
                   echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-                  echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-
-            - name: 'Update package.json version'
-              run: |
-                  npm version ${{ steps.version.outputs.new_version }} --no-git-tag-version
-                  echo "Updated package.json to version ${{ steps.version.outputs.new_version }}"
+                  echo "version_branch=$VERSION_BRANCH" >> $GITHUB_OUTPUT
 
             - name: 'Configure Git'
               run: |
                   git config --global user.name "release-automation-${{ github.actor }}"
                   git config --global user.email "${{ github.actor }}@users.noreply.github.com"
 
-            - name: 'Commit Version Bump'
+            - name: 'Create Version Bump PR'
               env:
                   RELEASE_BRANCH: ${{ github.ref_name }}
+                  VERSION_BRANCH: ${{ steps.version.outputs.version_branch }}
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  NEW_VERSION: ${{ steps.version.outputs.new_version }}
               run: |
-                  npm ci --ignore-scripts
-                  npm test
-                  git add package.json package-lock.json
-                  git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
+                  if PR_URL=$(gh pr view "$VERSION_BRANCH" --json url --jq .url 2>/dev/null); then
+                    echo "Version bump PR already exists: $PR_URL"
+                  else
+                    git switch -c "$VERSION_BRANCH"
+                    npm version "$NEW_VERSION" --no-git-tag-version
+                    npm ci --ignore-scripts
+                    npm test
+                    git add package.json package-lock.json
+                    git commit -m "chore: bump version to $NEW_VERSION"
+                    git push origin "$VERSION_BRANCH"
+                    gh pr create \
+                      --base "$RELEASE_BRANCH" \
+                      --head "$VERSION_BRANCH" \
+                      --title "chore: bump version to $NEW_VERSION" \
+                      --body "Bump the package version for the next release."
+                  fi
 
-                  for ATTEMPT in 1 2 3; do
-                    TESTED_COMMIT=$(git rev-parse HEAD)
-                    git fetch origin "$RELEASE_BRANCH"
-                    git rebase "origin/$RELEASE_BRANCH"
+                  gh workflow run migration-tests.yml --ref "$VERSION_BRANCH"
 
-                    if [ "$(git rev-parse HEAD)" != "$TESTED_COMMIT" ]; then
-                      npm ci --ignore-scripts
-                      npm test
-                    fi
+    release-check:
+        if: github.event_name == 'push'
+        runs-on: ubuntu-latest
+        outputs:
+            new_version: ${{ steps.version.outputs.new_version }}
+            tag_name: ${{ steps.version.outputs.tag_name }}
+            should_release: ${{ steps.version.outputs.should_release }}
+        steps:
+            - name: 'Checkout'
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
-                    if git push origin "HEAD:refs/heads/$RELEASE_BRANCH"; then
-                      exit 0
-                    fi
+            - name: 'Check for an untagged version'
+              id: version
+              run: |
+                  NEW_VERSION=$(node -p "require('./package.json').version")
+                  TAG_NAME="v${NEW_VERSION}"
 
-                    echo "::warning::Version bump push failed (attempt $ATTEMPT of 3)."
-                    sleep "$ATTEMPT"
-                  done
+                  echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+                  echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
 
-                  echo "::error::Unable to push the version bump after 3 attempts."
-                  exit 1
+                  if git rev-parse --verify "refs/tags/$TAG_NAME" >/dev/null 2>&1; then
+                    echo "Release tag $TAG_NAME already exists."
+                    echo "should_release=false" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "Release tag $TAG_NAME does not exist; creating release."
+                    echo "should_release=true" >> "$GITHUB_OUTPUT"
+                  fi
+
+    create-release:
+        needs: release-check
+        if: github.event_name == 'push' && needs.release-check.outputs.should_release == 'true'
+        runs-on: ubuntu-latest
+        outputs:
+            tag_name: ${{ needs.release-check.outputs.tag_name }}
+        permissions:
+            contents: write
+        steps:
+            - name: 'Checkout'
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.sha }}
+                  fetch-depth: 0
 
             - name: 'Create and Push Tag'
+              env:
+                  TAG_NAME: ${{ needs.release-check.outputs.tag_name }}
               run: |
-                  git tag -a ${{ steps.version.outputs.tag_name }} -m "Release ${{ steps.version.outputs.tag_name }}"
-                  git push origin ${{ steps.version.outputs.tag_name }}
+                  git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+                  git push origin "$TAG_NAME"
 
             - name: 'Generate Release Notes'
               id: release-notes
@@ -150,14 +196,14 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   # Get the previous tag
-                  PREV_TAG=$(git describe --tags --abbrev=0 ${{ steps.version.outputs.tag_name }}^ 2>/dev/null || echo "")
+                  PREV_TAG=$(git describe --tags --abbrev=0 "${{ github.sha }}^" 2>/dev/null || echo "")
 
                   if [ -z "$PREV_TAG" ]; then
                     echo "No previous tag found, this is the first release"
                     RELEASE_NOTES="## Initial Release"
                   else
                     echo "Previous tag: $PREV_TAG"
-                    echo "Current tag: ${{ steps.version.outputs.tag_name }}"
+                    echo "Current tag: ${{ needs.release-check.outputs.tag_name }}"
 
                     # Generate release notes using GitHub API
                     API_RESPONSE=$(gh api \
@@ -165,8 +211,8 @@ jobs:
                       -H "Accept: application/vnd.github+json" \
                       -H "X-GitHub-Api-Version: 2022-11-28" \
                       /repos/${{ github.repository }}/releases/generate-notes \
-                      -f tag_name="${{ steps.version.outputs.tag_name }}" \
-                      -f target_commitish="${{ github.ref_name }}" \
+                      -f tag_name="${{ needs.release-check.outputs.tag_name }}" \
+                      -f target_commitish="${{ github.sha }}" \
                       -f previous_tag_name="$PREV_TAG" 2>/dev/null || echo '{"body": null}')
 
                     RELEASE_NOTES=$(echo "$API_RESPONSE" | jq -r '.body // empty')
@@ -175,20 +221,20 @@ jobs:
                     if [ -z "$RELEASE_NOTES" ] || [ "$RELEASE_NOTES" = "null" ]; then
                       echo "API returned empty/null body, generating custom release notes"
 
-                      COMMITS=$(git log $PREV_TAG..${{ steps.version.outputs.tag_name }} --oneline --pretty=format:"* %s (%h)" 2>/dev/null || echo "")
+                      COMMITS=$(git log "$PREV_TAG..${{ github.sha }}" --oneline --pretty=format:"* %s (%h)" 2>/dev/null || echo "")
 
                       if [ -n "$COMMITS" ]; then
                         RELEASE_NOTES="## What's Changed
 
                   $COMMITS
 
-                  **Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ steps.version.outputs.tag_name }}"
+                  **Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ needs.release-check.outputs.tag_name }}"
                       else
-                        RELEASE_NOTES="## Release ${{ steps.version.outputs.tag_name }}
+                        RELEASE_NOTES="## Release ${{ needs.release-check.outputs.tag_name }}
 
                   This release includes updates and improvements.
 
-                  **Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ steps.version.outputs.tag_name }}"
+                  **Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...${{ needs.release-check.outputs.tag_name }}"
                       fi
                     fi
                   fi
@@ -203,11 +249,12 @@ jobs:
               id: create-release
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  TAG_NAME: ${{ needs.release-check.outputs.tag_name }}
               run: |
-                  gh release create ${{ steps.version.outputs.tag_name }} \
-                    --title "Release ${{ steps.version.outputs.tag_name }}" \
+                  gh release create "$TAG_NAME" \
+                    --title "Release $TAG_NAME" \
                     --notes-file release-notes.md \
-                    --target ${{ github.ref_name }}
+                    --target "${{ github.sha }}"
 
     build-and-publish:
         needs: create-release
