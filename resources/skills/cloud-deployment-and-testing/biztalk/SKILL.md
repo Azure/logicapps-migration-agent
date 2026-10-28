@@ -17,6 +17,8 @@ This task is OPTIONAL. The user decides whether to execute or skip it via the UI
 
 ## 2. Deployment Steps
 
+**Hosting gate:** First read the finalized planning preferences and `planning-decision-guidance`. The web-app/Workflow Service Plan examples below apply to Azure-hosted Standard, not hybrid. For hybrid or ASE, verify and use target-specific infrastructure, identity, storage, and deployment procedures from current documentation. If prerequisites or support cannot be verified, report the blocker; never silently deploy to another host.
+
 1. **Generate ARM/Bicep template** that deploys the Logic App Standard resource with all required dependencies.
 2. **Deploy using `az deployment group create`** — do NOT use zip deploy for infrastructure.
 3. **ALL app settings MUST be in the Bicep template** — do NOT use `az webapp config appsettings set` as a separate step. Bicep redeploys REPLACE all settings. Any setting not in the template will be wiped on the next deploy.

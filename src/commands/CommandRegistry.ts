@@ -940,7 +940,7 @@ export class CommandRegistry implements vscode.Disposable {
      */
     private async handleGeneratePlanForFlow(
         flowId?: string,
-        trigger: 'initial' | 'replan' = 'initial'
+        trigger: 'initial' | 'replan' | 'review-choices' = 'initial'
     ): Promise<void> {
         const logger = LoggingService.getInstance();
 
@@ -997,6 +997,7 @@ export class CommandRegistry implements vscode.Disposable {
                     flowName,
                     flowId: flowId as string,
                     artifactList,
+                    reconsiderChoices: trigger === 'review-choices',
                 }),
             });
             logger.debug('[Planning] Agent chat opened successfully');
@@ -1667,7 +1668,7 @@ export class CommandRegistry implements vscode.Disposable {
     /**
      * Export planning report as DOCX
      */
-    private async handleExportPlanReport(flowId?: string): Promise<void> {
+    private async handleExportPlanReport(flowId?: string, planId?: string): Promise<void> {
         const logger = LoggingService.getInstance();
 
         if (!flowId) {
@@ -1678,7 +1679,7 @@ export class CommandRegistry implements vscode.Disposable {
         logger.debug(`[Export] Generating planning report for flow: ${flowId}`);
         const { ReportExporterService } = await import('../services/ReportExporterService');
         const exporter = ReportExporterService.getInstance();
-        const filePath = await exporter.generatePlanningReport(flowId);
+        const filePath = await exporter.generatePlanningReport(flowId, planId);
 
         TelemetryService.getInstance().logStep('report.exported', {
             type: 'planning',

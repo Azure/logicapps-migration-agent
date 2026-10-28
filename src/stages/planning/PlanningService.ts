@@ -293,6 +293,18 @@ export class PlanningService implements vscode.Disposable {
         return this.state?.plans[flowId];
     }
 
+    public async pausePlanning(flowId: string): Promise<void> {
+        const flow = this.state?.flows.find((candidate) => candidate.id === flowId);
+        if (flow?.status === 'in-progress') {
+            flow.status = PlanningCacheService.getInstance().has(flowId)
+                ? 'planned'
+                : 'not-started';
+            await this.saveStateToStorage();
+            this._onStateChange.fire({ type: 'flows-loaded', flowId });
+        }
+        this.logger.debug(`[PlanningService] Planning paused for "${flowId}"`);
+    }
+
     /**
      * Reset planning state.
      */

@@ -33,6 +33,7 @@ This is an open-source project — contributions are welcome! To add support for
 ### Target Platform
 
 - **Azure Logic Apps Standard** (Workflow Service Plan)
+- **Planning for Standard hybrid and ASE v3**: hosting choices guide connector, identity, and infrastructure assessment. These choices do not imply automatic deployment support; target-specific prerequisites and deployment procedures must be validated.
 
 ## Features
 
@@ -70,6 +71,16 @@ Discovery → Planning → Conversion → Validation → Deployment
 3. Click the **Logic Apps Migration Agent** icon in the Activity Bar
 4. Select your source folder when prompted (or use the command palette: `Logic Apps Migration Agent: Select Source Folder`)
 5. Follow the guided 5-stage workflow
+
+### Decision-first planning
+
+Planning resolves important choices before generating workflow definitions. It reuses discovery results and saved answers, asks a short hosting question when no explicit deployment setting exists, then asks only consequential unresolved questions (typically broker choice and/or preserve-code versus native-first modernization). Minor, behavior-preserving mappings are chosen automatically. Canceling pauses planning without inventing answers; already answered choices are saved.
+
+The planner generates **one selected scenario**, not several complete alternatives. It records short option tradeoffs and evidenced modernization opportunities, such as XML parsing with schemas, SQL stored-procedure actions, secret-store adoption, or telemetry modernization. Trigger/broker changes require contract and delivery-semantics checks; a queue behind an HTTP endpoint is not automatically a reason to replace the HTTP trigger. Connector availability and authentication are checked for the selected host.
+
+The Planning view keeps a concise decision summary and modernization table in the **Summary** section at the bottom of the overview. Expand **Planning details** for timelines, assumptions, alternatives, and rationale. **Regenerate Plan** reuses choices and preserves history; use **Suggest a Change** to request different choices. The view always displays the current plan used by Conversion, without a saved-version comparison table. DOCX reports include the current plan and saved scenario comparison for stakeholder review.
+
+Choices are persisted in `.vscode/migration/planning/{flowId}/planning-preferences.json`; every finalized plan is archived under `history/`. `plan.json` remains the current conversion input. Existing plans remain readable and appear as legacy plans without recorded choices. A full migration reset removes planning data and history.
 
 ## Requirements
 
