@@ -54,6 +54,13 @@ export { MuleSoftFlowParser, MuleSoftDataWeaveParser, MuleSoftProjectParser } fr
 // TIBCO Parsers (basic implementation)
 export { TIBCOProjectParser, TIBCOProcessParser } from './tibco';
 
+// SAP PI/PO Parsers (fully implemented)
+export {
+    SAPPIPOProjectParser,
+    SAPPIPOIntegrationProcessParser,
+    SAPPIPOMessageMappingParser,
+} from './sappi';
+
 // Stub Parsers (work in progress)
 export { MuleSoftAPISpecParser, GenericXMLParser } from './stubs';
 
@@ -72,6 +79,11 @@ import {
 } from './biztalk';
 import { MuleSoftFlowParser, MuleSoftDataWeaveParser, MuleSoftProjectParser } from './mulesoft';
 import { TIBCOProjectParser, TIBCOProcessParser } from './tibco';
+import {
+    SAPPIPOProjectParser,
+    SAPPIPOIntegrationProcessParser,
+    SAPPIPOMessageMappingParser,
+} from './sappi';
 import { MuleSoftAPISpecParser, GenericXMLParser } from './stubs';
 
 /**
@@ -98,6 +110,11 @@ export function initializeParsers(): void {
     // TIBCO parsers (basic implementation)
     defaultParserRegistry.register(new TIBCOProjectParser());
     defaultParserRegistry.register(new TIBCOProcessParser());
+
+    // SAP PI/PO parsers (fully implemented)
+    defaultParserRegistry.register(new SAPPIPOProjectParser());
+    defaultParserRegistry.register(new SAPPIPOIntegrationProcessParser());
+    defaultParserRegistry.register(new SAPPIPOMessageMappingParser());
 
     // MuleSoft API spec parser (stub — RAML/OAS parsing planned)
     defaultParserRegistry.register(new MuleSoftAPISpecParser());
