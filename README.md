@@ -71,6 +71,22 @@ Discovery → Planning → Conversion → Validation → Deployment
 4. Select your source folder when prompted (or use the command palette: `Logic Apps Migration Agent: Select Source Folder`)
 5. Follow the guided 5-stage workflow
 
+### Exporting reports
+
+Use **Export Report** in a flow's Analysis or Planning tab to save a Word document.
+BizTalk Analysis exports use the **Migration Discovery Report** format: executive
+summary, current-state architecture, inventory and application portfolio, message
+flow and runtime characteristics, adapter and connectivity assessment, and
+findings, risks, and recommendations.
+
+The report covers the selected flow, not the entire application estate. Its
+Integration Map includes protocol, message types, frequency, exchange pattern,
+processing mode, and critical-path information only when recorded in that flow's
+analysis or matching source metadata. Authentication, TLS, and complexity details
+are likewise evidence-based; the exporter does not infer them or calculate a new
+complexity score. Planning reports, other source-platform reports, and the
+interactive tabs retain their existing formats.
+
 ## Requirements
 
 | Requirement                                                                                                                      | Purpose                                               |
