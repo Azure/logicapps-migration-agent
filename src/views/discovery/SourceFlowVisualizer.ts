@@ -2463,7 +2463,8 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             border-radius: 0 0 8px 8px;
             padding: 0;
             overflow: auto;
-            min-height: 400px;
+            min-height: min(400px, 70vh);
+            max-height: 70vh;
             position: relative;
             cursor: grab;
         }
@@ -2472,12 +2473,19 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             cursor: grabbing;
         }
         
+        .diagram-stage {
+            position: relative;
+            overflow: hidden;
+        }
+
         .diagram-inner {
+            position: absolute;
+            top: 0;
+            left: 0;
             transform-origin: 0 0;
             transition: transform 0.15s ease;
             padding: 24px;
-            display: inline-block;
-            min-width: 100%;
+            width: max-content;
         }
         
         .diagram-inner.no-transition {
@@ -3500,8 +3508,10 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             <button class="zoom-btn zoom-btn-text" onclick="zoomFit()" title="Fit to View">Fit</button>
         </div>
         <div class="diagram-container" id="diagramContainer">
-            <div class="diagram-inner" id="diagramInner">
-                <pre class="mermaid" id="mermaidCode">${result.mermaid}</pre>
+            <div class="diagram-stage" id="diagramStage">
+                <div class="diagram-inner" id="diagramInner">
+                    <pre class="mermaid" id="mermaidCode">${result.mermaid}</pre>
+                </div>
             </div>
         </div>
         
@@ -3800,40 +3810,38 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         function getZoom() {
             return groupZoomLevels[currentGroupId] || 1;
         }
-        function setZoom(z) {
-            groupZoomLevels[currentGroupId] = Math.round(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z)) * 100) / 100;
+        function setZoom(z, minZoom = ZOOM_MIN) {
+            groupZoomLevels[currentGroupId] = Math.max(minZoom, Math.min(ZOOM_MAX, z));
             applyZoom();
         }
         function applyZoom(animate) {
             const inner = document.getElementById('diagramInner');
+            const stage = document.getElementById('diagramStage');
             const label = document.getElementById('zoomLevel');
             const z = getZoom();
             if (!animate) inner.classList.add('no-transition');
             else inner.classList.remove('no-transition');
             inner.style.transform = 'scale(' + z + ')';
-            label.textContent = Math.round(z * 100) + '%';
+            stage.style.width = (inner.offsetWidth * z) + 'px';
+            stage.style.height = (inner.offsetHeight * z) + 'px';
+            label.textContent = z < 0.01 ? '<1%' : Math.round(z * 100) + '%';
             if (!animate) requestAnimationFrame(() => inner.classList.remove('no-transition'));
         }
         function zoomIn()  { setZoom(getZoom() + ZOOM_STEP); }
-        function zoomOut() { setZoom(getZoom() - ZOOM_STEP); }
+        function zoomOut() { setZoom(getZoom() - ZOOM_STEP, Math.min(ZOOM_MIN, getZoom())); }
         function zoomReset() { setZoom(1); }
         function zoomFit() {
             const container = document.getElementById('diagramContainer');
             const inner = document.getElementById('diagramInner');
-            // Temporarily reset scale to measure natural size
-            inner.classList.add('no-transition');
-            inner.style.transform = 'scale(1)';
-            requestAnimationFrame(() => {
-                const cw = container.clientWidth;
-                const ch = container.clientHeight;
-                const iw = inner.scrollWidth;
-                const ih = inner.scrollHeight;
-                if (iw > 0 && ih > 0) {
-                    const fitScale = Math.min(cw / iw, ch / ih, ZOOM_MAX);
-                    setZoom(Math.max(fitScale, ZOOM_MIN));
-                }
-                inner.classList.remove('no-transition');
-            });
+            const cw = container.clientWidth;
+            const ch = container.clientHeight;
+            const iw = inner.offsetWidth;
+            const ih = inner.offsetHeight;
+            if (cw > 0 && ch > 0 && iw > 0 && ih > 0) {
+                setZoom(Math.min(cw / iw, ch / ih), 0);
+                container.scrollLeft = 0;
+                container.scrollTop = 0;
+            }
         }
         
         // Mouse-wheel zoom on diagram
@@ -3841,7 +3849,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
                 const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
-                setZoom(getZoom() + delta);
+                setZoom(getZoom() + delta, Math.min(ZOOM_MIN, getZoom()));
             }
         }, { passive: false });
         
@@ -3902,6 +3910,12 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 await mermaid.parse(mermaidCode);
                 const { svg } = await mermaid.render('mermaid-diagram', mermaidCode);
                 inner.innerHTML = svg;
+                const diagram = inner.querySelector('svg');
+                // Mermaid's percentage width otherwise measures the viewport, not the diagram.
+                if (diagram && diagram.viewBox.baseVal.width > 0 && diagram.viewBox.baseVal.height > 0) {
+                    diagram.setAttribute('width', diagram.viewBox.baseVal.width);
+                    diagram.setAttribute('height', diagram.viewBox.baseVal.height);
+                }
                 applyZoom(false);
             } catch (error) {
                 console.error('Mermaid render error:', error);
@@ -3918,6 +3932,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                         </details>
                     </div>
                 \`;
+                zoomReset();
                 
                 vscode.postMessage({ 
                     command: 'mermaidError', 

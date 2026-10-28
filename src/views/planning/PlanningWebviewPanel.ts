@@ -1086,15 +1086,14 @@ export class PlanningWebviewPanel implements vscode.Disposable {
         }
         .designer-card-tooltip {
             display: none;
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 100;
-            min-width: 220px;
-            max-width: 380px;
+            position: fixed;
+            z-index: 1000;
+            width: 380px;
+            max-width: calc(100vw - 16px);
+            max-height: calc(100vh - 16px);
+            box-sizing: border-box;
+            overflow: auto;
             padding: 10px 14px;
-            margin-top: 6px;
             background: var(--vscode-editorHoverWidget-background, #2d2d30);
             border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
             border-radius: 6px;
@@ -1104,9 +1103,8 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             white-space: pre-wrap;
             word-break: break-word;
             box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-            pointer-events: none;
         }
-        .designer-card:hover .designer-card-tooltip {
+        .designer-card-tooltip.is-visible {
             display: block;
         }
         .designer-card-tooltip .tip-label {
@@ -1645,6 +1643,79 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                 card.classList.toggle('collapsed');
             }
         }
+
+        // Keep designer tooltips outside scrollable and clipping ancestors.
+        (function() {
+            var tooltip;
+            var activeCard;
+            var hideTimer;
+
+            function hideTooltip() {
+                clearTimeout(hideTimer);
+                if (tooltip) tooltip.classList.remove('is-visible');
+                activeCard = undefined;
+            }
+
+            function positionTooltip(card) {
+                var rect = card.getBoundingClientRect();
+                var width = document.documentElement.clientWidth;
+                var height = document.documentElement.clientHeight;
+                var margin = 8;
+                var gap = 6;
+                var below = height - rect.bottom - gap - margin;
+                var above = rect.top - gap - margin;
+                tooltip.style.maxHeight = Math.max(0, Math.min(height - margin * 2, Math.max(above, below))) + 'px';
+                var top = tooltip.offsetHeight <= below ? rect.bottom + gap : rect.top - gap - tooltip.offsetHeight;
+                var left = rect.left + (rect.width - tooltip.offsetWidth) / 2;
+                tooltip.style.top = Math.max(margin, Math.min(top, height - tooltip.offsetHeight - margin)) + 'px';
+                tooltip.style.left = Math.max(margin, Math.min(left, width - tooltip.offsetWidth - margin)) + 'px';
+            }
+
+            document.addEventListener('mouseover', function(event) {
+                if (tooltip && tooltip.contains(event.target)) {
+                    clearTimeout(hideTimer);
+                    return;
+                }
+                var card = event.target.closest && event.target.closest('.designer-card');
+                if (!card) return;
+                clearTimeout(hideTimer);
+                if (card === activeCard) return;
+                var source = card.querySelector('.designer-card-tooltip');
+                if (!source) {
+                    hideTooltip();
+                    return;
+                }
+                if (!tooltip) {
+                    tooltip = document.createElement('div');
+                    tooltip.className = 'designer-card-tooltip';
+                    tooltip.setAttribute('role', 'tooltip');
+                    document.body.appendChild(tooltip);
+                }
+                tooltip.innerHTML = source.innerHTML;
+                tooltip.classList.add('is-visible');
+                activeCard = card;
+                positionTooltip(card);
+            });
+
+            document.addEventListener('mouseout', function(event) {
+                if (!activeCard) return;
+                var next = event.relatedTarget;
+                if (next && (activeCard.contains(next) || tooltip.contains(next))) return;
+                if (activeCard.contains(event.target) || tooltip.contains(event.target)) {
+                    hideTimer = setTimeout(hideTooltip, 150);
+                }
+            });
+            document.addEventListener('scroll', function(event) {
+                if (!tooltip || !tooltip.contains(event.target)) hideTooltip();
+            }, true);
+            document.addEventListener('click', function(event) {
+                if (!tooltip || !tooltip.contains(event.target)) hideTooltip();
+            });
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') hideTooltip();
+            });
+            window.addEventListener('resize', hideTooltip);
+        })();
 
         // Zoom state per container
         var _zoomLevels = {};
