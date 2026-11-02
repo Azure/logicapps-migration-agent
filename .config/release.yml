@@ -1,0 +1,113 @@
+parameters:
+    - name: publishVersion
+      type: string
+    - name: dryRun
+      type: boolean
+      default: true
+
+resources:
+    repositories:
+        - repository: 1esPipelines
+          type: git
+          name: 1ESPipelineTemplates/1ESPipelineTemplates
+          ref: refs/tags/release
+        - repository: azExtTemplates
+          type: github
+          name: microsoft/vscode-azuretools
+          ref: main
+          endpoint: GitHub-AzureTools
+
+variables:
+    - name: TeamName
+      value: 'Azure Logic Apps Migration Agent'
+
+# The shared release template currently ignores releaseApprovalEnvironment.
+# Keep a deployment job so the existing environment approvals remain enforced.
+extends:
+    template: v1/1ES.Official.PipelineTemplate.yml@1esPipelines
+    parameters:
+        pool:
+            name: VSEng-MicroBuildVSStable
+            image: server2025-microbuildVSStable
+            os: windows
+        stages:
+            - stage: Release
+              displayName: Release extension
+              jobs:
+                  - deployment: Publish
+                    displayName: Publish extension
+                    environment: VSCodeDeployMigrationAssistant
+                    templateContext:
+                        type: releaseJob
+                        isProduction: true
+                        inputs:
+                            - input: pipelineArtifact
+                              pipeline: build
+                              targetPath: $(System.DefaultWorkingDirectory)
+                              artifactName: Build Root
+                    strategy:
+                        runOnce:
+                            deploy:
+                                steps:
+                                    - checkout: none
+
+                                    - template: azdo-pipelines/templates/find-vsixs.yml@azExtTemplates
+                                      parameters:
+                                          vsixName: logicapps-migration-agent
+                                          publishVersion: ${{ parameters.publishVersion }}
+
+                                    - template: azdo-pipelines/templates/set-release-build-number.yml@azExtTemplates
+                                      parameters:
+                                          packageToPublish: logicapps-migration-agent
+                                          publishVersion: ${{ parameters.publishVersion }}
+                                          dryRun: ${{ parameters.dryRun }}
+
+                                    - task: UseNode@1
+                                      displayName: 'Install Node.js'
+                                      condition: and(succeeded(), eq(${{ parameters.dryRun }}, false))
+                                      inputs:
+                                          version: 22.x
+
+                                    - template: azdo-pipelines/templates/set-npm-before-date.yml@azExtTemplates
+
+                                    - task: Npm@1
+                                      displayName: 'Install vsce'
+                                      condition: and(succeeded(), eq(${{ parameters.dryRun }}, false))
+                                      inputs:
+                                          command: custom
+                                          customCommand: i -g --omit=optional --before $(npmBeforeDate) @vscode/vsce@latest
+                                          customRegistry: useFeed
+                                          customFeed: DevDiv/azcode
+
+                                    - task: AzureCLI@2
+                                      displayName: 'Publish VSIX to Marketplace'
+                                      condition: and(succeeded(), eq(${{ parameters.dryRun }}, false))
+                                      inputs:
+                                          azureSubscription: AzCodeReleases
+                                          scriptType: pscore
+                                          scriptLocation: inlineScript
+                                          inlineScript: |
+                                              $vsixList = @('$(vsixListJson)' | ConvertFrom-Json)
+                                              foreach ($vsix in $vsixList) {
+                                                  Set-Location $vsix.directory
+                                                  # The custom build stages unprefixed signing artifacts.
+                                                  $vsceArgs = @(
+                                                      'publish'
+                                                      '--azure-credential'
+                                                      '--packagePath'
+                                                      $vsix.vsixName
+                                                      '--manifestPath'
+                                                      'extension.manifest'
+                                                      '--signaturePath'
+                                                      'extension.signature.p7s'
+                                                  )
+                                                  if ($vsix.proposedApis -ne $null -and $vsix.proposedApis.Count -gt 0) {
+                                                      $vsceArgs += '--allow-proposed-apis'
+                                                      $vsceArgs += $vsix.proposedApis
+                                                  }
+                                                  & vsce @vsceArgs
+                                                  if ($LASTEXITCODE -ne 0) {
+                                                      Write-Error "Failed to publish VSIX: $($vsix.vsixName)"
+                                                      exit 1
+                                                  }
+                                              }
