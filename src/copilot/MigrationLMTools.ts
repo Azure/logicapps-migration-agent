@@ -2999,7 +2999,7 @@ class PlanningStoreWorkflowDefinitionTool implements vscode.LanguageModelTool<Pl
                         error: 'Workflow definition failed schema validation. Fix the issues below and call this tool again.',
                         validationErrors: validation.errors,
                         validationWarnings: validation.warnings,
-                        hint: 'Ensure the definition has "$schema" set to "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#", "contentVersion" (e.g. "1.0.0.0"), and valid "triggers"/"actions" with correct "type" values. Do NOT use 2019-05-01.',
+                        hint: 'Ensure the definition has "$schema" set to "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#", "contentVersion" (e.g. "1.0.0.0"), and valid "triggers"/"actions" with correct "type" values. Do NOT use 2019-05-01. For local-function result errors, read dotnet-local-functions-logic-apps and reconcile the result class and consumer property expressions before storing the workflow again.',
                     })
                 ),
             ]);
