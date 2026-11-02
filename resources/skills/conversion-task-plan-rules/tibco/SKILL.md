@@ -15,6 +15,8 @@ description: Rules for generating ordered conversion task plans. Covers mandator
 
 After reading planning results (`migration_conversion_getPlanningResults`), determine ALL conversion tasks needed based on the specific flow's planned architecture.
 
+If the plan includes local functions, read `dotnet-local-functions-logic-apps` section 10 BEFORE creating the task list. Check the planned result classes/properties and every consuming expression together. Carry the same contracts into the local-function and workflow tasks' `executionPrompt`. If the stored plan expects scalar function results instead of result objects, reconcile the planning artifacts and re-finalize the plan before creating conversion tasks; do not defer the conflict until code generation.
+
 ---
 
 ## 2. Mandatory Task Order
@@ -141,5 +143,4 @@ Each task needs:
 - Connection generation tasks MUST include: "Search with `category=connection` to find exact `connections.json` format."
 - Local function tasks MUST reference skill `dotnet-local-functions-logic-apps`.
 - ALL code generation tasks MUST follow skill `no-stubs-code-generation`.
-
 

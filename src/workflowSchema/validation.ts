@@ -234,7 +234,125 @@ export function validateWorkflowDefinition(def: any): WorkflowValidationResult {
         validateActions(def.actions, '', errors, warnings);
     }
 
+    errors.push(...validateLocalFunctionResultContracts(def));
+
     return { valid: errors.length === 0, errors, warnings };
+}
+
+/**
+ * Local functions return result objects, not scalar values. Only reject consumers
+ * whose expected type is known; passing a whole object to another action is valid.
+ */
+export function validateLocalFunctionResultContracts(definition: unknown): string[] {
+    const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+        value !== null && typeof value === 'object' && !Array.isArray(value)
+            ? (value as Record<string, unknown>)
+            : undefined;
+    const root = asRecord(definition);
+    if (!root) {
+        return [];
+    }
+    const def = asRecord(root.definition) ?? root;
+    const actions: { name: string; path: string; action: Record<string, unknown> }[] = [];
+    const visit = (container: unknown, parent = ''): void => {
+        for (const [name, value] of Object.entries(asRecord(container) ?? {})) {
+            const action = asRecord(value);
+            if (!action) {
+                continue;
+            }
+            const path = parent ? `${parent} > ${name}` : name;
+            actions.push({ name, path, action });
+            visit(action.actions, path);
+            visit(asRecord(action.else)?.actions, `${path} > [else]`);
+            visit(asRecord(action.default)?.actions, `${path} > [default]`);
+            for (const [caseName, branch] of Object.entries(asRecord(action.cases) ?? {})) {
+                visit(asRecord(branch)?.actions, `${path} > [case:${caseName}]`);
+            }
+        }
+    };
+    visit(def.actions);
+    const localFunctions = new Set(
+        actions.filter(({ action }) => action.type === 'InvokeFunction').map(({ name }) => name)
+    );
+    if (localFunctions.size === 0) {
+        return [];
+    }
+
+    const variableTypes = new Map<string, string>();
+    for (const { action } of actions) {
+        const variables = asRecord(action.inputs)?.variables;
+        if (action.type === 'InitializeVariable' && Array.isArray(variables)) {
+            for (const value of variables) {
+                const variable = asRecord(value);
+                if (typeof variable?.name === 'string' && typeof variable.type === 'string') {
+                    variableTypes.set(variable.name, variable.type);
+                }
+            }
+        }
+    }
+
+    const errors: string[] = [];
+    const nonObjectTypes = new Set([
+        'bool',
+        'boolean',
+        'string',
+        'securestring',
+        'int',
+        'integer',
+        'float',
+        'number',
+        'array',
+    ]);
+    const check = (value: unknown, type: unknown, consumer: string): void => {
+        if (
+            typeof value !== 'string' ||
+            typeof type !== 'string' ||
+            !nonObjectTypes.has(type.toLowerCase())
+        ) {
+            return;
+        }
+        // Match whole results only, not property selections, interpolation, or explicit conversions.
+        const match =
+            /^@\s*body\s*\(\s*'((?:[^']|'')+)'\s*\)\s*$/i.exec(value) ??
+            /^@\s*outputs\s*\(\s*'((?:[^']|'')+)'\s*\)\s*(?:\??\s*\[\s*'body'\s*\]|\??\.body)?\s*$/i.exec(
+                value
+            );
+        const source = match?.[1].replace(/''/g, "'");
+        if (source && localFunctions.has(source)) {
+            errors.push(
+                `${consumer}: local function action "${source}" returns a result object, ` +
+                    `but this consumer expects "${type}". Plan a Task<TResult> class with public get/set properties ` +
+                    `and select the appropriate property, e.g. @body('${source.replace(/'/g, "''")}')?['PropertyName']. ` +
+                    'Reconcile the function result and all consumers before finalizing the plan.'
+            );
+        }
+    };
+    for (const { path, action } of actions) {
+        const inputs = asRecord(action.inputs);
+        if (action.type === 'InitializeVariable' && Array.isArray(inputs?.variables)) {
+            for (const value of inputs.variables) {
+                const variable = asRecord(value);
+                check(variable?.value, variable?.type, `Action "${path}"`);
+            }
+        } else if (action.type === 'SetVariable' && typeof inputs?.name === 'string') {
+            check(inputs.value, variableTypes.get(inputs.name), `Action "${path}"`);
+        } else if (action.type === 'AppendToStringVariable') {
+            check(inputs?.value, 'string', `Action "${path}"`);
+        } else if (action.type === 'IncrementVariable' || action.type === 'DecrementVariable') {
+            check(inputs?.value, 'number', `Action "${path}"`);
+        } else if (action.type === 'If' || action.type === 'Until') {
+            check(action.expression, 'boolean', `Action "${path}"`);
+        } else if (action.type === 'Switch') {
+            check(action.expression, 'string', `Action "${path}"`);
+        } else if (action.type === 'Foreach') {
+            check(action.foreach, 'array', `Action "${path}"`);
+        }
+    }
+    for (const [name, value] of Object.entries(asRecord(def.outputs) ?? {})) {
+        const output = asRecord(value);
+        check(output?.value, output?.type, `Output "${name}"`);
+    }
+    return errors;
 }
 
 // =============================================================================

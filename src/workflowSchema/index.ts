@@ -27,5 +27,5 @@ export type {
     TriggerCondition,
     WorkflowTrigger,
 } from './types';
-export { validateWorkflowDefinition } from './validation';
+export { validateWorkflowDefinition, validateLocalFunctionResultContracts } from './validation';
 export type { WorkflowValidationResult } from './validation';

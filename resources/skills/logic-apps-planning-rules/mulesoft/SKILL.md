@@ -76,6 +76,15 @@ For all **other** (non-custom-code) components:
 
 ---
 
+### 3.4 Local-Function Result Contracts
+
+- Before planning any local function or its consumers, read `dotnet-local-functions-logic-apps` section 10. Its signature rules apply during planning, not only code generation.
+- Every local function MUST return `Task<T>` where `T` is a class with public get/set properties. Do NOT plan raw `Task<bool>`, `Task<string>`, or other scalar results.
+- When source code returns a scalar, preserve that value in a named result property and update every consumer to select that property. For example, return `Task<LoggingFlagResult>` with `public bool Enabled { get; set; }` and assign `@body('Read_logging_flag')?['Enabled']` to a Boolean variable, not the entire function body.
+- Record each function name, result class, property names/types, and consumer expressions in the relevant action-mapping notes. Reuse an existing compatible result contract when available; do not rename properties independently in producer and consumer tasks.
+- Passing the whole result body is valid only when the consumer expects the complete object. Check Boolean/string assignments, conditions, workflow outputs, and parameters passed to other functions against the planned property types.
+- Reconcile all producer/consumer contracts before storing workflow definitions and finalizing the plan. Do not defer a known signature conflict to conversion or silently change source behavior.
+
 ## 4. Reference Lookup (MANDATORY)
 
 Before generating any workflow definition:
