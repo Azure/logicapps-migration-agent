@@ -1,5 +1,6 @@
 .vscode/**
 .vscode-test/**
+.config/**
 out/**
 src/**
 .gitignore

@@ -15,22 +15,9 @@ resources:
     pipelines:
         - pipeline: build
           source: \Azure Tools\VSCode\Extensions\vscode-logicappsmigrationagent
-    repositories:
-        - repository: azExtTemplates
-          type: github
-          name: microsoft/vscode-azuretools
-          ref: main
-          endpoint: GitHub-AzureTools
-
-variables:
-    - name: TeamName
-      value: 'Azure Logic Apps Migration Agent'
 
 extends:
-    template: azure-pipelines/release-extension.yml@azExtTemplates
+    template: ../.config/release.yml
     parameters:
-        pipelineID: $(resources.pipeline.build.pipelineID)
-        runID: $(resources.pipeline.build.runID)
         publishVersion: ${{ parameters.publishVersion }}
         dryRun: ${{ parameters.dryRun }}
-        environmentName: VSCodeDeployMigrationAssistant
