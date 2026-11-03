@@ -32,7 +32,7 @@ const CONVERTER_AGENT_FILENAME = 'migration-converter.agent.md';
  * A version stamp embedded as an HTML comment at the top of the generated file.
  * Bump this when the prompt content changes so existing files get updated.
  */
-const ANALYSER_AGENT_VERSION = '2.4.0';
+const ANALYSER_AGENT_VERSION = '2.5.0';
 const ANALYSER_VERSION_TAG = `<!-- migration-analyser-agent v${ANALYSER_AGENT_VERSION} -->`;
 
 const PLANNER_AGENT_VERSION = '2.10.0';
@@ -228,7 +228,9 @@ export class AgentFileProvisioner {
                 );
                 return;
             }
-            this.logger.debug('[AgentFileProvisioner] Updating converter agent file to new version');
+            this.logger.debug(
+                '[AgentFileProvisioner] Updating converter agent file to new version'
+            );
         }
 
         await fs.promises.mkdir(agentDir, { recursive: true });
@@ -243,7 +245,7 @@ export class AgentFileProvisioner {
     // Skills
     // -------------------------------------------------------------------------
 
-    private static readonly SKILLS_VERSION = '10.25.0';
+    private static readonly SKILLS_VERSION = '10.27.0';
     private static readonly SKILLS_VERSION_TAG = `<!-- skills v${AgentFileProvisioner.SKILLS_VERSION} -->`;
 
     /**
@@ -349,6 +351,14 @@ export class AgentFileProvisioner {
                     'connections-json-generation-rules',
                     platformFolder
                 ),
+            },
+            {
+                folder: 'msmq-built-in-connector',
+                content: this.buildSkillFromResource('msmq-built-in-connector', platformFolder),
+            },
+            {
+                folder: 'soap-built-in-connector',
+                content: this.buildSkillFromResource('soap-built-in-connector', platformFolder),
             },
             {
                 folder: 'no-stubs-code-generation',

@@ -207,7 +207,7 @@
         "systemNumber": "00",
         "client": "100"
       },
-      "gateway": { "required": true, "name": "on-prem-gateway" },
+      "gateway": { "required": false },
       "sourceMapping": {
         "biztalk": {
           "adapter": "WCF-SAP",
@@ -355,9 +355,9 @@
 | BizTalk Adapter | Logic Apps Connector | Notes |
 |-----------------|---------------------|-------|
 | HTTP | HTTP | Direct mapping |
-| WCF-SQL | SQL Server | Requires gateway for on-prem |
-| WCF-SAP | SAP | Requires gateway |
-| FILE | File System | Requires gateway |
+| WCF-SQL | SQL Server | Built-in connector; no gateway required |
+| WCF-SAP | SAP | Built-in connector; no gateway required |
+| FILE | File System | Built-in connector; no gateway required |
 | FTP/SFTP | FTP/SFTP-SSH | Direct mapping |
 | Service Bus | Service Bus | Direct mapping |
 

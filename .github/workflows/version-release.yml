@@ -17,6 +17,10 @@ on:
 permissions:
     contents: write
 
+concurrency:
+    group: version-release-${{ github.ref }}
+    cancel-in-progress: false
+
 env:
     AI_KEY: ${{ vars.AI_KEY }}
 
@@ -106,10 +110,34 @@ jobs:
                   git config --global user.email "${{ github.actor }}@users.noreply.github.com"
 
             - name: 'Commit Version Bump'
+              env:
+                  RELEASE_BRANCH: ${{ github.ref_name }}
               run: |
-                  git add package.json
+                  npm ci --ignore-scripts
+                  npm test
+                  git add package.json package-lock.json
                   git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
-                  git push origin ${{ github.ref_name }}
+
+                  for ATTEMPT in 1 2 3; do
+                    TESTED_COMMIT=$(git rev-parse HEAD)
+                    git fetch origin "$RELEASE_BRANCH"
+                    git rebase "origin/$RELEASE_BRANCH"
+
+                    if [ "$(git rev-parse HEAD)" != "$TESTED_COMMIT" ]; then
+                      npm ci --ignore-scripts
+                      npm test
+                    fi
+
+                    if git push origin "HEAD:refs/heads/$RELEASE_BRANCH"; then
+                      exit 0
+                    fi
+
+                    echo "::warning::Version bump push failed (attempt $ATTEMPT of 3)."
+                    sleep "$ATTEMPT"
+                  done
+
+                  echo "::error::Unable to push the version bump after 3 attempts."
+                  exit 1
 
             - name: 'Create and Push Tag'
               run: |

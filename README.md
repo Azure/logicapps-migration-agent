@@ -176,6 +176,30 @@ The Flow Visualizer provides an interactive webview for exploring your integrati
 - Copilot chat integration — discuss or correct any flow group
 - Badge indicators for gaps, dependencies, and patterns
 
+## Migration tests
+
+Run the BizTalk and TIBCO stage tests before submitting a pull request:
+
+```powershell
+npm ci --ignore-scripts
+npm test
+```
+
+This strictly compiles TypeScript and runs all unit and stage-handoff integration tests.
+The tests use fixed agent responses; they do not call Copilot or Azure. Skipped and
+focused (`.only`) tests fail the suite.
+
+The `Migration tests` GitHub Actions check runs for every pull request targeting
+`main` (the default branch) or `master`, pushes to those branches, and merge-queue
+requests, without path filters.
+
+**Repository administrator setup:** after the check first runs, configure an active
+branch ruleset for `main` under **Settings > Rules > Rulesets**. Require a pull request,
+require the `Migration tests` status check, and require branches to be up to date.
+Keep existing required checks and prevent bypasses so direct pushes cannot skip the
+tests. Apply the same rules to `master` if that branch is used. Adding the workflow
+alone does not make its result mandatory for merging.
+
 ## Contributing a New Platform
 
 This project is open-source and designed for extensibility. There are **two ways** to add support for a new integration platform:
@@ -273,7 +297,11 @@ resources/skills/
 │   ├── biztalk/SKILL.md
 │   ├── mulesoft/SKILL.md
 │   └── <your-platform>/SKILL.md
-└── ... (13 skills total)
+├── msmq-built-in-connector/
+│   └── SKILL.md                 # Shared MSMQ connector rules
+├── soap-built-in-connector/
+│   └── SKILL.md                 # Shared SOAP connector rules
+└── ... (16 skills total)
 ```
 
 #### Skill Format
@@ -300,21 +328,26 @@ description: One-to-one mapping of every YourPlatform component to its Azure Log
 ...
 ```
 
-#### Required Skills (13 total)
+#### Required Skills (16 total)
 
-You should create a `<your-platform>/SKILL.md` variant for each of these skills:
+Create a `<your-platform>/SKILL.md` variant for each platform-specific skill. The
+MSMQ and SOAP built-in connector skills are shared fallbacks and apply whenever a
+platform maps a source component to those connectors.
 
 | Skill                                   | Purpose                                                               | Agent                  |
 | --------------------------------------- | --------------------------------------------------------------------- | ---------------------- |
 | `detect-logical-groups`                 | Rules for grouping artifacts into logical flow groups                 | `@migration-analyser`  |
 | `analyse-source-design`                 | Rules for analyzing source architecture and generating visualizations | `@migration-analyser`  |
 | `dependency-and-decompilation-analysis` | Rules for identifying missing dependencies                            | `@migration-analyser`  |
+| `edmx-to-efcore-functions`              | Rules for converting EDMX data access to EF Core functions            | `@migration-converter` |
 | `source-to-logic-apps-mapping`          | Component-by-component mapping from source to Logic Apps              | All agents             |
 | `logic-apps-planning-rules`             | Rules for generating migration plans                                  | `@migration-planner`   |
 | `conversion-task-plan-rules`            | Rules for creating conversion task plans                              | `@migration-converter` |
 | `scaffold-logic-apps-project`           | Rules for scaffolding the Logic Apps project structure                | `@migration-converter` |
 | `workflow-json-generation-rules`        | Rules for generating workflow.json files                              | `@migration-converter` |
 | `connections-json-generation-rules`     | Rules for generating connections.json                                 | `@migration-converter` |
+| `msmq-built-in-connector`               | Rules for the MSMQ broker, workflows, networking, and validation      | All agents             |
+| `soap-built-in-connector`               | Rules for WSDL-driven SOAP connections, actions, and validation       | All agents             |
 | `dotnet-local-functions-logic-apps`     | Rules for generating .NET local functions                             | `@migration-converter` |
 | `no-stubs-code-generation`              | Rules ensuring generated code is complete (no stubs/placeholders)     | `@migration-converter` |
 | `runtime-validation-and-testing`        | Rules for runtime validation and testing                              | `@migration-converter` |

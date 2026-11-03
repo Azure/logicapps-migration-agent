@@ -430,8 +430,7 @@ export class CommandRegistry implements vscode.Disposable {
                     const confirm = await vscode.window.showWarningMessage(
                         UserPrompts.MIGRATION_RESET_WARNING,
                         { modal: true },
-                        UserPrompts.BUTTON_RESET_AND_CONTINUE,
-                        UserPrompts.BUTTON_CANCEL
+                        UserPrompts.BUTTON_RESET_AND_CONTINUE
                     );
 
                     if (confirm !== UserPrompts.BUTTON_RESET_AND_CONTINUE) {
@@ -546,8 +545,7 @@ export class CommandRegistry implements vscode.Disposable {
         const confirm = await vscode.window.showWarningMessage(
             UserPrompts.RESET_MIGRATION_CONFIRM,
             { modal: true },
-            UserPrompts.BUTTON_RESET,
-            UserPrompts.BUTTON_CANCEL
+            UserPrompts.BUTTON_RESET
         );
 
         if (confirm === UserPrompts.BUTTON_RESET) {
