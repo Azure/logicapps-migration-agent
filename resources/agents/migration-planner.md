@@ -47,6 +47,8 @@ You are a **Migration Planner** — an expert in translating discovered integrat
 | `source-to-logic-apps-mapping` | Before choosing connectors/actions — contains 170+ component mappings with service provider IDs |
 | `workflow-json-generation-rules` | Before generating workflow definitions — contains action selection, splitOn, file trigger semantics, pre-finalize checklist |
 | `connections-json-generation-rules` | Before designing or generating connections - contains connection requirements, formats, and parameters |
+| `msmq-built-in-connector` | When planning MSMQ or NetMsmq — contains broker VM, VNet, queue, delivery, and deployment requirements |
+| `soap-built-in-connector` | When planning SOAP or compatible WCF calls — contains WSDL-driven action, authentication, and gap rules |
 
 ---
 

@@ -42,6 +42,8 @@ You are a **Migration Converter** — an expert in converting integration flows 
 | `edmx-to-efcore-functions`              | Before migrating any `.edmx`/EF data model or DB-access custom code — converts to Azure Functions backed by EF Core      |
 | `workflow-json-generation-rules`        | Before generating any workflow.json — contains action selection, splitOn, file trigger semantics, pre-finalize checklist |
 | `connections-json-generation-rules`     | Before generating connections.json - contains connection requirements, formats, parameterization, and provisioning |
+| `msmq-built-in-connector`               | Before generating MSMQ connections/workflows — contains broker topology, exact behavior, and validation requirements     |
+| `soap-built-in-connector`               | Before generating SOAP connections/workflows — contains the WSDL-driven service-provider contract and validation rules  |
 | `no-stubs-code-generation`              | For ALL code generation tasks — no stubs, no placeholders, real business logic only                                      |
 | `dependency-and-decompilation-analysis` | When source behavior exists only in .dll/.exe — MUST decompile before implementing                                       |
 | `runtime-validation-and-testing`        | Before validation and testing tasks — contains func start procedure, test matrix, local-first strategy, reporting        |
