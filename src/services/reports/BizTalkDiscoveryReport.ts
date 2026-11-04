@@ -838,7 +838,10 @@ function factRows(
             return [];
         }
         if (label === 'Source' || label === 'Target') {
-            value = value.replace(/(\/\/)[^/?#\s]*@/g, '$1').replace(/[?#].*$/, '');
+            value = value.replace(/(\/\/)[^/?#\s]*@/g, '$1');
+            if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
+                value = value.replace(/[?#].*$/, '');
+            }
         }
         return [[label, value]];
     });
