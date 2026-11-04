@@ -874,4 +874,20 @@ describe('Decision-first planning', () => {
         assert.strictEqual(reused.revision, original.revision);
         assert.strictEqual(mockState.prompts.length, 0);
     });
+
+    it('promotes an explicit hosting answer matching configuration to a per-flow override', async () => {
+        const service = new PlanningDecisionService();
+        mockState.explicitDeployment = 'hybrid';
+        const configured = await service.resolve('orders', [], cancellationToken);
+        assert.strictEqual(configured.decisions[0].source, 'configuration');
+
+        const explicit = await service.resolve('orders', [], cancellationToken, false, 'hybrid');
+        assert.strictEqual(explicit.decisions[0].source, 'user-request');
+
+        mockState.explicitDeployment = 'workflow-service-plan';
+        const reused = await service.resolve('orders', [], cancellationToken);
+        assert.strictEqual(reused.decisions[0].selectedOptionId, 'hybrid');
+        assert.strictEqual(reused.decisions[0].source, 'user-request');
+        assert.strictEqual(mockState.prompts.length, 0);
+    });
 });

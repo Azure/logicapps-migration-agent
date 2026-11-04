@@ -81,7 +81,8 @@ export class PlanningDecisionService {
                 configurationChanged ||
                 !existing ||
                 (question.answerFromUser !== undefined &&
-                    question.answerFromUser !== existing.selectedOptionId) ||
+                    (question.answerFromUser !== existing.selectedOptionId ||
+                        existing.source !== 'user-request')) ||
                 existing.whyItMatters !== question.whyItMatters ||
                 !question.options.some(
                     (option) =>
