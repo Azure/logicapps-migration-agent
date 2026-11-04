@@ -660,6 +660,7 @@ describe('BizTalk discovery report', () => {
             contents.indexOf('Recommendations Summary')
         );
         assert.strictEqual((risks.match(/\[(?:HIGH|LOW)\]/g) ?? []).length, 10);
+        assert.ok(risks.includes('Component-12.'));
         assert.ok(risks.indexOf('Component-12.') < risks.indexOf('Component-1.'));
         const details = contents.slice(contents.indexOf('6. Findings, Risks, and Recommendations'));
         assert.ok(details.includes('Finding-12.'));
