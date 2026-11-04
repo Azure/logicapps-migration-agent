@@ -743,6 +743,9 @@ function interfaceCatalog(interfaces: readonly ReportInterface[]): Table {
     ];
     const rows = interfaces.map((entry) => {
         const facts = new Map(factRows(entry.records, INTERFACE_FACTS));
+        if (!facts.has('Direction') && entry.direction) {
+            facts.set('Direction', entry.direction);
+        }
         const source = facts.get('Source');
         const target = facts.get('Target');
         const route =
