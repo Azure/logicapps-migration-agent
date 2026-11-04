@@ -32,6 +32,7 @@ import { LoggingService } from './LoggingService';
 import { MermaidImageRenderer } from './MermaidImageRenderer';
 import { GeneratedFlowResult, ComponentDetail, MessageFlowStep } from './LLMFlowGenerator';
 import { PlanningCacheService, FlowPlanningResult } from '../stages/planning/PlanningCacheService';
+import { selectedChoiceLabel } from '../stages/planning/PlanningDecisions';
 
 // ─── Color palette ───
 const COLORS = {
@@ -113,8 +114,24 @@ export class ReportExporterService {
     //  PUBLIC: Generate Planning Report
     // ════════════════════════════════════════════════════════════════
 
-    public async generatePlanningReport(flowId: string): Promise<string | undefined> {
-        const planResult = PlanningCacheService.getInstance().get(flowId);
+    public async generatePlanningReport(
+        flowId: string,
+        planId?: string
+    ): Promise<string | undefined> {
+        let planResult: FlowPlanningResult | undefined;
+        try {
+            const cache = PlanningCacheService.getInstance();
+            planResult = planId ? cache.getVersion(flowId, planId) : cache.get(flowId);
+        } catch (error) {
+            this.logger.error(
+                '[ReportExporter] Could not read planning data',
+                error instanceof Error ? error : new Error(String(error))
+            );
+            void vscode.window.showErrorMessage(
+                `Failed to read planning data: ${error instanceof Error ? error.message : String(error)}`
+            );
+            return undefined;
+        }
         if (!planResult) {
             vscode.window.showWarningMessage('No planning data available for this flow.');
             return undefined;
@@ -293,8 +310,86 @@ export class ReportExporterService {
         children.push(this.pageBreakParagraph());
         children.push(this.heading1('Executive Summary'));
         children.push(this.bodyText(plan.summary));
+        children.push(
+            this.bodyText(
+                `Plan version: ${plan.planId ?? 'Legacy'} | Generated: ${plan.generatedAt}`
+            )
+        );
         if (plan.explanation) {
             children.push(this.bodyText(plan.explanation));
+        }
+        if (plan.brief) {
+            children.push(this.heading2(plan.brief.scenarioName));
+            children.push(this.bodyText(`Indicative timeline: ${plan.brief.estimatedTimeline}`));
+            children.push(
+                this.bodyText(`Assumptions: ${plan.brief.assumptions.join('; ') || 'Not recorded'}`)
+            );
+            children.push(
+                this.bodyText(`Tradeoffs: ${plan.brief.tradeoffs.join('; ') || 'Not recorded'}`)
+            );
+        }
+        if (plan.preferences) {
+            children.push(this.heading2('Planning Decisions'));
+            for (const decision of plan.preferences.decisions) {
+                children.push(
+                    this.bodyText(
+                        `${decision.question} ${selectedChoiceLabel(decision)} (${decision.source})`
+                    )
+                );
+                children.push(this.bodyText(decision.whyItMatters));
+                for (const option of decision.options) {
+                    children.push(this.bodyText(`${option.label}: ${option.description}`));
+                }
+            }
+        }
+        if (plan.brief?.opportunities.length) {
+            children.push(this.heading2('Modernization Opportunities'));
+            for (const opportunity of plan.brief.opportunities) {
+                children.push(
+                    this.bodyText(
+                        `${opportunity.component}: ${opportunity.currentApproach} -> ${opportunity.proposedApproach} [${opportunity.disposition}]`
+                    )
+                );
+                children.push(
+                    this.bodyText(`${opportunity.reason} Evidence: ${opportunity.evidence}`)
+                );
+            }
+        }
+        const history = PlanningCacheService.getInstance().getHistory(plan.flowId);
+        if (history.length > 1) {
+            children.push(this.heading2('Saved Scenario Comparison'));
+            children.push(
+                new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    layout: TableLayoutType.AUTOFIT,
+                    rows: [
+                        new TableRow({
+                            children: [
+                                'Generated / Scenario',
+                                'Choices',
+                                'Indicative timeline',
+                                'Tradeoffs',
+                            ].map((title) => this.makeHeaderCell(title)),
+                        }),
+                        ...history.map(
+                            (version, index) =>
+                                new TableRow({
+                                    children: [
+                                        `${version.generatedAt}\n${version.brief?.scenarioName ?? 'Legacy plan'}`,
+                                        version.preferences?.decisions
+                                            .map(
+                                                (decision) =>
+                                                    `${decision.question} ${selectedChoiceLabel(decision)}`
+                                            )
+                                            .join('\n') ?? 'Not recorded',
+                                        version.brief?.estimatedTimeline ?? 'Not estimated',
+                                        version.brief?.tradeoffs.join('\n') || 'Not recorded',
+                                    ].map((text) => this.makeCell(text, index % 2 === 1)),
+                                })
+                        ),
+                    ],
+                })
+            );
         }
 
         // ── Architecture Diagram ──
