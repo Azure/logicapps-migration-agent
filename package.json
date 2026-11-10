@@ -2,7 +2,7 @@
     "name": "logicapps-migration-agent",
     "displayName": "Logic Apps Migration Agent",
     "description": "Migrate BizTalk, MuleSoft, and other integration platforms to Azure Logic Apps Standard with AI-powered agent",
-    "version": "1.18.1",
+    "version": "1.18.2",
     "aiKey": "setInGitHubBuild",
     "publisher": "ms-azuretools",
     "license": "MIT",
@@ -996,7 +996,10 @@
                         },
                         "action": {
                             "type": "string",
-                            "enum": ["read", "resolve"]
+                            "enum": [
+                                "read",
+                                "resolve"
+                            ]
                         },
                         "reconsider": {
                             "type": "boolean",
@@ -1004,7 +1007,11 @@
                         },
                         "deploymentTarget": {
                             "type": "string",
-                            "enum": ["workflow-service-plan", "hybrid", "ase-v3"],
+                            "enum": [
+                                "workflow-service-plan",
+                                "hybrid",
+                                "ase-v3"
+                            ],
                             "description": "Only a hosting target explicitly supplied by the user in their request. Saves that answer without asking again. Never infer from source or use a default."
                         },
                         "questions": {
@@ -1042,23 +1049,40 @@
                                         "items": {
                                             "type": "object",
                                             "properties": {
-                                                "id": { "type": "string" },
-                                                "label": { "type": "string", "maxLength": 80 },
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "label": {
+                                                    "type": "string",
+                                                    "maxLength": 80
+                                                },
                                                 "description": {
                                                     "type": "string",
                                                     "maxLength": 240,
                                                     "description": "Brief benefit/tradeoff and target support caveat"
                                                 }
                                             },
-                                            "required": ["id", "label", "description"]
+                                            "required": [
+                                                "id",
+                                                "label",
+                                                "description"
+                                            ]
                                         }
                                     }
                                 },
-                                "required": ["id", "question", "whyItMatters", "options"]
+                                "required": [
+                                    "id",
+                                    "question",
+                                    "whyItMatters",
+                                    "options"
+                                ]
                             }
                         }
                     },
-                    "required": ["flowId", "action"]
+                    "required": [
+                        "flowId",
+                        "action"
+                    ]
                 }
             },
             {
@@ -1094,36 +1118,73 @@
                         "brief": {
                             "type": "object",
                             "properties": {
-                                "scenarioName": { "type": "string" },
+                                "scenarioName": {
+                                    "type": "string"
+                                },
                                 "estimatedTimeline": {
                                     "type": "string",
                                     "description": "Indicative elapsed timeline and capacity basis, or Not estimated; do not invent precision"
                                 },
-                                "assumptions": { "type": "array", "items": { "type": "string" } },
-                                "tradeoffs": { "type": "array", "items": { "type": "string" } },
+                                "assumptions": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "tradeoffs": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
                                 "opportunities": {
                                     "type": "array",
                                     "items": {
                                         "type": "object",
                                         "properties": {
-                                            "component": { "type": "string" },
-                                            "currentApproach": { "type": "string" },
-                                            "proposedApproach": { "type": "string" },
+                                            "component": {
+                                                "type": "string"
+                                            },
+                                            "currentApproach": {
+                                                "type": "string"
+                                            },
+                                            "proposedApproach": {
+                                                "type": "string"
+                                            },
                                             "disposition": {
                                                 "type": "string",
-                                                "enum": ["applied", "retained", "deferred"]
+                                                "enum": [
+                                                    "applied",
+                                                    "retained",
+                                                    "deferred"
+                                                ]
                                             },
-                                            "reason": { "type": "string" },
+                                            "reason": {
+                                                "type": "string"
+                                            },
                                             "evidence": {
                                                 "type": "string",
                                                 "description": "Artifact/method/configuration reference and capability validation; no secret values"
                                             }
                                         },
-                                        "required": ["component", "currentApproach", "proposedApproach", "disposition", "reason", "evidence"]
+                                        "required": [
+                                            "component",
+                                            "currentApproach",
+                                            "proposedApproach",
+                                            "disposition",
+                                            "reason",
+                                            "evidence"
+                                        ]
                                     }
                                 }
                             },
-                            "required": ["scenarioName", "estimatedTimeline", "assumptions", "tradeoffs", "opportunities"]
+                            "required": [
+                                "scenarioName",
+                                "estimatedTimeline",
+                                "assumptions",
+                                "tradeoffs",
+                                "opportunities"
+                            ]
                         }
                     },
                     "required": [
