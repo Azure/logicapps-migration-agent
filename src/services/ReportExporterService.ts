@@ -32,6 +32,10 @@ import { LoggingService } from './LoggingService';
 import { MermaidImageRenderer } from './MermaidImageRenderer';
 import { GeneratedFlowResult, ComponentDetail, MessageFlowStep } from './LLMFlowGenerator';
 import { PlanningCacheService, FlowPlanningResult } from '../stages/planning/PlanningCacheService';
+import { ConfigurationService } from './ConfigurationService';
+import { DiscoveryCacheService } from '../stages/discovery/DiscoveryCacheService';
+import { InventoryService } from '../stages/discovery/InventoryService';
+import { createBizTalkDiscoveryReport } from './reports/BizTalkDiscoveryReport';
 
 // ─── Color palette ───
 const COLORS = {
@@ -71,7 +75,7 @@ export class ReportExporterService {
     // ════════════════════════════════════════════════════════════════
 
     public async generateAnalysisReport(
-        _flowId: string,
+        flowId: string,
         flowName: string,
         result: GeneratedFlowResult
     ): Promise<string | undefined> {
@@ -87,9 +91,33 @@ export class ReportExporterService {
                     const archImage = await this.mermaidRenderer.renderToBuffer(result.mermaid);
 
                     progress.report({ message: 'Building document…', increment: 40 });
-                    const sections = await this.buildAnalysisSections(flowName, result, archImage);
-
-                    const doc = this.createDocument(flowName, 'Analysis Report', sections);
+                    let doc: Document;
+                    if (ConfigurationService.getInstance().getSourcePlatform() === 'biztalk') {
+                        const group = DiscoveryCacheService.getInstance().getFlowGroup(flowId);
+                        const artifactIds = new Set(group?.artifactIds ?? []);
+                        if (!group) {
+                            this.logger.warn(
+                                `[ReportExporter] Flow group "${flowId}" unavailable; exporting saved analysis without supplemental inventory metadata.`
+                            );
+                        }
+                        const artifacts = group
+                            ? (await InventoryService.getInstance().getAllParsedArtifacts())
+                                  .filter((artifact) => artifactIds.has(artifact.id))
+                            : [];
+                        doc = createBizTalkDiscoveryReport({
+                            flowName,
+                            result,
+                            artifacts,
+                            architectureImage: archImage,
+                        });
+                    } else {
+                        const sections = await this.buildAnalysisSections(
+                            flowName,
+                            result,
+                            archImage
+                        );
+                        doc = this.createDocument(flowName, 'Analysis Report', sections);
+                    }
 
                     progress.report({ message: 'Writing file…', increment: 40 });
                     const filePath = await this.saveDocument(doc, flowName, 'Analysis');
