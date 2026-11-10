@@ -81,6 +81,21 @@ The planner generates **one selected scenario**, not several complete alternativ
 The Planning view keeps a concise decision summary and modernization table in the **Summary** section at the bottom of the overview. Expand **Planning details** for timelines, assumptions, alternatives, and rationale. **Regenerate Plan** reuses choices and preserves history; use **Suggest a Change** to request different choices. The view always displays the current plan used by Conversion, without a saved-version comparison table. DOCX reports include the current plan and saved scenario comparison for stakeholder review.
 
 Choices are persisted in `.vscode/migration/planning/{flowId}/planning-preferences.json`; every finalized plan is archived under `history/`. `plan.json` remains the current conversion input. Existing plans remain readable and appear as legacy plans without recorded choices. A full migration reset removes planning data and history.
+### Exporting reports
+
+Use **Export Report** in a flow's Analysis or Planning tab to save a Word document.
+BizTalk Analysis exports use the **Migration Discovery Report** format: executive
+summary, current-state architecture, inventory and application portfolio, message
+flow and runtime characteristics, adapter and connectivity assessment, and
+findings, risks, and recommendations.
+
+The report covers the selected flow, not the entire application estate. Its
+Integration Map includes protocol, message types, frequency, exchange pattern,
+processing mode, and critical-path information only when recorded in that flow's
+analysis or matching source metadata. Authentication, TLS, and complexity details
+are likewise evidence-based; the exporter does not infer them or calculate a new
+complexity score. Planning reports, other source-platform reports, and the
+interactive tabs retain their existing formats.
 
 ## Requirements
 
