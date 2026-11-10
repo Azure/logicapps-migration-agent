@@ -115,11 +115,11 @@ describe('BizTalk Planning stage', () => {
 
     it('reconciles not-started status with a finalized disk-cached plan', async () => {
         const flow = await preparePlanning();
-        await PlanningCacheService.getInstance().store(cachedPlan(flow));
+        const finalized = await PlanningCacheService.getInstance().store(cachedPlan(flow));
         PlanningCacheService.resetInstance();
         const flows = PlanningService.getInstance().buildFlowsFromDiscovery();
         assert.equal(flows[0].status, 'planned');
-        assert.deepEqual(PlanningCacheService.getInstance().get(flow.id), cachedPlan(flow));
+        assert.deepEqual(PlanningCacheService.getInstance().get(flow.id), finalized);
     });
 
     it('reset removes the persisted plan and allows a clean planning session', async () => {

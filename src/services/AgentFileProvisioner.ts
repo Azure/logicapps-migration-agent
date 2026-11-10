@@ -289,6 +289,10 @@ export class AgentFileProvisioner {
 
         const skills: { folder: string; content: string }[] = [
             {
+                folder: 'planning-decision-guidance',
+                content: this.buildSkillFromResource('planning-decision-guidance', platformFolder),
+            },
+            {
                 folder: 'dotnet-local-functions-logic-apps',
                 content: this.buildCustomCodeSkill(platformFolder),
             },
