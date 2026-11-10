@@ -21,6 +21,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { LoggingService } from '../../services/LoggingService';
 import type { LogicAppsWorkflowDefinition } from '../../workflowSchema';
+import { validateLocalFunctionResultContracts } from '../../workflowSchema';
 import {
     PlanningBrief,
     PlanningPreferences,
@@ -561,7 +562,19 @@ export class PlanningFileService {
             });
             missingFiles.push('workflow-*.json');
         } else {
-            files.push({ name: `workflow-*.json (${workflowDefs.length} found)`, exists: true });
+            const contractErrors = workflowDefs.flatMap((workflow) =>
+                validateLocalFunctionResultContracts(workflow.definition).map(
+                    (error) => `Workflow "${workflow.name}": ${error}`
+                )
+            );
+            files.push({
+                name: `workflow-*.json (${workflowDefs.length} found)`,
+                exists: true,
+                ...(contractErrors.length > 0 ? { error: contractErrors.join('\n') } : {}),
+            });
+            if (contractErrors.length > 0) {
+                missingFiles.push('workflow-*.json');
+            }
         }
 
         return {
