@@ -85,7 +85,7 @@ describe('TIBCO Planning stage', () => {
     it('restores finalized disk plans and preserves TIBCO artifact IDs after restart', async () => {
         const flow = await preparePlanning();
         const plan = cachedPlan(flow);
-        await PlanningCacheService.getInstance().store(plan);
+        const finalized = await PlanningCacheService.getInstance().store(plan);
         PlanningService.getInstance().dispose();
         PlanningCacheService.resetInstance();
         const restored = PlanningService.getInstance();
@@ -93,8 +93,9 @@ describe('TIBCO Planning stage', () => {
         const flows = restored.buildFlowsFromDiscovery();
         assert.equal(flows[0].id, flow.id);
         assert.equal(flows[0].status, 'planned');
-        assert.deepEqual(PlanningCacheService.getInstance().get(flow.id), plan);
-        assert.deepEqual(plan.workflows[0].sourceArtifactIds, flow.artifactIds);
+        const restoredPlan = PlanningCacheService.getInstance().get(flow.id);
+        assert.deepEqual(restoredPlan, finalized);
+        assert.deepEqual(restoredPlan?.workflows[0].sourceArtifactIds, flow.artifactIds);
     });
 
     it('resets planning without deleting the discovered TIBCO inventory', async () => {
