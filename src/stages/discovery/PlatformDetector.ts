@@ -20,6 +20,7 @@ import {
     QuickScanResult,
 } from './types';
 import { SourcePlatformType } from '../../ir/types/common';
+import { isBoomiManifest } from '../../parsers/boomi/BoomiComponentReader';
 
 // =============================================================================
 // Platform Detector Manager
@@ -55,6 +56,7 @@ export class PlatformDetector implements vscode.Disposable {
         this.detectors.set('biztalk', new BizTalkDetector());
         this.detectors.set('mulesoft', new MuleSoftDetector());
         this.detectors.set('tibco', new TIBCODetector());
+        this.detectors.set('boomi', new BoomiDetector());
     }
 
     /**
@@ -172,7 +174,7 @@ export class PlatformDetector implements vscode.Disposable {
         }
 
         // Add all platforms
-        const allPlatforms: SourcePlatformType[] = ['biztalk', 'mulesoft', 'tibco'];
+        const allPlatforms: SourcePlatformType[] = ['biztalk', 'mulesoft', 'tibco', 'boomi'];
 
         for (const platform of allPlatforms) {
             if (
@@ -228,6 +230,7 @@ export class PlatformDetector implements vscode.Disposable {
             biztalk: 'BizTalk Server',
             mulesoft: 'MuleSoft Anypoint',
             tibco: 'TIBCO BusinessWorks',
+            boomi: 'Dell Boomi AtomSphere',
             generic: 'Generic/Other',
         };
         return names[platform] || platform;
@@ -241,6 +244,7 @@ export class PlatformDetector implements vscode.Disposable {
             'BizTalk Server': 'biztalk',
             'MuleSoft Anypoint': 'mulesoft',
             'TIBCO BusinessWorks': 'tibco',
+            'Dell Boomi AtomSphere': 'boomi',
             'Generic/Other': 'generic',
         };
         return mapping[displayName] || 'generic';
@@ -678,6 +682,91 @@ class TIBCODetector extends BasePlatformDetector {
 
         return {
             platform: 'tibco',
+            version,
+            confidence: Math.min(confidence, 100),
+            indicators,
+            alternativePlatforms: [],
+        };
+    }
+}
+
+/**
+ * Dell Boomi AtomSphere platform detector.
+ *
+ * Recognizes a Boomi migration manifest, native AtomSphere component exports
+ * (`<bns:Component xmlns:bns="http://api.platform.boomi.com/">`) and the
+ * synthetic Boomi XML used by migration-test corpora.
+ */
+class BoomiDetector extends BasePlatformDetector {
+    readonly platform: SourcePlatformType = 'boomi';
+
+    async detect(folderPath: string): Promise<PlatformDetectionResult | null> {
+        const indicators: PlatformIndicator[] = [];
+        let confidence = 0;
+        let version: string | undefined;
+
+        const manifests = await this.findFiles(folderPath, ['migration-manifest.json']);
+        for (const manifest of manifests) {
+            if (isBoomiManifest(manifest)) {
+                confidence += 60;
+                version = 'AtomSphere';
+                indicators.push({
+                    platform: 'boomi',
+                    indicatorType: 'config-file',
+                    match: 'migration-manifest.json (Dell Boomi)',
+                    confidence: 'high',
+                });
+                break;
+            }
+        }
+
+        const xmlFiles = await this.findFiles(folderPath, ['*.xml'], 3);
+        let processCount = 0;
+        let componentCount = 0;
+        for (const file of xmlFiles.slice(0, 500)) {
+            const content = await this.readFileContent(file);
+            if (!content) {
+                continue;
+            }
+            const head = content.slice(0, 4096);
+            const isNative =
+                /<(\w+:)?Component\b[^>]*(api\.platform\.boomi\.com|componentId=)/.test(head);
+            const isSynthetic = /<synthetic(Boomi\w+|TradingPartner)\b/.test(head);
+            if (!isNative && !isSynthetic) {
+                continue;
+            }
+            componentCount++;
+            if (/<syntheticBoomiProcess\b/.test(head) || /\btype="process"/.test(head)) {
+                processCount++;
+            }
+        }
+
+        if (processCount > 0) {
+            confidence += 40;
+            version = version || 'AtomSphere';
+            indicators.push({
+                platform: 'boomi',
+                indicatorType: 'file-extension',
+                match: `${processCount} Boomi process component(s)`,
+                confidence: 'high',
+            });
+        }
+        if (componentCount > processCount) {
+            confidence += 15;
+            indicators.push({
+                platform: 'boomi',
+                indicatorType: 'config-file',
+                match: `${componentCount - processCount} Boomi connection/operation/map component(s)`,
+                confidence: 'medium',
+            });
+        }
+
+        if (indicators.length === 0) {
+            return null;
+        }
+
+        return {
+            platform: 'boomi',
             version,
             confidence: Math.min(confidence, 100),
             indicators,

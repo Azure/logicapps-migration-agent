@@ -1,0 +1,6 @@
+{
+  "name": "DeadLetterStorage",
+  "type": "ObjectStorage",
+  "endpoint": "${DEADLETTERSTORAGE_ENDPOINT}",
+  "credential": "${DEADLETTERSTORAGE_SECRET}"
+}

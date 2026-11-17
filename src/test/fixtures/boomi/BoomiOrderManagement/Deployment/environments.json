@@ -1,0 +1,8 @@
+{
+  "environments": [
+    "DEV",
+    "TEST",
+    "PROD"
+  ],
+  "synthetic": true
+}

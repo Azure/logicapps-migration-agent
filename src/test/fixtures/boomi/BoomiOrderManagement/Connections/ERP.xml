@@ -1,0 +1,1 @@
+<syntheticBoomiConnection name="ERP" type="Database" auth="ManagedIdentity"><secret value="${ERP_SECRET}"/></syntheticBoomiConnection>

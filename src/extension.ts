@@ -59,6 +59,7 @@ const disposables: vscode.Disposable[] = [];
  * - workspaceContains:**\/mule-*.xml (MuleSoft flows)
  * - workspaceContains:**\/tibco.xml (TIBCO BW projects)
  * - workspaceContains:**\/*.process (TIBCO BW process files)
+ * - workspaceContains:**\/migration-manifest.json (Dell Boomi exports)
  *
  * @returns Extension API for parser registration by partner extensions
  */

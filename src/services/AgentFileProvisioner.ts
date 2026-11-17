@@ -245,7 +245,7 @@ export class AgentFileProvisioner {
     // Skills
     // -------------------------------------------------------------------------
 
-    private static readonly SKILLS_VERSION = '10.27.0';
+    private static readonly SKILLS_VERSION = '10.28.0';
     private static readonly SKILLS_VERSION_TAG = `<!-- skills v${AgentFileProvisioner.SKILLS_VERSION} -->`;
 
     /**
@@ -278,7 +278,9 @@ export class AgentFileProvisioner {
         // Map platform to skill subfolder name (default to biztalk for unknown platforms)
         const normalizedPlatform = sourcePlatform.toLowerCase();
         const platformFolder =
-            normalizedPlatform === 'mulesoft' || normalizedPlatform === 'tibco'
+            normalizedPlatform === 'mulesoft' ||
+            normalizedPlatform === 'tibco' ||
+            normalizedPlatform === 'boomi'
                 ? normalizedPlatform
                 : 'biztalk';
 

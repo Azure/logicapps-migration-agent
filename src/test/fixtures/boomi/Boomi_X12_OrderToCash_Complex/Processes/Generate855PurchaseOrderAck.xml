@@ -1,0 +1,8 @@
+<syntheticBoomiProcess name="Generate855PurchaseOrderAck" version="2.0" migrationTestArtifact="true">
+  <shapes>
+    <shape id="01" type="ReadOMSResponse" next="02" />
+    <shape id="02" type="MapCanonicalTo855" next="03" />
+    <shape id="03" type="SetPartnerEnvelope" next="04" />
+    <shape id="04" type="TPSend" />
+  </shapes>
+</syntheticBoomiProcess>

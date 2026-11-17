@@ -1,0 +1,13 @@
+{
+  "name": "ValidationResult_To_X12_997",
+  "source": "EDI Validation Result",
+  "target": "X12 004010 997",
+  "synthetic": true,
+  "controlNumberStrategy": "environment sequence",
+  "rules": [
+    "partner-specific envelope",
+    "loop creation",
+    "code conversion",
+    "trailer count calculation"
+  ]
+}

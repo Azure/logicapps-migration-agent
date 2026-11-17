@@ -1,0 +1,6 @@
+<syntheticBoomiProcess name="CustomerLookup" version="1.0" migrationTestArtifact="true">
+  <shapes>
+    <shape id="s1" type="CRMQuery" />
+    <shape id="s2" type="CommonErrorHandler" />
+  </shapes>
+</syntheticBoomiProcess>

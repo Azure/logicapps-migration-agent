@@ -1,0 +1,1 @@
+<syntheticBoomiMap name="InvoiceToEDIMap"><field source="invoiceNumber" target="BIG02"/><field source="amount" target="TDS01"/></syntheticBoomiMap>

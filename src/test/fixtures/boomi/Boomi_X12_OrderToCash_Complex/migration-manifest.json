@@ -1,0 +1,89 @@
+{
+  "application": "Synthetic X12 Order-to-Cash",
+  "synthetic": true,
+  "warning": "Not validated as native AtomSphere import/export. Designed as a migration-analysis corpus.",
+  "transactions": [
+    "850",
+    "997",
+    "855",
+    "856",
+    "810"
+  ],
+  "processes": {
+    "Inbound850Orchestration": [
+      "TPReceive",
+      "ArchiveRawInterchange",
+      "ValidateEnvelope",
+      "SplitTransactionSets",
+      "Validate850",
+      "DuplicateCheck",
+      "Map850ToCanonical",
+      "EnrichPartnerAndSKU",
+      "RouteByBusinessRules",
+      "SubmitOMS",
+      "Generate997",
+      "Generate855",
+      "AuditSuccess",
+      "ExceptionSubprocess"
+    ],
+    "Generate997Acknowledgment": [
+      "ReadEnvelopeContext",
+      "DeriveAckStatus",
+      "MapValidationErrors",
+      "Build997",
+      "SetControlNumbers",
+      "TPSend"
+    ],
+    "Generate855PurchaseOrderAck": [
+      "ReadOMSResponse",
+      "MapCanonicalTo855",
+      "SetPartnerEnvelope",
+      "TPSend"
+    ],
+    "Outbound856ShipNotice": [
+      "ReceiveShipmentEvent",
+      "MapShipmentTo856",
+      "Validate856",
+      "SetControlNumbers",
+      "TPSend",
+      "AuditSuccess"
+    ],
+    "Outbound810Invoice": [
+      "ReceiveInvoiceEvent",
+      "CalculateTotals",
+      "MapInvoiceTo810",
+      "Validate810",
+      "SetControlNumbers",
+      "TPSend",
+      "AuditSuccess"
+    ],
+    "ExceptionSubprocess": [
+      "ClassifyError",
+      "PersistDeadLetter",
+      "NotifyOperations",
+      "RetryIfTransient"
+    ]
+  },
+  "features": [
+    "AS2 and SFTP partner metadata",
+    "raw interchange archive",
+    "envelope and transaction validation",
+    "transaction-set splitting",
+    "canonical transformation",
+    "cross-reference enrichment",
+    "duplicate detection",
+    "997 and 855 generation",
+    "outbound 856 and 810",
+    "control-number handling",
+    "retry/dead-letter/audit"
+  ],
+  "migrationTargets": {
+    "Trading Partner": "Logic Apps B2B/Integration Account or equivalent agreement design",
+    "X12 decode/encode": "X12 connector actions",
+    "Map": "Data Mapper/XSLT or workflow transformation",
+    "Groovy": "Inline code/Azure Function/redesign",
+    "Subprocess": "Callable/nested workflow",
+    "Dead letter": "Service Bus or Storage pattern",
+    "Audit database": "SQL connector"
+  }
+}

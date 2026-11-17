@@ -156,6 +156,7 @@ export class ProjectAutoDetection implements vscode.Disposable {
             biztalk: 'BizTalk Server',
             mulesoft: 'MuleSoft Anypoint',
             tibco: 'TIBCO BusinessWorks',
+            boomi: 'Dell Boomi AtomSphere',
             generic: 'Generic Integration',
         };
 

@@ -1,0 +1,10 @@
+<syntheticBoomiProcess name="Generate997Acknowledgment" version="2.0" migrationTestArtifact="true">
+  <shapes>
+    <shape id="01" type="ReadEnvelopeContext" next="02" />
+    <shape id="02" type="DeriveAckStatus" next="03" />
+    <shape id="03" type="MapValidationErrors" next="04" />
+    <shape id="04" type="Build997" next="05" />
+    <shape id="05" type="SetControlNumbers" next="06" />
+    <shape id="06" type="TPSend" />
+  </shapes>
+</syntheticBoomiProcess>

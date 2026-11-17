@@ -1,0 +1,17 @@
+{
+  "name": "RetailHub_AS2",
+  "standard": "X12",
+  "version": "004010",
+  "communication": "AS2",
+  "senderId": "ZZ:SYNTHRETAIL",
+  "receiverId": "ZZ:SYNTHSUPPLIER",
+  "documents": [
+    "850",
+    "997",
+    "855",
+    "856",
+    "810"
+  ],
+  "archiveRaw": true,
+  "secrets": "placeholders only"
+}

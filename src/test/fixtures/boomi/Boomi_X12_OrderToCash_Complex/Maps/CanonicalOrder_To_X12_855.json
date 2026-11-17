@@ -1,0 +1,13 @@
+{
+  "name": "CanonicalOrder_To_X12_855",
+  "source": "OMS Order Response",
+  "target": "X12 004010 855",
+  "synthetic": true,
+  "controlNumberStrategy": "environment sequence",
+  "rules": [
+    "partner-specific envelope",
+    "loop creation",
+    "code conversion",
+    "trailer count calculation"
+  ]
+}
