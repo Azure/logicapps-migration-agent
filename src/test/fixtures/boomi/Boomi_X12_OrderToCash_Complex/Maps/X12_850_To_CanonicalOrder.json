@@ -1,0 +1,54 @@
+{
+  "name": "X12_850_To_CanonicalOrder",
+  "source": "X12 004010 850",
+  "target": "CanonicalPurchaseOrder",
+  "rules": [
+    {
+      "from": "ISA06",
+      "to": "partnerId",
+      "function": "trim"
+    },
+    {
+      "from": "BEG03",
+      "to": "purchaseOrderNumber"
+    },
+    {
+      "from": "BEG05",
+      "to": "orderDate",
+      "function": "date yyyyMMdd -> yyyy-MM-dd"
+    },
+    {
+      "from": "CUR02",
+      "to": "currency",
+      "default": "USD"
+    },
+    {
+      "loop": "N1 where N101=ST",
+      "mappings": {
+        "N102": "shipTo.name",
+        "N104": "shipTo.locationCode",
+        "N301": "shipTo.address1",
+        "N401": "shipTo.city",
+        "N402": "shipTo.state",
+        "N403": "shipTo.postalCode"
+      }
+    },
+    {
+      "loop": "PO1",
+      "mappings": {
+        "PO101": "lines[].lineNumber",
+        "PO102": "lines[].quantity",
+        "PO103": "lines[].uom",
+        "PO104": "lines[].unitPrice",
+        "qualifier VN": "lines[].partnerSku"
+      },
+      "lookups": [
+        "PartnerSKUToInternalSKU"
+      ],
+      "validation": [
+        "quantity > 0",
+        "partnerSku required"
+      ]
+    }
+  ]
+}

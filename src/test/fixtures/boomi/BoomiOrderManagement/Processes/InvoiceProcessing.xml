@@ -1,0 +1,7 @@
+<syntheticBoomiProcess name="InvoiceProcessing" version="1.0" migrationTestArtifact="true">
+  <shapes>
+    <shape id="s1" type="InvoiceToEDIMap" />
+    <shape id="s2" type="SFTPSend" />
+    <shape id="s3" type="CommonErrorHandler" />
+  </shapes>
+</syntheticBoomiProcess>

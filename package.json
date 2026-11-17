@@ -19,6 +19,7 @@
         "biztalk",
         "mulesoft",
         "tibco",
+        "boomi",
         "azure",
         "logic-apps",
         "migration",
@@ -44,7 +45,8 @@
         "workspaceContains:**/pom.xml",
         "workspaceContains:**/mule-*.xml",
         "workspaceContains:**/tibco.xml",
-        "workspaceContains:**/*.process"
+        "workspaceContains:**/*.process",
+        "workspaceContains:**/migration-manifest.json"
     ],
     "main": "./dist/extension.js",
     "contributes": {

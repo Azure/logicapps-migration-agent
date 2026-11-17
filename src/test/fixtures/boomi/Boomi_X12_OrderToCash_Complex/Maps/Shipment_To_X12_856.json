@@ -1,0 +1,13 @@
+{
+  "name": "Shipment_To_X12_856",
+  "source": "Shipment JSON",
+  "target": "X12 004010 856",
+  "synthetic": true,
+  "controlNumberStrategy": "environment sequence",
+  "rules": [
+    "partner-specific envelope",
+    "loop creation",
+    "code conversion",
+    "trailer count calculation"
+  ]
+}

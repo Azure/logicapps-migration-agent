@@ -1,0 +1,6 @@
+{
+  "name": "AuditDatabase",
+  "type": "Database",
+  "endpoint": "${AUDITDATABASE_ENDPOINT}",
+  "credential": "${AUDITDATABASE_SECRET}"
+}

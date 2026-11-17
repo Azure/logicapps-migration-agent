@@ -1,0 +1,6 @@
+{
+  "name": "WarehouseSFTP",
+  "type": "SFTP",
+  "endpoint": "${WAREHOUSESFTP_ENDPOINT}",
+  "credential": "${WAREHOUSESFTP_SECRET}"
+}

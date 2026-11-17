@@ -1,0 +1,1 @@
+<syntheticBoomiConnection name="CRM" type="Salesforce" auth="OAuth2"><secret value="${CRM_SECRET}"/></syntheticBoomiConnection>

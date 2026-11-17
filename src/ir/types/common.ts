@@ -16,7 +16,7 @@
  * Each platform has specialized parsers that convert platform-specific
  * artifacts into the normalized IR format.
  */
-export type SourcePlatformType = 'biztalk' | 'mulesoft' | 'tibco' | 'generic'; // For generic XML/JSON inputs
+export type SourcePlatformType = 'biztalk' | 'mulesoft' | 'tibco' | 'boomi' | 'generic'; // For generic XML/JSON inputs
 
 /**
  * Target platforms for conversion output.
@@ -94,7 +94,8 @@ export type SourceFileType =
     | 'transform' // Transformation (generic)
     | 'config' // Configuration file
     | 'api-spec' // API specification
-    | 'connector'; // Connector configuration
+    | 'connector' // Connector configuration
+    | 'b2b'; // B2B/EDI trading partner configuration
 
 // =============================================================================
 // Workflow Types

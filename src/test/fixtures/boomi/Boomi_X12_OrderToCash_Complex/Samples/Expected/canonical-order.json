@@ -1,0 +1,31 @@
+{
+  "partnerId": "SYNTHRETAIL",
+  "purchaseOrderNumber": "PO-78452",
+  "orderDate": "2026-11-13",
+  "currency": "USD",
+  "shipTo": {
+    "name": "Bengaluru Distribution Center",
+    "locationCode": "BLR01",
+    "city": "Bengaluru",
+    "state": "KA",
+    "postalCode": "560001"
+  },
+  "lines": [
+    {
+      "lineNumber": 1,
+      "quantity": 10,
+      "uom": "EA",
+      "partnerSku": "SKU-100",
+      "internalSku": "INT-AX100",
+      "unitPrice": 125.5
+    },
+    {
+      "lineNumber": 2,
+      "quantity": 5,
+      "uom": "EA",
+      "partnerSku": "SKU-200",
+      "internalSku": "INT-BX200",
+      "unitPrice": 89.0
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "transactionSet": "850",
+  "version": "004010",
+  "segments": [
+    "ISA",
+    "GS",
+    "ST",
+    "BEG",
+    "REF",
+    "DTM",
+    "N1",
+    "N3",
+    "N4",
+    "PO1",
+    "PID",
+    "CTT",
+    "SE",
+    "GE",
+    "IEA"
+  ],
+  "synthetic": true
+}

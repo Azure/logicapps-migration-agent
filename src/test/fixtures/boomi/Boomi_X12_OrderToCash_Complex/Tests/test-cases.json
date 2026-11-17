@@ -1,0 +1,29 @@
+{
+  "cases": [
+    {
+      "id": "TC01",
+      "input": "valid-850.edi",
+      "expected": "accepted, canonical order, 997 A, 855 generated after OMS response"
+    },
+    {
+      "id": "TC02",
+      "input": "invalid-850-missing-po.edi",
+      "expected": "rejected, 997 R, dead-letter record"
+    },
+    {
+      "id": "TC03",
+      "condition": "duplicate ISA13+GS06+ST02",
+      "expected": "no duplicate OMS submission; audited duplicate"
+    },
+    {
+      "id": "TC04",
+      "condition": "OMS HTTP 503",
+      "expected": "transient retry then dead-letter after configured attempts"
+    },
+    {
+      "id": "TC05",
+      "condition": "unknown partner SKU",
+      "expected": "business rejection or manual-review route"
+    }
+  ]
+}

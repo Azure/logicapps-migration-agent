@@ -1,0 +1,49 @@
+{
+  "application": "BoomiOrderManagement",
+  "sourcePlatform": "Dell Boomi",
+  "targetPlatform": "Azure Logic Apps Standard",
+  "synthetic": true,
+  "warning": "Migration-test corpus only. These files are NOT claimed to be native AtomSphere export XML.",
+  "processes": {
+    "OrderProcessing": [
+      "ValidateOrder",
+      "CustomerLookup",
+      "OrderToERPMap",
+      "ERPUpsert",
+      "PublishOrderEvent",
+      "CommonErrorHandler"
+    ],
+    "CustomerLookup": [
+      "CRMQuery",
+      "CommonErrorHandler"
+    ],
+    "InvoiceProcessing": [
+      "InvoiceToEDIMap",
+      "SFTPSend",
+      "CommonErrorHandler"
+    ],
+    "CommonErrorHandler": [
+      "LogError",
+      "NotifyOps"
+    ]
+  },
+  "connections": [
+    "OrderApi",
+    "CRM",
+    "ERP",
+    "OutboundSFTP"
+  ],
+  "maps": [
+    "OrderToERPMap",
+    "InvoiceToEDIMap"
+  ],
+  "migrationHints": {
+    "Process": "Logic Apps Standard workflow",
+    "Map": "Data Mapper/XSLT/Liquid depending on semantics",
+    "HTTP": "HTTP/request pattern",
+    "Database": "SQL/database connector or equivalent",
+    "SFTP": "SFTP-SSH connector",
+    "Groovy": "Requires assessment/redesign, e.g. inline code or external compute",
+    "X12": "B2B/EDI assessment required"
+  }
+}

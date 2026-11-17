@@ -1,0 +1,1 @@
+<syntheticBoomiConnection name="OrderApi" type="HTTP" auth="OAuth2"><secret value="${ORDERAPI_SECRET}"/></syntheticBoomiConnection>

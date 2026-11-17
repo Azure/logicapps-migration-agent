@@ -1,0 +1,18 @@
+<syntheticBoomiProcess name="Inbound850Orchestration" version="2.0" migrationTestArtifact="true">
+  <shapes>
+    <shape id="01" type="TPReceive" next="02" />
+    <shape id="02" type="ArchiveRawInterchange" next="03" />
+    <shape id="03" type="ValidateEnvelope" next="04" />
+    <shape id="04" type="SplitTransactionSets" next="05" />
+    <shape id="05" type="Validate850" next="06" />
+    <shape id="06" type="DuplicateCheck" next="07" />
+    <shape id="07" type="Map850ToCanonical" next="08" />
+    <shape id="08" type="EnrichPartnerAndSKU" next="09" />
+    <shape id="09" type="RouteByBusinessRules" next="10" />
+    <shape id="10" type="SubmitOMS" next="11" />
+    <shape id="11" type="Generate997" next="12" />
+    <shape id="12" type="Generate855" next="13" />
+    <shape id="13" type="AuditSuccess" next="14" />
+    <shape id="14" type="ExceptionSubprocess" />
+  </shapes>
+</syntheticBoomiProcess>

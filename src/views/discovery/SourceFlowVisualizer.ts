@@ -2016,6 +2016,10 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 sourceLogo = '';
                 sourceLabel = 'MuleSoft';
                 break;
+            case 'boomi':
+                sourceLogo = '';
+                sourceLabel = 'Dell Boomi';
+                break;
             default:
                 sourceLogo = biztalkLogo;
                 sourceLabel = 'BizTalk';
@@ -2103,38 +2107,57 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                       Schema: 'XSD definition that describes the structure of messages (elements, attributes, data types).',
                       XSLT: 'XSLT-based transformation that converts messages from one schema format to another.',
                   }
-                : sourcePlatform === 'mulesoft'
+                : sourcePlatform === 'boomi'
                   ? {
-                        Flow: 'A MuleSoft flow defining message processing from source to one or more processors.',
-                        Source: 'Entry point that triggers flow execution (e.g., HTTP Listener, Scheduler, JMS Subscriber).',
-                        Processor:
-                            'A component that processes, transforms, or routes messages within a flow.',
-                        Connector:
-                            'Configuration for connecting to external systems (e.g., Database, HTTP, Salesforce).',
-                        Transform:
-                            'DataWeave transformation for converting message payloads between formats.',
-                        'Sub-Flow':
-                            'A reusable set of processors that can be referenced from other flows.',
-                        'Error Handler': 'Defines how errors are caught and handled within a flow.',
+                        Process:
+                            'A Dell Boomi process that moves documents through connected shapes from a Start shape to one or more End/Stop shapes.',
+                        Shape: 'A step in a Boomi process (e.g., Connector, Map, Decision, Route, Branch, Set Properties, Data Process, Try/Catch).',
+                        Connection:
+                            'Reusable component holding endpoint and credential settings for a connector (HTTP Client, Database, SFTP, AS2, etc.).',
+                        Operation:
+                            'Reusable component defining what a connector shape does (Get, Send, Query, Upsert) and its request/response profiles.',
+                        'Sub-Process':
+                            'A process invoked from another process via a Process Call or Process Route shape.',
+                        Map: 'A Boomi Map component that transforms documents between source and target profiles using links, functions and lookups.',
+                        Profile:
+                            'A structure definition for XML, JSON, flat file, database or EDI (X12/EDIFACT) documents.',
+                        'Trading Partner':
+                            'B2B partner definition with EDI identifiers, document standards and communication channels (AS2, SFTP, HTTP).',
+                        Script: 'A Groovy or JavaScript Data Process script that implements custom logic over documents and properties.',
                     }
-                  : {
-                        'Receive Location':
-                            'Entry point where messages enter BizTalk. Configured with an adapter (FILE, HTTP, etc.) to poll or listen for incoming data.',
-                        'Receive Port':
-                            'Container for one or more Receive Locations. Defines the message type and optional pipeline processing.',
-                        'Receive Pipeline':
-                            'Processes incoming messages - decodes, disassembles, validates XML, and promotes properties for routing.',
-                        'Message Box':
-                            'Central SQL Server database that stores all messages. Uses publish/subscribe pattern to route messages to subscribers.',
-                        Orchestration:
-                            'Visual workflow that coordinates business processes. Contains shapes for receiving, sending, transforming, and making decisions.',
-                        Map: 'XSLT-based transformation that converts messages from one schema format to another.',
-                        Schema: 'XSD definition that describes the structure of messages (elements, attributes, data types).',
-                        'Send Pipeline':
-                            'Processes outgoing messages - assembles, encodes, and signs/encrypts as needed.',
-                        'Send Port':
-                            'Exit point that delivers messages to external systems. Can be static (fixed destination) or dynamic (runtime routing).',
-                    };
+                  : sourcePlatform === 'mulesoft'
+                    ? {
+                          Flow: 'A MuleSoft flow defining message processing from source to one or more processors.',
+                          Source: 'Entry point that triggers flow execution (e.g., HTTP Listener, Scheduler, JMS Subscriber).',
+                          Processor:
+                              'A component that processes, transforms, or routes messages within a flow.',
+                          Connector:
+                              'Configuration for connecting to external systems (e.g., Database, HTTP, Salesforce).',
+                          Transform:
+                              'DataWeave transformation for converting message payloads between formats.',
+                          'Sub-Flow':
+                              'A reusable set of processors that can be referenced from other flows.',
+                          'Error Handler':
+                              'Defines how errors are caught and handled within a flow.',
+                      }
+                    : {
+                          'Receive Location':
+                              'Entry point where messages enter BizTalk. Configured with an adapter (FILE, HTTP, etc.) to poll or listen for incoming data.',
+                          'Receive Port':
+                              'Container for one or more Receive Locations. Defines the message type and optional pipeline processing.',
+                          'Receive Pipeline':
+                              'Processes incoming messages - decodes, disassembles, validates XML, and promotes properties for routing.',
+                          'Message Box':
+                              'Central SQL Server database that stores all messages. Uses publish/subscribe pattern to route messages to subscribers.',
+                          Orchestration:
+                              'Visual workflow that coordinates business processes. Contains shapes for receiving, sending, transforming, and making decisions.',
+                          Map: 'XSLT-based transformation that converts messages from one schema format to another.',
+                          Schema: 'XSD definition that describes the structure of messages (elements, attributes, data types).',
+                          'Send Pipeline':
+                              'Processes outgoing messages - assembles, encodes, and signs/encrypts as needed.',
+                          'Send Port':
+                              'Exit point that delivers messages to external systems. Can be static (fixed destination) or dynamic (runtime routing).',
+                      };
         const explanationsJson = JSON.stringify(componentExplanations);
 
         const cachedBadge = isCached ? '<span class="badge badge-cached">Cached</span>' : '';
@@ -3494,7 +3517,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         <button class="tab" onclick="showTab('dependencies')">Missing Dependencies ${depTabBadge}</button>
         <button class="tab" onclick="showTab('gaps')">Gap Analysis ${gapBadge}</button>
         <button class="tab" onclick="showTab('patterns')">Patterns ${patternBadge}</button>
-        <button class="tab" onclick="showTab('learn')">Learn ${sourcePlatform === 'tibco' ? 'TIBCO' : sourcePlatform === 'mulesoft' ? 'MuleSoft' : 'BizTalk'}</button>
+        <button class="tab" onclick="showTab('learn')">Learn ${sourcePlatform === 'tibco' ? 'TIBCO' : sourcePlatform === 'mulesoft' ? 'MuleSoft' : sourcePlatform === 'boomi' ? 'Dell Boomi' : 'BizTalk'}</button>
     </div>
     
     <!-- Diagram Tab -->
@@ -3555,7 +3578,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     <div id="tab-flow" class="tab-content">
         <h2 style="margin-bottom: 24px;">Step-by-Step Message Flow</h2>
         ${SourceFlowVisualizer.getMigrationBannerHtml(sourcePlatform)}
-        <p style="margin-bottom: 24px; opacity: 0.8;">Follow the journey of a message through the ${sourcePlatform === 'tibco' ? 'TIBCO' : sourcePlatform === 'mulesoft' ? 'MuleSoft' : 'BizTalk'} integration:</p>
+        <p style="margin-bottom: 24px; opacity: 0.8;">Follow the journey of a message through the ${sourcePlatform === 'tibco' ? 'TIBCO' : sourcePlatform === 'mulesoft' ? 'MuleSoft' : sourcePlatform === 'boomi' ? 'Dell Boomi' : 'BizTalk'} integration:</p>
         <div class="flow-timeline" id="flowTimeline">
             <!-- Populated by JavaScript -->
         </div>
@@ -3591,7 +3614,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     <!-- Patterns Tab -->
     <div id="tab-patterns" class="tab-content">
         <h2 style="margin-bottom: 8px;">Migration Patterns</h2>
-        <p style="margin-bottom: 24px; opacity: 0.8;">${sourcePlatform === 'tibco' ? 'TIBCO' : sourcePlatform === 'mulesoft' ? 'MuleSoft' : 'BizTalk'} integration patterns detected in this flow and how they translate to Azure Logic Apps Standard.</p>
+        <p style="margin-bottom: 24px; opacity: 0.8;">${sourcePlatform === 'tibco' ? 'TIBCO' : sourcePlatform === 'mulesoft' ? 'MuleSoft' : sourcePlatform === 'boomi' ? 'Dell Boomi' : 'BizTalk'} integration patterns detected in this flow and how they translate to Azure Logic Apps Standard.</p>
         <div id="patternsContainer">
             <!-- Populated by JavaScript -->
         </div>
@@ -3600,8 +3623,104 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     <!-- Learn Tab -->
     <div id="tab-learn" class="tab-content">
         ${
-            sourcePlatform === 'tibco'
+            sourcePlatform === 'boomi'
                 ? `
+        <h2 style="margin-bottom: 24px;">Understanding Dell Boomi AtomSphere Architecture</h2>
+
+        <div class="education-section">
+            <h3>Process Building Blocks</h3>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    <span class="concept-icon" style="background: #4CAF50;"></span>
+                    Start Shapes (Inbound)
+                </div>
+                <div class="concept-desc">
+                    A Boomi process begins with a <strong>Start shape</strong>: a connector listener (Web Services Server, JMS, Disk/SFTP poll),
+                    a Trading Partner receive for B2B documents, or <em>No Data</em> for scheduled runs and sub-processes.
+                </div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    <span class="concept-icon" style="background: #607D8B;"></span>
+                    Processes &amp; Shapes (Orchestration)
+                </div>
+                <div class="concept-desc">
+                    Processes move a <strong>set of documents</strong> through shapes: Connector, Map, Decision, Route, Branch,
+                    Set Properties, Data Process, Try/Catch, Process Call and Stop. Each shape runs once per document.
+                </div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    <span class="concept-icon" style="background: #FF9800;"></span>
+                    Connections, Operations &amp; Profiles
+                </div>
+                <div class="concept-desc">
+                    Reusable <strong>Connection</strong> components hold endpoints and credentials; <strong>Operations</strong> define
+                    Get/Send/Query actions; <strong>Profiles</strong> describe XML, JSON, flat file, database and EDI structures.
+                </div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    <span class="concept-icon" style="background: #9C27B0;"></span>
+                    Maps, Scripts &amp; B2B
+                </div>
+                <div class="concept-desc">
+                    <strong>Maps</strong> transform documents between profiles using functions and cross-reference lookups.
+                    Groovy/JavaScript scripts implement custom logic. <strong>Trading Partners</strong> define X12/EDIFACT standards
+                    and AS2/SFTP communication.
+                </div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    <span class="concept-icon" style="background: #2196F3;"></span>
+                    Atoms &amp; Environments
+                </div>
+                <div class="concept-desc">
+                    Processes are packaged and deployed to Atoms, Molecules or Atom Clouds. Environment <strong>extensions</strong>
+                    override connection settings and process properties per environment.
+                </div>
+            </div>
+        </div>
+
+        <div class="education-section">
+            <h3>Migration to Azure Logic Apps</h3>
+
+            <div class="concept-card">
+                <div class="concept-desc">
+                    When migrating to Azure Logic Apps, each Boomi component maps to an Azure equivalent:
+                    <ul style="margin-top: 12px;">
+                        <li><strong>Start shapes</strong> → Logic Apps Triggers (HTTP, Service Bus, SFTP, Recurrence, etc.)</li>
+                        <li><strong>Processes / Sub-processes</strong> → Logic Apps Standard Workflows (child workflows via the Workflow action)</li>
+                        <li><strong>Maps</strong> → XSLT, Liquid or Data Mapper transforms</li>
+                        <li><strong>Decision / Route / Branch</strong> → Condition, Switch and sequential Scopes</li>
+                        <li><strong>Trading Partners &amp; X12/AS2</strong> → Integration Account partners, agreements and X12/AS2 actions</li>
+                        <li><strong>Groovy/JavaScript scripts</strong> → .NET local functions</li>
+                        <li><strong>Extensions &amp; process properties</strong> → App settings, parameters and Key Vault references</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="education-section">
+            <h3>Official Documentation</h3>
+
+            <div class="concept-card">
+                <div class="concept-desc">
+                    For comprehensive Boomi documentation, refer to the official resources:
+                    <ul style="margin-top: 12px;">
+                        <li><a href="https://help.boomi.com/" style="color: var(--vscode-textLink-foreground);">Boomi Documentation</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        `
+                : sourcePlatform === 'tibco'
+                  ? `
         <h2 style="margin-bottom: 24px;">Understanding TIBCO BusinessWorks Architecture</h2>
         
         <div class="education-section">
@@ -3699,7 +3818,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             </div>
         </div>
         `
-                : `
+                  : `
         <h2 style="margin-bottom: 24px;">Understanding BizTalk Architecture</h2>
         
         <div class="education-section">
@@ -3796,7 +3915,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         const dependencyAnalysis = ${dependencyAnalysisJson};
         const gapAnalysis = ${gapAnalysisJson};
         const migrationPatterns = ${migrationPatternsJson};
-        const sourcePlatformName = '${sourcePlatform === 'tibco' ? 'TIBCO' : sourcePlatform === 'mulesoft' ? 'MuleSoft' : 'BizTalk'}';
+        const sourcePlatformName = '${sourcePlatform === 'tibco' ? 'TIBCO' : sourcePlatform === 'mulesoft' ? 'MuleSoft' : sourcePlatform === 'boomi' ? 'Dell Boomi' : 'BizTalk'}';
         
         // ── Zoom State (per flow group) ──
         const ZOOM_STEP = 0.1;
@@ -4601,11 +4720,15 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                     const orchComps = componentDetails.filter(c => c.type.toLowerCase() === 'orchestration' || c.type.toLowerCase() === 'process').map(c => c.name);
                     patterns.push({
                         pattern: 'Orchestration Workflow',
-                        description: sourcePlatformName === 'TIBCO' 
+                        description: sourcePlatformName === 'Dell Boomi'
+                            ? 'Dell Boomi processes move documents through shapes, sub-process calls and Try/Catch error handling.'
+                            : sourcePlatformName === 'TIBCO' 
                             ? 'TIBCO BusinessWorks processes coordinate complex business logic with activities, transitions, and error handling.'
                             : 'BizTalk orchestrations coordinate complex business processes with state management, correlation, and exception handling.',
                         complexity: 'high',
-                        biztalkApproach: sourcePlatformName === 'TIBCO'
+                        biztalkApproach: sourcePlatformName === 'Dell Boomi'
+                            ? 'Boomi processes with Start, Connector, Decision, Route, Branch, Process Call and Try/Catch shapes deployed to an Atom.'
+                            : sourcePlatformName === 'TIBCO'
                             ? 'TIBCO BW process definitions with activities, transitions, groups, and inline error handling (catch blocks).'
                             : 'XLANG/s orchestration with visual designer, dehydration/rehydration for long-running processes, correlation sets for message routing.',
                         logicAppsApproach: 'Logic Apps Standard stateful workflows with triggers, actions, and built-in retry/error handling. Use Run After configuration for exception handling.',
@@ -4617,11 +4740,15 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                     const mapComps = componentDetails.filter(c => ['map', 'xslt', 'transformation'].includes(c.type.toLowerCase())).map(c => c.name);
                     patterns.push({
                         pattern: 'Message Transformation',
-                        description: sourcePlatformName === 'TIBCO'
+                        description: sourcePlatformName === 'Dell Boomi'
+                            ? 'Boomi Map components transform documents between profiles (XML, JSON, flat file, EDI).'
+                            : sourcePlatformName === 'TIBCO'
                             ? 'TIBCO uses XSLT transformations and mapping activities to convert messages between formats.'
                             : 'BizTalk maps use XSLT-based transformations with functoids for complex data mapping between schemas.',
                         complexity: 'medium',
-                        biztalkApproach: sourcePlatformName === 'TIBCO'
+                        biztalkApproach: sourcePlatformName === 'Dell Boomi'
+                            ? 'Boomi Maps with field links, standard and scripting functions, cross-reference lookups and default values.'
+                            : sourcePlatformName === 'TIBCO'
                             ? 'TIBCO Mapper activities with XSLT, XPath expressions, and inline transformation logic.'
                             : 'BizTalk Mapper with XSLT, custom functoids, inline scripts, and multi-input maps.',
                         logicAppsApproach: 'Logic Apps Data Mapper (XSLT-based), Liquid templates for JSON, or Azure Functions for complex transformations.',
@@ -4644,11 +4771,15 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 if (types.has('receive port') || types.has('receiveport') || types.has('receive location') || types.has('receivelocation') || types.has('connection') || types.has('jms connection') || types.has('http connection')) {
                     patterns.push({
                         pattern: 'Adapter-Based Connectivity',
-                        description: sourcePlatformName === 'TIBCO'
+                        description: sourcePlatformName === 'Dell Boomi'
+                            ? 'Boomi uses reusable Connection and Operation components (HTTP, Database, SFTP, JMS, AS2, etc.) for connectivity.'
+                            : sourcePlatformName === 'TIBCO'
                             ? 'TIBCO uses shared connections and transport resources (HTTP, JMS, File, FTP, etc.) for inbound and outbound connectivity.'
                             : 'BizTalk uses adapters (FILE, HTTP, SQL, FTP, WCF, etc.) for inbound and outbound connectivity with transport-level configuration.',
                         complexity: 'low',
-                        biztalkApproach: sourcePlatformName === 'TIBCO'
+                        biztalkApproach: sourcePlatformName === 'Dell Boomi'
+                            ? 'Boomi Connection components with environment extensions, referenced by connector shapes through Operations.'
+                            : sourcePlatformName === 'TIBCO'
                             ? 'TIBCO shared connections and resources configured at the project or engine level for transport connectivity.'
                             : 'Built-in and custom adapters with receive locations and send ports configured for specific transports and protocols.',
                         logicAppsApproach: 'Logic Apps Standard built-in connectors (HTTP, Service Bus, SQL, FTP, etc.) and managed connectors. Most common adapters have direct equivalents.',

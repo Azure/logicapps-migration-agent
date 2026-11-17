@@ -1,0 +1,19 @@
+{
+  "transactionSet": "855",
+  "version": "004010",
+  "segments": [
+    "ISA",
+    "GS",
+    "ST",
+    "BAK",
+    "REF",
+    "N1",
+    "PO1",
+    "ACK",
+    "CTT",
+    "SE",
+    "GE",
+    "IEA"
+  ],
+  "synthetic": true
+}

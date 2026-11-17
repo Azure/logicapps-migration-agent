@@ -1,0 +1,5 @@
+{
+  "CRM_URL": "${CRM_URL}",
+  "ERP_SERVER": "${ERP_SERVER}",
+  "SFTP_HOST": "${SFTP_HOST}"
+}

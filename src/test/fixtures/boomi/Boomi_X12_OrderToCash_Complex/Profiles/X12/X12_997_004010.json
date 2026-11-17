@@ -1,0 +1,19 @@
+{
+  "transactionSet": "997",
+  "version": "004010",
+  "segments": [
+    "ISA",
+    "GS",
+    "ST",
+    "AK1",
+    "AK2",
+    "AK3",
+    "AK4",
+    "AK5",
+    "AK9",
+    "SE",
+    "GE",
+    "IEA"
+  ],
+  "synthetic": true
+}

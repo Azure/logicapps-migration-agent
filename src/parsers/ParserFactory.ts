@@ -12,6 +12,11 @@ import { IParser, IProjectParser } from './IParser';
 import { ParserRegistry, defaultParserRegistry } from './ParserRegistry';
 import { ParseOptions, ParseResult, DetectedFile } from './types';
 import { SourcePlatformType } from '../ir/types/common';
+import {
+    BOOMI_MANIFEST_FILE,
+    containsBoomiProcess,
+    isBoomiManifest,
+} from './boomi/BoomiComponentReader';
 
 // =============================================================================
 // Parser Factory
@@ -81,6 +86,15 @@ export class ParserFactory {
         const stat = await fs.promises.stat(folderPath);
         if (!stat.isDirectory()) {
             return undefined;
+        }
+
+        // Dell Boomi has no distinctive file extensions; detect by content.
+        const manifest = path.join(folderPath, BOOMI_MANIFEST_FILE);
+        if (
+            (fs.existsSync(manifest) && isBoomiManifest(manifest)) ||
+            containsBoomiProcess(folderPath)
+        ) {
+            return 'boomi';
         }
 
         // Check for platform-specific indicators

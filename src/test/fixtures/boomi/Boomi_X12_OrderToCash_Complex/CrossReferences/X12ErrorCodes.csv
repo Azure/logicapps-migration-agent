@@ -1,0 +1,4 @@
+internalCode,ak3Code,ak5Code,message
+MISSING_REQUIRED,8,R,Required data element missing
+INVALID_CODE,7,R,Invalid code value
+ACCEPTED,,A,Accepted
