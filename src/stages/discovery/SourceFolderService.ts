@@ -57,6 +57,15 @@ const PLATFORM_FILE_PATTERNS: Record<
         { patterns: ['*.substvar'], confidence: 'medium' },
         { patterns: ['*.xsd', '*.wsdl', '*.xsl', '*.xslt'], confidence: 'low' },
     ],
+    sappi: [
+        { patterns: ['*.iar'], confidence: 'high' },
+        { patterns: ['IntegrationProcess*.xml'], confidence: 'high' },
+        { patterns: ['MessageMapping*.xml'], confidence: 'high' },
+        { patterns: ['CommunicationChannel*.xml'], confidence: 'high' },
+        { patterns: ['ipproviders', 'iarexportstructure'], confidence: 'high' },
+        { patterns: ['*.xsd', '*.wsdl'], confidence: 'medium' },
+        { patterns: ['Objects.xml', 'manifest.xml'], confidence: 'medium' },
+    ],
     generic: [{ patterns: ['*.xml', '*.json'], confidence: 'low' }],
 };
 
@@ -265,6 +274,9 @@ export class SourceFolderService implements vscode.Disposable {
                     // Check against platform patterns
                     this.checkFileForPlatform(entry.name, platformIndicators);
                 } else if (entry.isDirectory() && !entry.name.startsWith('.')) {
+                    // Check directory names against platform patterns (e.g., SAP PI/PO directories)
+                    this.checkDirectoryForPlatform(entry.name, platformIndicators);
+                    
                     // Scan one level deep
                     const subPath = path.join(folderPath, entry.name);
                     try {
@@ -362,6 +374,31 @@ export class SourceFolderService implements vscode.Disposable {
                             });
                         }
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * Check a directory name against SAP PI/PO specific patterns.
+     */
+    private checkDirectoryForPlatform(dirName: string, indicators: PlatformIndicator[]): void {
+        // SAP PI/PO specific directory patterns
+        const sappiDirs = ['ipproviders', 'iarexportstructure'];
+        
+        for (const pattern of sappiDirs) {
+            if (dirName.toLowerCase() === pattern) {
+                // Avoid duplicates
+                const exists = indicators.some(
+                    (ind) => ind.platform === 'sappi' && ind.match === dirName
+                );
+                if (!exists) {
+                    indicators.push({
+                        platform: 'sappi',
+                        indicatorType: 'folder-structure',
+                        match: dirName,
+                        confidence: 'high',
+                    });
                 }
             }
         }
