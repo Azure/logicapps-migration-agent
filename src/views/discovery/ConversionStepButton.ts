@@ -1,8 +1,9 @@
 /**
- * Conversion step on the Home flow cards.
+ * Execute step on the Home flow cards.
  *
- * A single step covers conversion: it creates the conversion tasks, then opens
- * the task list where each task (or Execute All) is executed.
+ * A single Execute step covers conversion: on a planned flow it generates the
+ * conversion tasks and opens the task list, where each task (or Execute All)
+ * is executed.
  *
  * @module views/discovery/ConversionStepButton
  */
@@ -37,21 +38,19 @@ function actionStep(
 }
 
 /**
- * Render the conversion step: Create the tasks, then Execute them from the task list.
+ * Render the Execute step. It keeps the Execute name in every state, like
+ * Analyse → ✓ Analysed and Plan → ✓ Planned.
  */
 export function renderConversionStepButton(state: ConversionStepState): string {
     if (!state.isPlanned) {
-        return disabledStep('Create', 'Plan first');
+        return disabledStep('Execute', 'Plan first');
     }
-    if (state.isCreatingTasks) {
-        return disabledStep('Creating...');
-    }
-    if (state.isExecuting) {
+    if (state.isCreatingTasks || state.isExecuting) {
         return disabledStep('Executing...');
     }
     if (state.isConverted) {
         return actionStep(
-            '✓ Converted',
+            '✓ Executed',
             'btn-done',
             'viewConversion',
             state.flowId,
@@ -68,13 +67,13 @@ export function renderConversionStepButton(state: ConversionStepState): string {
         );
     }
     if (state.isBlockedByOtherFlow) {
-        return disabledStep('Create', 'Another flow is in progress');
+        return disabledStep('Execute', 'Another flow is in progress');
     }
     return actionStep(
-        'Create',
+        'Execute',
         'btn-primary',
         'convertFlow',
         state.flowId,
-        'Create the conversion tasks'
+        'Generate the conversion tasks, then execute them from the task list'
     );
 }

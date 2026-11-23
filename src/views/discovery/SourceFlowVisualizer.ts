@@ -296,7 +296,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                         planBtn = `<button class="btn btn-step btn-primary" onclick="event.stopPropagation(); planFlow('${g.id}')"><span class="step-label"><strong>Plan</strong><small>LogicApp Design</small></span></button>`;
                     }
 
-                    // ── Conversion step: create the tasks, then open them to execute ──
+                    // ── Execute step: generate the conversion tasks, then open them to execute ──
                     const conversionBtn = renderConversionStepButton({
                         flowId: g.id,
                         isPlanned,
@@ -1360,11 +1360,12 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             }
 
             case 'convertFlowFromSelector': {
-                // User clicked Convert button — mark as converting and start agent chat
+                // User clicked Execute on a flow without tasks — generate them; the task
+                // list opens once the agent stores them
                 const flowId = message.data as string;
                 this.logger.debug(`[FlowViz] User requested conversion for flow: ${flowId}`);
 
-                // Mark as converting and refresh UI to show Converting... state
+                // Mark as converting and refresh UI to show the Executing... state
                 SourceFlowVisualizer.convertingGroupIds.add(flowId);
                 SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
 
@@ -1392,7 +1393,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             }
 
             case 'viewConversionFromSelector': {
-                // User clicked "✓ Converted" — open Conversion webview for this flow
+                // User clicked Execute / ✓ Executed on a flow with tasks — open the task list
                 const flowId = message.data as string;
                 this.logger.debug(`[FlowViz] User viewing conversion for flow: ${flowId}`);
                 void (async () => {

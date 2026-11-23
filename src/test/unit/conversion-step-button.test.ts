@@ -27,22 +27,22 @@ function step(overrides: Partial<ConversionStepState>): {
     };
 }
 
-describe('Home conversion step', () => {
-    it('creates the conversion tasks once the flow is planned', () => {
+describe('Home Execute step', () => {
+    it('is named Execute and generates the conversion tasks once the flow is planned', () => {
         assert.deepEqual(step({ isPlanned: false }), {
-            label: 'Create',
+            label: 'Execute',
             action: undefined,
             disabled: true,
         });
-        assert.deepEqual(step({}), { label: 'Create', action: 'convertFlow', disabled: false });
+        assert.deepEqual(step({}), { label: 'Execute', action: 'convertFlow', disabled: false });
         assert.deepEqual(step({ isCreatingTasks: true }), {
-            label: 'Creating...',
+            label: 'Executing...',
             action: undefined,
             disabled: true,
         });
     });
 
-    it('opens the created tasks so they are executed from the task list', () => {
+    it('opens the generated tasks so they are executed from the task list', () => {
         assert.deepEqual(step({ isTasksCreated: true }), {
             label: 'Execute',
             action: 'viewConversion',
@@ -54,15 +54,15 @@ describe('Home conversion step', () => {
             disabled: true,
         });
         assert.deepEqual(step({ isTasksCreated: true, isConverted: true }), {
-            label: '✓ Converted',
+            label: '✓ Executed',
             action: 'viewConversion',
             disabled: false,
         });
     });
 
-    it('only blocks creating tasks while another flow is busy', () => {
+    it('only blocks starting a flow while another flow is busy', () => {
         assert.deepEqual(step({ isBlockedByOtherFlow: true }), {
-            label: 'Create',
+            label: 'Execute',
             action: undefined,
             disabled: true,
         });
@@ -71,5 +71,28 @@ describe('Home conversion step', () => {
             action: 'viewConversion',
             disabled: false,
         });
+    });
+
+    it('never shows Create in any state', () => {
+        const flags = [
+            'isPlanned',
+            'isTasksCreated',
+            'isConverted',
+            'isCreatingTasks',
+            'isExecuting',
+            'isBlockedByOtherFlow',
+        ] as const;
+        for (let mask = 0; mask < 2 ** flags.length; mask++) {
+            const overrides: Partial<Record<(typeof flags)[number], boolean>> = {};
+            flags.forEach((flag, i) => {
+                overrides[flag] = Math.floor(mask / 2 ** i) % 2 === 1;
+            });
+            const html = renderConversionStepButton({ ...planned, ...overrides });
+            assert.doesNotMatch(html, /creat/i, JSON.stringify(overrides));
+            assert.ok(
+                ['Execute', 'Executing...', '✓ Executed'].includes(step(overrides).label),
+                JSON.stringify(overrides)
+            );
+        }
     });
 });
