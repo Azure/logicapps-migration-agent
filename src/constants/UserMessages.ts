@@ -221,6 +221,13 @@ export class UserPrompts {
         );
     }
 
+    static convertingFlow(flowName: string): string {
+        return format(
+            'Converting "{0}" in a new Agent chat session: creating and executing the conversion tasks...',
+            flowName
+        );
+    }
+
     static failedToOpenAgentChatConversion(errorMsg: string): string {
         return format('Failed to open agent chat for conversion. {0}', errorMsg);
     }
@@ -230,7 +237,7 @@ export class UserPrompts {
     // ========================================================================
 
     static readonly NO_FLOW_OR_TASK_SPECIFIED = 'No flow or task specified.';
-    static readonly NO_TASK_PLAN_FOUND = 'No task plan found. Run "Plan Conversion" first.';
+    static readonly NO_TASK_PLAN_FOUND = 'No task plan found. Run "Convert" first.';
 
     static taskNotFound(taskId: string): string {
         return format('Task "{0}" not found in the task plan.', taskId);
@@ -539,8 +546,7 @@ export class UserPrompts {
         return format('Failed to Execute All tasks: {0}', error);
     }
 
-    static readonly NO_CONVERSION_TASK_PLAN =
-        'No conversion task plan found. Run "Plan Conversion" first.';
+    static readonly NO_CONVERSION_TASK_PLAN = 'No conversion task plan found. Run "Convert" first.';
     static readonly NO_WORKSPACE_FOLDER = 'No workspace folder found.';
 
     static projectFolderNotFound(projectPath: string): string {

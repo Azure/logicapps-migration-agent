@@ -67,6 +67,8 @@ Follow skill `conversion-task-plan-rules` exactly to determine and order all tas
 
 Include the relevant design decisions, source references, and implementation requirements in each task's execution prompt so isolated task execution follows the same plan.
 
+When the request asks you to convert the flow end to end (the Convert step), continue straight into STEP 3 after the plan is stored — do not wait for the user. When it asks only for the task plan, stop after storing it.
+
 ### STEP 3 — Execute Tasks
 
 For each task in dependency order:

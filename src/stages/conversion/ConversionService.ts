@@ -65,6 +65,7 @@ export class ConversionService implements vscode.Disposable {
     // Conversion state
     private state: ConversionStageState | undefined;
     private readonly executeAllActiveFlows = new Set<string>();
+    private readonly executeAfterPlanFlows = new Set<string>();
 
     private constructor() {
         this.disposables.push(this._onStateChange);
@@ -369,11 +370,52 @@ export class ConversionService implements vscode.Disposable {
     }
 
     /**
+     * Ask the next stored task plan for a flow to start executing its required
+     * tasks immediately, so creating and executing the tasks is one Convert step.
+     */
+    public requestExecuteAfterPlan(flowId: string): void {
+        this.executeAfterPlanFlows.add(flowId);
+    }
+
+    /**
+     * Withdraw a pending execute-after-plan request for a flow.
+     */
+    public cancelExecuteAfterPlan(flowId: string): void {
+        this.executeAfterPlanFlows.delete(flowId);
+    }
+
+    /**
+     * Start Execute All for a freshly stored task plan when the Convert step
+     * requested it. Marks the first required task in progress and returns the
+     * required tasks in execution order, or undefined when execution was not
+     * requested or nothing is left to run.
+     */
+    public async startExecuteAfterPlan(flowId: string): Promise<ConversionTask[] | undefined> {
+        if (!this.executeAfterPlanFlows.delete(flowId)) {
+            return undefined;
+        }
+
+        const requiredTasks = (this.getTaskPlan(flowId)?.tasks ?? [])
+            .filter(
+                (task) => !task.optional && task.status !== 'completed' && task.status !== 'skipped'
+            )
+            .sort((a, b) => a.order - b.order);
+        if (requiredTasks.length === 0) {
+            return undefined;
+        }
+
+        await this.setExecuteAllActive(flowId, true);
+        await this.updateTask(flowId, requiredTasks[0].id, { status: 'in-progress' });
+        return requiredTasks;
+    }
+
+    /**
      * Stop a stuck execution for a flow. Resets any in-progress tasks back to
      * pending and clears Execute All orchestration state. Used when the agent
      * chat was stopped mid-run, leaving the UI stuck showing "Executing...".
      */
     public async stopExecution(flowId: string): Promise<void> {
+        this.executeAfterPlanFlows.delete(flowId);
         if (!this.state) {
             return;
         }
@@ -414,6 +456,7 @@ export class ConversionService implements vscode.Disposable {
      */
     public async reset(): Promise<void> {
         this.state = undefined;
+        this.executeAfterPlanFlows.clear();
         const storage = StorageService.getInstance();
         await storage.setWorkspace(StorageKeys.CONVERSION_STATE, undefined);
         this.logger.debug('Conversion state reset');
@@ -523,6 +566,7 @@ export class ConversionService implements vscode.Disposable {
             d.dispose();
         }
         this.executeAllActiveFlows.clear();
+        this.executeAfterPlanFlows.clear();
         ConversionService.instance = undefined;
     }
 }

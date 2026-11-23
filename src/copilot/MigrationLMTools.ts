@@ -35,6 +35,7 @@ import { validateWorkflowDefinition } from '../workflowSchema';
 import { ConversionService } from '../stages/conversion/ConversionService';
 import { ConversionFileService } from '../stages/conversion/ConversionFileService';
 import { MermaidValidationService } from '../services/MermaidValidationService';
+import { ChatPrompts } from '../constants/ChatPrompts';
 import type { ConversionTask, ConversionTaskOutput, ConversionTaskPlan } from '../stages/conversion/types';
 import { PlanningPreflightTool } from './PlanningPreflightTool';
 import { PlanningBrief, validatePlanningBrief } from '../stages/planning/PlanningDecisions';
@@ -4365,6 +4366,16 @@ class ConversionStoreTaskPlanTool implements vscode.LanguageModelTool<Conversion
             const conversionService = ConversionService.getInstance();
             await conversionService.storeTaskPlan(flowId, taskPlan);
 
+            // Convert step: carry straight on into executing the required tasks.
+            const executionTasks = await conversionService.startExecuteAfterPlan(flowId);
+            if (executionTasks) {
+                TelemetryService.getInstance().logStep('conversion.batch.started', {
+                    flowId,
+                    flowName: taskPlan.flowName,
+                    totalTasks: taskPlan.tasks.length,
+                });
+            }
+
             // Do NOT auto-open conversion webview — let the user click "✓ Converted" from the flow group page
             // void vscode.commands.executeCommand('logicAppsMigrationAgent.openConversionView');
 
@@ -4382,6 +4393,9 @@ class ConversionStoreTaskPlanTool implements vscode.LanguageModelTool<Conversion
                 const { SourceFlowVisualizer } =
                     await import('../views/discovery/SourceFlowVisualizer');
                 SourceFlowVisualizer.convertingGroupIds.delete(flowId);
+                if (executionTasks) {
+                    SourceFlowVisualizer.executingGroupIds.add(flowId);
+                }
                 if (SourceFlowVisualizer.currentPanel) {
                     SourceFlowVisualizer.showFlowGroupSelector(
                         SourceFlowVisualizer.currentPanel.extensionUri
@@ -4423,7 +4437,12 @@ class ConversionStoreTaskPlanTool implements vscode.LanguageModelTool<Conversion
                         flowId,
                         taskCount: tasks.length,
                         tasks: tasks.map((t) => ({ id: t.id, name: t.name, order: t.order })),
-                        message: `Conversion task plan stored with ${tasks.length} tasks. The tasks are now visible in the Conversion webview. You can proceed to execute tasks when the user asks.`,
+                        message: executionTasks
+                            ? ChatPrompts.executeAfterPlanInstruction(
+                                  executionTasks.map((t) => t.id),
+                                  conversionTasks.filter((t) => t.optional).map((t) => t.id)
+                              )
+                            : `Conversion task plan stored with ${tasks.length} tasks. The tasks are now visible in the Conversion webview. You can proceed to execute tasks when the user asks.`,
                     })
                 ),
             ]);

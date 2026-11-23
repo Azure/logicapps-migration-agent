@@ -44,9 +44,9 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     public static generatingGroupIds = new Set<string>();
     // Track which flow group IDs are currently being planned
     public static planningGroupIds = new Set<string>();
-    // Track which flow group IDs are currently being converted
+    // Track which flow group IDs are creating conversion tasks (first phase of Convert)
     public static convertingGroupIds = new Set<string>();
-    // Track which flow group IDs are currently executing conversion tasks
+    // Track which flow group IDs are executing conversion tasks (second phase of Convert)
     public static executingGroupIds = new Set<string>();
     // Track per-flow analysis panels (reuse on re-click instead of creating duplicates)
     private static analysisPanels = new Map<string, vscode.WebviewPanel>();
@@ -56,7 +56,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         return this.isInitialGenerating || this.generatingGroupIds.size > 0;
     }
 
-    /** True if ANY LLM operation (analyse/plan/create/execute) is running on ANY flow */
+    /** True if ANY LLM operation (analyse/plan/convert) is running on ANY flow */
     public static get isAnyFlowBusy(): boolean {
         return (
             this.generatingGroupIds.size > 0 ||
@@ -295,38 +295,22 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                         planBtn = `<button class="btn btn-step btn-primary" onclick="event.stopPropagation(); planFlow('${g.id}')"><span class="step-label"><strong>Plan</strong><small>LogicApp Design</small></span></button>`;
                     }
 
-                    // ── Create button ──
-                    let createBtn: string;
+                    // ── Convert button (creates the conversion tasks, then executes them) ──
+                    let convertBtn: string;
                     if (!isPlanned) {
-                        createBtn =
-                            '<button class="btn btn-step btn-disabled" disabled title="Plan first"><span class="step-label"><strong>Create</strong><small>Conversion Tasks</small></span></button>';
-                    } else if (isConverting) {
-                        createBtn =
-                            '<button class="btn btn-step btn-disabled" disabled><span class="step-label"><strong>Creating...</strong><small>Conversion Tasks</small></span></button>';
-                    } else if (isTasksCreated) {
-                        createBtn = `<button class="btn btn-step btn-done" onclick="event.stopPropagation(); viewConversion('${g.id}')" title="View conversion tasks"><span class="step-label"><strong>✓ Created</strong><small>Conversion Tasks</small></span></button>`;
-                    } else if (isBlockedByOtherFlow) {
-                        createBtn =
-                            '<button class="btn btn-step btn-disabled" disabled title="Another flow is in progress"><span class="step-label"><strong>Create</strong><small>Conversion Tasks</small></span></button>';
-                    } else {
-                        createBtn = `<button class="btn btn-step btn-primary" onclick="event.stopPropagation(); convertFlow('${g.id}')"><span class="step-label"><strong>Create</strong><small>Conversion Tasks</small></span></button>`;
-                    }
-
-                    // ── Execute button ──
-                    let executeBtn: string;
-                    if (!isTasksCreated) {
-                        executeBtn =
-                            '<button class="btn btn-step btn-disabled" disabled title="Create conversion tasks first"><span class="step-label"><strong>Execute</strong><small>Conversion Tasks</small></span></button>';
-                    } else if (isExecuting) {
-                        executeBtn =
-                            '<button class="btn btn-step btn-disabled" disabled><span class="step-label"><strong>Executing...</strong><small>Conversion Tasks</small></span></button>';
+                        convertBtn =
+                            '<button class="btn btn-step btn-disabled" disabled title="Plan first"><span class="step-label"><strong>Convert</strong><small>LogicApp Project</small></span></button>';
+                    } else if (isConverting || isExecuting) {
+                        convertBtn = `<button class="btn btn-step btn-disabled" disabled><span class="step-label"><strong>Converting...</strong><small>${isConverting ? 'Creating tasks' : 'Executing tasks'}</small></span></button>`;
                     } else if (isConverted) {
-                        executeBtn = `<button class="btn btn-step btn-done" onclick="event.stopPropagation(); viewConversion('${g.id}')" title="View completed conversion"><span class="step-label"><strong>✓ Executed</strong><small>Conversion Tasks</small></span></button>`;
+                        convertBtn = `<button class="btn btn-step btn-done" onclick="event.stopPropagation(); viewConversion('${g.id}')" title="View conversion tasks"><span class="step-label"><strong>✓ Converted</strong><small>LogicApp Project</small></span></button>`;
                     } else if (isBlockedByOtherFlow) {
-                        executeBtn =
-                            '<button class="btn btn-step btn-disabled" disabled title="Another flow is in progress"><span class="step-label"><strong>Execute</strong><small>Conversion Tasks</small></span></button>';
+                        convertBtn =
+                            '<button class="btn btn-step btn-disabled" disabled title="Another flow is in progress"><span class="step-label"><strong>Convert</strong><small>LogicApp Project</small></span></button>';
+                    } else if (isTasksCreated) {
+                        convertBtn = `<button class="btn btn-step btn-primary" onclick="event.stopPropagation(); convertFlow('${g.id}')" title="Execute the remaining conversion tasks"><span class="step-label"><strong>Convert</strong><small>Resume tasks</small></span></button>`;
                     } else {
-                        executeBtn = `<button class="btn btn-step btn-primary" onclick="event.stopPropagation(); executeFlow('${g.id}')" title="Execute all conversion tasks"><span class="step-label"><strong>Execute</strong><small>Conversion Tasks</small></span></button>`;
+                        convertBtn = `<button class="btn btn-step btn-primary" onclick="event.stopPropagation(); convertFlow('${g.id}')" title="Create the conversion tasks and execute them"><span class="step-label"><strong>Convert</strong><small>LogicApp Project</small></span></button>`;
                     }
 
                     // ── Open in VS Code button ──
@@ -338,7 +322,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                     if (isConverted) {
                         openBtn = `<button class="btn btn-step btn-primary btn-vscode" onclick="event.stopPropagation(); openProject('${g.id}')" title="Open generated project in VS Code"><span class="step-label-row"><span class="vscode-text"><small>Open in</small><small>VS Code</small></span>${vsIconEnabled}</span></button>`;
                     } else {
-                        openBtn = `<button class="btn btn-step btn-disabled btn-vscode" disabled title="Available after execution"><span class="step-label-row"><span class="vscode-text"><small>Open in</small><small>VS Code</small></span>${vsIconDisabled}</span></button>`;
+                        openBtn = `<button class="btn btn-step btn-disabled btn-vscode" disabled title="Available after conversion"><span class="step-label-row"><span class="vscode-text"><small>Open in</small><small>VS Code</small></span>${vsIconDisabled}</span></button>`;
                     }
 
                     // Step connector arrows
@@ -352,7 +336,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                             title="Reset all progress for this flow and start over">↺ Start Over</button>`
                             : '';
 
-                    // Stop button — shown while any process (analyse/plan/create/execute) runs on this flow
+                    // Stop button — shown while any process (analyse/plan/convert) runs on this flow
                     const stopBtn = isThisFlowBusy
                         ? `<button class="btn btn-stop-flow" onclick="event.stopPropagation(); stopFlow('${g.id}')" title="Stop the running process for this flow (use if you stopped Copilot)">■ Stop</button>`
                         : '';
@@ -369,7 +353,7 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                             <span class="meta-item">${escapeHtml(g.category)}</span>
                         </div>
                         <div class="flow-steps">
-                            ${analyseBtn}${stepArrow}${planBtn}${stepArrow}${createBtn}${stepArrow}${executeBtn}${stepArrow}${openBtn}
+                            ${analyseBtn}${stepArrow}${planBtn}${stepArrow}${convertBtn}${stepArrow}${openBtn}
                         </div>
                     </div>`;
                 })
@@ -663,9 +647,6 @@ export class SourceFlowVisualizer implements vscode.Disposable {
         }
         function viewConversion(flowId) {
             vscode.postMessage({ command: 'viewConversionFromSelector', data: flowId });
-        }
-        function executeFlow(flowId) {
-            vscode.postMessage({ command: 'executeFlowFromSelector', data: flowId });
         }
         function stopFlow(flowId) {
             vscode.postMessage({ command: 'stopFlowFromSelector', data: flowId });
@@ -1385,34 +1366,37 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             }
 
             case 'convertFlowFromSelector': {
-                // User clicked Convert button — mark as converting and start agent chat
+                // Single Convert step: create the conversion tasks and execute them in one
+                // agent session, or resume the tasks this flow already has.
                 const flowId = message.data as string;
                 this.logger.debug(`[FlowViz] User requested conversion for flow: ${flowId}`);
-
-                // Mark as converting and refresh UI to show Converting... state
-                SourceFlowVisualizer.convertingGroupIds.add(flowId);
-                SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
-
-                // Use setTimeout to let the UI refresh before starting async work
-                setTimeout(() => {
-                    void (async () => {
-                        try {
-                            // Open conversion planning agent chat for this flow
-                            await vscode.commands.executeCommand(
-                                'logicAppsMigrationAgent.generateConversionForFlow',
-                                flowId
-                            );
-                        } catch (err) {
-                            SourceFlowVisualizer.convertingGroupIds.delete(flowId);
-                            SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
-                            vscode.window.showErrorMessage(
-                                UserPrompts.failedToStartConversionVisualizer(
-                                    err instanceof Error ? err.message : String(err)
-                                )
-                            );
+                void (async () => {
+                    try {
+                        const { DiscoveryCacheService } =
+                            await import('../../stages/discovery/DiscoveryCacheService');
+                        const tasksCreated = !!DiscoveryCacheService.getInstance()
+                            .getFlowGroups()
+                            ?.groups.find((g) => g.id === flowId)?.tasksCreated;
+                        let hasTaskPlan = false;
+                        if (tasksCreated) {
+                            const { ConversionService } = await import('../../stages/conversion');
+                            const conversionService = ConversionService.getInstance();
+                            await conversionService.initialize();
+                            hasTaskPlan = !!conversionService.getTaskPlan(flowId);
                         }
-                    })();
-                }, 100);
+                        if (hasTaskPlan) {
+                            this.executeConversionTasks(flowId);
+                        } else {
+                            this.createAndExecuteConversionTasks(flowId);
+                        }
+                    } catch (err) {
+                        vscode.window.showErrorMessage(
+                            UserPrompts.failedToStartConversionVisualizer(
+                                err instanceof Error ? err.message : String(err)
+                            )
+                        );
+                    }
+                })();
                 break;
             }
 
@@ -1435,48 +1419,6 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                     } catch (err) {
                         vscode.window.showErrorMessage(
                             UserPrompts.failedToOpenConversion(
-                                err instanceof Error ? err.message : String(err)
-                            )
-                        );
-                    }
-                })();
-                break;
-            }
-
-            case 'executeFlowFromSelector': {
-                // User clicked Execute button — mark as executing, open Conversion webview, trigger Execute All
-                const flowId = message.data as string;
-                this.logger.debug(`[FlowViz] User requested execute all for flow: ${flowId}`);
-
-                // Mark as executing and refresh UI
-                SourceFlowVisualizer.executingGroupIds.add(flowId);
-                SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
-
-                void (async () => {
-                    try {
-                        // Ensure conversion service is initialized and has the flow
-                        const { ConversionService } = await import('../../stages/conversion');
-                        const conversionService = ConversionService.getInstance();
-                        await conversionService.initialize();
-                        if (conversionService.getFlows().length === 0) {
-                            conversionService.buildFlowsFromPlanning();
-                        }
-                        await conversionService.selectFlow(flowId);
-
-                        // Open conversion webview
-                        const { ConversionWebviewPanel } = await import('../conversion');
-                        ConversionWebviewPanel.createOrShow(this.extensionUri);
-
-                        // Trigger Execute All after a short delay to let the webview render
-                        setTimeout(() => {
-                            void vscode.commands.executeCommand(
-                                'logicAppsMigrationAgent.executeAllConversionTasks',
-                                flowId
-                            );
-                        }, 500);
-                    } catch (err) {
-                        vscode.window.showErrorMessage(
-                            UserPrompts.failedToExecute(
                                 err instanceof Error ? err.message : String(err)
                             )
                         );
@@ -1773,6 +1715,77 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                 break;
             }
         }
+    }
+
+    /**
+     * Convert step for a flow without tasks: create the conversion tasks and let
+     * the agent execute them in the same chat session.
+     */
+    private createAndExecuteConversionTasks(flowId: string): void {
+        // Mark as converting and refresh UI to show the Creating tasks state
+        SourceFlowVisualizer.convertingGroupIds.add(flowId);
+        SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
+
+        // Use setTimeout to let the UI refresh before starting async work
+        setTimeout(() => {
+            void (async () => {
+                try {
+                    await vscode.commands.executeCommand(
+                        'logicAppsMigrationAgent.generateConversionForFlow',
+                        flowId,
+                        { executeAfterPlan: true }
+                    );
+                } catch (err) {
+                    SourceFlowVisualizer.convertingGroupIds.delete(flowId);
+                    SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
+                    vscode.window.showErrorMessage(
+                        UserPrompts.failedToStartConversionVisualizer(
+                            err instanceof Error ? err.message : String(err)
+                        )
+                    );
+                }
+            })();
+        }, 100);
+    }
+
+    /**
+     * Convert step for a flow that already has tasks (e.g. an interrupted run):
+     * open the Conversion view and execute the remaining tasks.
+     */
+    private executeConversionTasks(flowId: string): void {
+        SourceFlowVisualizer.executingGroupIds.add(flowId);
+        SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
+
+        void (async () => {
+            try {
+                // Ensure conversion service is initialized and has the flow
+                const { ConversionService } = await import('../../stages/conversion');
+                const conversionService = ConversionService.getInstance();
+                await conversionService.initialize();
+                if (conversionService.getFlows().length === 0) {
+                    conversionService.buildFlowsFromPlanning();
+                }
+                await conversionService.selectFlow(flowId);
+
+                // Open conversion webview
+                const { ConversionWebviewPanel } = await import('../conversion');
+                ConversionWebviewPanel.createOrShow(this.extensionUri);
+
+                // Trigger Execute All after a short delay to let the webview render
+                setTimeout(() => {
+                    void vscode.commands.executeCommand(
+                        'logicAppsMigrationAgent.executeAllConversionTasks',
+                        flowId
+                    );
+                }, 500);
+            } catch (err) {
+                SourceFlowVisualizer.executingGroupIds.delete(flowId);
+                SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
+                vscode.window.showErrorMessage(
+                    UserPrompts.failedToExecute(err instanceof Error ? err.message : String(err))
+                );
+            }
+        })();
     }
 
     /**

@@ -1,12 +1,14 @@
 import * as assert from 'assert/strict';
 import {
     cachedPlan,
+    conversionPlan,
     createWorkspace,
     disposeWorkspace,
     generatedAt,
     prepareConversion,
     preparePlanning,
 } from '../helpers/biztalk';
+import { ChatPrompts } from '../../constants/ChatPrompts';
 import { ConversionService } from '../../stages/conversion/ConversionService';
 import { ConversionFileService } from '../../stages/conversion/ConversionFileService';
 import { PlanningCacheService } from '../../stages/planning/PlanningCacheService';
@@ -147,6 +149,39 @@ describe('BizTalk Conversion stage', () => {
         assert.equal(restored.getTaskPlan(flow.id)?.tasks[1].status, 'in-progress');
     });
 
+    it('starts executing the required tasks as soon as the Convert step stores the plan', async () => {
+        const flow = await prepareConversion();
+        const conversion = ConversionService.getInstance();
+        assert.equal(await conversion.startExecuteAfterPlan(flow.id), undefined);
+        assert.equal(conversion.isExecuteAllActive(flow.id), false);
+
+        conversion.requestExecuteAfterPlan(flow.id);
+        await conversion.storeTaskPlan(flow.id, conversionPlan(flow));
+        const tasks = await conversion.startExecuteAfterPlan(flow.id);
+        assert.deepEqual(
+            tasks?.map((task) => task.id),
+            ['convert-schemas-and-map', 'generate-workflow', 'test-workflows']
+        );
+        assert.equal(conversion.isExecuteAllActive(flow.id), true);
+        assert.equal(conversion.getFlows()[0].status, 'in-progress');
+        assert.deepEqual(
+            conversion.getTaskPlan(flow.id)?.tasks.map((task) => task.status),
+            ['in-progress', 'pending', 'pending', 'pending']
+        );
+        assert.equal(await conversion.startExecuteAfterPlan(flow.id), undefined);
+    });
+
+    it('drops a pending Convert request when execution is stopped', async () => {
+        const flow = await prepareConversion();
+        const conversion = ConversionService.getInstance();
+        conversion.requestExecuteAfterPlan(flow.id);
+        await conversion.stopExecution(flow.id);
+        await conversion.storeTaskPlan(flow.id, conversionPlan(flow));
+        assert.equal(await conversion.startExecuteAfterPlan(flow.id), undefined);
+        assert.equal(conversion.isExecuteAllActive(flow.id), false);
+        assert.equal(conversion.getFlows()[0].status, 'tasks-ready');
+    });
+
     it('reset removes conversion state without changing the approved planning inputs', async () => {
         const flow = await prepareConversion();
         const conversion = ConversionService.getInstance();
@@ -159,5 +194,52 @@ describe('BizTalk Conversion stage', () => {
         const flows = conversion.buildFlowsFromPlanning();
         assert.equal(flows[0].id, flow.id);
         assert.equal(flows[0].status, 'not-started');
+    });
+});
+
+describe('Convert step prompts', () => {
+    const params = {
+        flowName: 'Purchase order to invoice',
+        flowId: 'po-to-invoice',
+        azureResourceGroup: 'rg-test',
+        azureLocation: 'eastus',
+        azureSubscriptionId: '',
+        outputProjectName: 'Purchase-order-to-invoice',
+        outputProjectRoot: 'out/Purchase-order-to-invoice',
+        outputLogicAppName: 'Purchase-order-to-invoice-logicapp',
+        outputLogicAppRoot: 'out/Purchase-order-to-invoice/Purchase-order-to-invoice-logicapp',
+    };
+
+    it('asks only for the task plan when tasks are regenerated', () => {
+        const prompt = ChatPrompts.conversionForFlow(params);
+        assert.match(prompt, /3\. Call migration_conversion_storeTaskPlan/);
+        assert.doesNotMatch(
+            prompt,
+            /migration_conversion_storeTaskOutput|migration_conversion_finalize/
+        );
+    });
+
+    it('continues from the stored plan into executing the required tasks', () => {
+        const prompt = ChatPrompts.conversionForFlow({ ...params, executeAfterPlan: true });
+        assert.match(
+            prompt,
+            /3\. Call migration_conversion_storeTaskPlan[^\n]*\n4\. [^\n]*migration_conversion_storeTaskOutput[^\n]*\n5\. [^\n]*migration_conversion_finalize/
+        );
+        assert.match(prompt, /Do NOT execute optional tasks/);
+        assert.match(prompt, /SCAFFOLD REQUIREMENT/);
+    });
+
+    it('lists the required tasks the agent runs after storing the plan', () => {
+        const message = ChatPrompts.executeAfterPlanInstruction(
+            ['convert-schemas-and-map', 'generate-workflow', 'test-workflows'],
+            ['cloud-deploy-test']
+        );
+        assert.match(
+            message,
+            /in this order: convert-schemas-and-map, generate-workflow, test-workflows\./
+        );
+        assert.match(message, /Start with "convert-schemas-and-map"/);
+        assert.match(message, /migration_conversion_finalize/);
+        assert.match(message, /optional tasks \(cloud-deploy-test\)/);
     });
 });

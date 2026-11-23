@@ -159,8 +159,13 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                         this.update();
                     }
                     this.logger.debug(`Conversion started for flow: ${flowId}`);
+                    // Convert creates the task plan and executes it in one agent session
                     vscode.commands
-                        .executeCommand('logicAppsMigrationAgent.generateConversionForFlow', flowId)
+                        .executeCommand(
+                            'logicAppsMigrationAgent.generateConversionForFlow',
+                            flowId,
+                            { executeAfterPlan: true }
+                        )
                         .then(
                             () =>
                                 this.logger.debug(
@@ -1003,7 +1008,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
     private getFlowActionButton(flow: ConversionFlow): string {
         switch (flow.status) {
             case 'not-started':
-                return `<button class="btn btn-sm btn-primary" onclick="startConversion('${this.escapeHtml(flow.id)}')">Plan Conversion</button>`;
+                return `<button class="btn btn-sm btn-primary" onclick="startConversion('${this.escapeHtml(flow.id)}')" title="Create the conversion tasks and execute them">Convert</button>`;
             case 'thinking':
                 return `<button class="btn btn-sm btn-disabled" disabled>Thinking...</button>`;
             case 'tasks-ready':
@@ -1218,11 +1223,11 @@ export class ConversionWebviewPanel implements vscode.Disposable {
 
         return `
             <div class="task-placeholder">
-                <h3>Ready to Execute</h3>
-                <p>Click "Plan Conversion" to have the converter agent analyse the planning results and determine the ordered conversion tasks for this flow.</p>
+                <h3>Ready to Convert</h3>
+                <p>Click "Convert" to have the converter agent create the ordered conversion tasks for this flow from the planning results and execute them.</p>
                 <br>
                 <button class="btn btn-primary" onclick="startConversion('${this.escapeHtml(flowId)}')">
-                    Plan Conversion
+                    Convert
                 </button>
             </div>`;
     }

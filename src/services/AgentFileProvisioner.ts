@@ -38,7 +38,7 @@ const ANALYSER_VERSION_TAG = `<!-- migration-analyser-agent v${ANALYSER_AGENT_VE
 const PLANNER_AGENT_VERSION = '2.10.0';
 const PLANNER_VERSION_TAG = `<!-- migration-planner-agent v${PLANNER_AGENT_VERSION} -->`;
 
-const CONVERTER_AGENT_VERSION = '2.21.0';
+const CONVERTER_AGENT_VERSION = '2.22.0';
 const CONVERTER_VERSION_TAG = `<!-- migration-converter-agent v${CONVERTER_AGENT_VERSION} -->`;
 
 // =============================================================================
