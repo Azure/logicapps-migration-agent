@@ -47,8 +47,6 @@ interface ConversionForFlowParams {
     outputProjectRoot: string;
     outputLogicAppName: string;
     outputLogicAppRoot: string;
-    /** Convert step: continue straight into executing the required tasks after storing the plan */
-    executeAfterPlan?: boolean;
 }
 
 interface ExecuteSingleTaskParams {
@@ -173,25 +171,8 @@ export class ChatPrompts {
         const subscriptionSuffix = params.azureSubscriptionId
             ? `, SubscriptionId="${params.azureSubscriptionId}"`
             : '';
-        const header = params.executeAfterPlan
-            ? `@migration-converter Convert the flow "${params.flowName}" (flowId: "${params.flowId}") end to end: create the conversion task plan, then execute its required tasks.\n`
-            : `@migration-converter Convert the flow "${params.flowName}" (flowId: "${params.flowId}").\n`;
-        const scaffoldRequirement = params.executeAfterPlan
-            ? ChatPrompts.scaffoldExtra(
-                  params.outputProjectName,
-                  params.outputLogicAppName,
-                  params.outputProjectRoot,
-                  params.outputLogicAppRoot
-              )
-            : '';
-        const executionSteps = params.executeAfterPlan
-            ? '4. Do NOT wait for the user: execute the required tasks in order. For each task, read the skills and source artifacts it needs, execute it per its executionPrompt, then call migration_conversion_storeTaskOutput with flowId, taskId, summary, and generatedFiles.\n' +
-              '5. After ALL required tasks complete, call migration_conversion_finalize.\n' +
-              'Do NOT execute optional tasks (like local-blackbox-test or cloud-deploy-test) — the user runs them from the Conversion view.\n' +
-              'PLAN ADHERENCE: Do not deviate from the planned design. If a fix requires design changes, STOP and report.\n'
-            : '';
         return (
-            header +
+            `@migration-converter Convert the flow "${params.flowName}" (flowId: "${params.flowId}").\n` +
             AUTONOMOUS_MODE_SHORT +
             'PLANNING HANDOFF: Read finalized preferences and brief from migration_conversion_getPlanningResults. Preserve the selected host, broker, modernization scope, and authentication constraints in every task executionPrompt. Do not substitute defaults or use Azure Workflow Service Plan deployment instructions for hybrid.\n' +
             SKILL_AUTHORITY +
@@ -211,12 +192,10 @@ export class ChatPrompts {
             `OUTPUT PATHS: Workspace root="${params.outputProjectRoot}/", Logic App="${params.outputLogicAppRoot}/", ` +
             `Workspace file="${params.outputProjectRoot}/${params.outputProjectName}.code-workspace".\n` +
             `Scaffold params: workspaceName="${params.outputProjectName}", logicAppName="${params.outputLogicAppName}".\n` +
-            scaffoldRequirement +
             '\nPROCEDURE:\n' +
             '1. Call migration_conversion_getPlanningResults to get the finalized plan.\n' +
             '2. Determine ALL conversion tasks per skill `conversion-task-plan-rules`.\n' +
             '3. Call migration_conversion_storeTaskPlan with flowId, summary, and task list.\n' +
-            executionSteps +
             'Task IDs MUST be descriptive (not "task-1") — see skill for rules.'
         );
     }
@@ -398,25 +377,5 @@ export class ChatPrompts {
             );
         }
         return '\nThis is the LAST task. After calling migration_conversion_storeTaskOutput, call migration_conversion_finalize to complete the flow.\n';
-    }
-
-    // ========================================================================
-    // Convert step: continue from the stored task plan into execution
-    // (returned by migration_conversion_storeTaskPlan)
-    // ========================================================================
-
-    static executeAfterPlanInstruction(
-        requiredTaskIds: string[],
-        optionalTaskIds: string[]
-    ): string {
-        const optionalNote =
-            optionalTaskIds.length > 0
-                ? ` Do NOT execute the optional tasks (${optionalTaskIds.join(', ')}) — the user runs them from the Conversion view.`
-                : '';
-        return (
-            `Task plan stored. Do NOT stop or wait for the user: execute the ${requiredTaskIds.length} required tasks now, in this order: ${requiredTaskIds.join(', ')}. ` +
-            `Start with "${requiredTaskIds[0]}" (already marked in progress). After each task, call migration_conversion_storeTaskOutput, then move to the next task. ` +
-            `When all required tasks are complete, call migration_conversion_finalize.${optionalNote}`
-        );
     }
 }

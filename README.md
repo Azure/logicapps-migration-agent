@@ -60,7 +60,7 @@ Discovery → Planning → Conversion → Validation → Deployment
 | --- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | **Discovery**  | Find and catalog all integration artifacts from the source platform. Auto-detects platform, scans files, builds artifact inventory and dependency graph.                                     |
 | 2   | **Planning**   | Analyze complexity, plan the migration roadmap, and map source patterns to Logic Apps patterns. Generates per-flow migration plans with action mappings, gap analysis, and effort estimates. |
-| 3   | **Conversion** | Transform source artifacts into Logic Apps Standard workflows, connections, and supporting files. A single **Convert** step creates the conversion task plan and executes its tasks.         |
+| 3   | **Conversion** | Transform source artifacts into Logic Apps Standard workflows, connections, and supporting files. Executes task plans generated during planning.                                             |
 | 4   | **Validation** | Test generated workflows and validate behavior against source specifications.                                                                                                                |
 | 5   | **Deployment** | Deploy generated Logic Apps artifacts to Azure.                                                                                                                                              |
 

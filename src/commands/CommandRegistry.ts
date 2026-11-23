@@ -1036,14 +1036,9 @@ export class CommandRegistry implements vscode.Disposable {
     /**
      * Handle generating conversion tasks for a specific flow.
      * Opens the @migration-converter agent chat to analyse the planning
-     * results and produce an ordered conversion task plan. With
-     * `executeAfterPlan` (the single Convert step), the agent then executes the
-     * required tasks in the same session instead of waiting for Execute All.
+     * results and produce an ordered conversion task plan.
      */
-    private async handleGenerateConversionForFlow(
-        flowId?: string,
-        options?: { executeAfterPlan?: boolean }
-    ): Promise<void> {
+    private async handleGenerateConversionForFlow(flowId?: string): Promise<void> {
         const logger = LoggingService.getInstance();
 
         if (!flowId) {
@@ -1062,19 +1057,9 @@ export class CommandRegistry implements vscode.Disposable {
         const flow = conversionService.getFlows().find((f) => f.id === flowId);
         const flowName = flow?.name || flowId;
 
-        // The latest request decides whether the stored plan starts executing, so
-        // regenerating tasks never auto-executes because of an abandoned Convert run.
-        const executeAfterPlan = options?.executeAfterPlan === true;
-        if (executeAfterPlan) {
-            conversionService.requestExecuteAfterPlan(flowId);
-        } else {
-            conversionService.cancelExecuteAfterPlan(flowId);
-        }
-
         TelemetryService.getInstance().logStep('conversion.tasklist.started', {
             flowId,
             flowName,
-            executeAfterPlan,
         });
 
         // Ensure the @migration-converter agent file is provisioned
@@ -1092,11 +1077,7 @@ export class CommandRegistry implements vscode.Disposable {
         }
 
         // Show user feedback
-        vscode.window.showInformationMessage(
-            executeAfterPlan
-                ? UserPrompts.convertingFlow(flowName)
-                : UserPrompts.analysingConversionTasks(flowName)
-        );
+        vscode.window.showInformationMessage(UserPrompts.analysingConversionTasks(flowName));
 
         // Read Azure settings from VS Code configuration
         const azureConfig = vscode.workspace.getConfiguration('logicAppsMigrationAgent.azure');
@@ -1128,14 +1109,10 @@ export class CommandRegistry implements vscode.Disposable {
                     outputProjectRoot,
                     outputLogicAppName,
                     outputLogicAppRoot,
-                    executeAfterPlan,
                 }),
             });
             logger.debug('[Conversion] Agent chat opened successfully');
         } catch (err) {
-            conversionService.cancelExecuteAfterPlan(flowId);
-            SourceFlowVisualizer.convertingGroupIds.delete(flowId);
-            SourceFlowVisualizer.refreshFlowGroupSelectorIfOpen();
             logger.error(
                 `[Conversion] Failed to open agent chat: ${err instanceof Error ? err.message : String(err)}`
             );
@@ -1330,8 +1307,6 @@ export class CommandRegistry implements vscode.Disposable {
         const taskPlan = conversionService.getTaskPlan(flowId);
 
         if (!taskPlan) {
-            SourceFlowVisualizer.executingGroupIds.delete(flowId);
-            SourceFlowVisualizer.refreshFlowGroupSelectorIfOpen();
             vscode.window.showWarningMessage(UserPrompts.NO_TASK_PLAN_FOUND);
             return;
         }
@@ -1370,7 +1345,6 @@ export class CommandRegistry implements vscode.Disposable {
                     (t.optional && t.status === 'pending')
             );
             await conversionService.setExecuteAllActive(flowId, false);
-            SourceFlowVisualizer.executingGroupIds.delete(flowId);
             SourceFlowVisualizer.refreshFlowGroupSelectorIfOpen();
             if (allDone) {
                 vscode.window.showInformationMessage(UserPrompts.ALL_TASKS_COMPLETE);
