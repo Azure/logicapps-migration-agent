@@ -326,6 +326,20 @@ export class ConversionService implements vscode.Disposable {
     }
 
     /**
+     * Whether every required (non-optional) task in the flow's plan is completed
+     * or skipped, so the flow's conversion can be finalized.
+     */
+    public areRequiredTasksComplete(flowId: string): boolean {
+        const tasks = this.getTaskPlan(flowId)?.tasks ?? [];
+        return (
+            tasks.length > 0 &&
+            tasks.every(
+                (task) => task.optional || task.status === 'completed' || task.status === 'skipped'
+            )
+        );
+    }
+
+    /**
      * Set Execute All orchestration mode for a flow.
      */
     public async setExecuteAllActive(flowId: string, active: boolean): Promise<void> {

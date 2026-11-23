@@ -115,6 +115,27 @@ describe('BizTalk Conversion stage', () => {
         assert.deepEqual(completedFlows, [flow.id]);
     });
 
+    it('is ready to finalize once every required task is done, even with optional tasks pending', async () => {
+        const flow = await prepareConversion();
+        const conversion = ConversionService.getInstance();
+        assert.equal(conversion.areRequiredTasksComplete(flow.id), false);
+        await conversion.storeTaskOutput(flow.id, 'convert-schemas-and-map', {
+            completedAt: generatedAt,
+            summary: 'convert-schemas-and-map completed.',
+        });
+        await conversion.updateTask(flow.id, 'generate-workflow', { status: 'failed' });
+        assert.equal(conversion.areRequiredTasksComplete(flow.id), false);
+        for (const taskId of ['generate-workflow', 'test-workflows']) {
+            await conversion.storeTaskOutput(flow.id, taskId, {
+                completedAt: generatedAt,
+                summary: `${taskId} completed.`,
+            });
+        }
+        assert.equal(conversion.getTaskPlan(flow.id)?.tasks[3].status, 'pending');
+        assert.equal(conversion.areRequiredTasksComplete(flow.id), true);
+        assert.equal(conversion.areRequiredTasksComplete('flow-without-tasks'), false);
+    });
+
     it('stops interrupted execution without losing previously completed tasks', async () => {
         const flow = await prepareConversion();
         const conversion = ConversionService.getInstance();

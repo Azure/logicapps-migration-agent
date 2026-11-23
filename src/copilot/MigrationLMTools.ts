@@ -4897,8 +4897,17 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
             const updatedTask = taskPlan2?.tasks.find((t) => t.id === taskId);
             const actualStatus = updatedTask?.status || 'completed';
 
+            // Finalize once the last required task is stored, so the flow shows as converted
+            // ("Open in VS Code" enables) even when tasks are executed one at a time and the
+            // agent never calls migration_conversion_finalize.
+            let flowFinalized = false;
+            if (taskPlan2 && conversionService.areRequiredTasksComplete(flowId)) {
+                await completeFlowConversion(flowId, taskPlan2, logger);
+                flowFinalized = true;
+            }
+
             logger.debug(
-                `[LMTool] migration_conversion_storeTaskOutput: stored output for task "${taskId}" in flow "${flowId}" (status: ${actualStatus})`
+                `[LMTool] migration_conversion_storeTaskOutput: stored output for task "${taskId}" in flow "${flowId}" (status: ${actualStatus}${flowFinalized ? ', flow finalized' : ''})`
             );
             TelemetryService.getInstance().logStep('conversion.task.completed', {
                 flowId,
@@ -4915,7 +4924,11 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
                         success: true,
                         flowId,
                         taskId,
-                        message: `Task "${taskId}" marked as ${actualStatus}. ${generatedFiles?.length || 0} files generated.`,
+                        message:
+                            `Task "${taskId}" marked as ${actualStatus}. ${generatedFiles?.length || 0} files generated.` +
+                            (flowFinalized
+                                ? ' All required tasks are complete, so the flow conversion has been finalized.'
+                                : ''),
                     })
                 ),
             ]);
@@ -5063,6 +5076,52 @@ async function applyWorkflowMigrationMetadata(
     return stamped;
 }
 
+/**
+ * Finalize a flow whose required tasks are complete: stamp workflow metadata,
+ * mark the flow converted (enables "Open in VS Code" on Home) and refresh Home.
+ * Safe to run more than once.
+ */
+async function completeFlowConversion(
+    flowId: string,
+    plan: ConversionTaskPlan,
+    logger: LoggingService
+): Promise<number> {
+    // Deterministically stamp MigrationMetadata into every generated workflow.json.
+    // Machine-generated data — no agent involvement, no rejection/retry loop.
+    const stampedCount = await applyWorkflowMigrationMetadata(plan, logger);
+
+    // Mark the flow as completed
+    const flow = ConversionService.getInstance()
+        .getFlows()
+        .find((f) => f.id === flowId);
+    if (flow) {
+        flow.status = 'completed';
+    }
+
+    // Mark flow as fully converted in DiscoveryCacheService
+    try {
+        const { DiscoveryCacheService } = await import('../stages/discovery/DiscoveryCacheService');
+        await DiscoveryCacheService.getInstance().markFlowConverted(flowId);
+    } catch {
+        // Non-critical
+    }
+
+    // Clear executing flag and refresh flow group selector
+    try {
+        const { SourceFlowVisualizer } = await import('../views/discovery/SourceFlowVisualizer');
+        SourceFlowVisualizer.executingGroupIds.delete(flowId);
+        if (SourceFlowVisualizer.currentPanel) {
+            SourceFlowVisualizer.showFlowGroupSelector(
+                SourceFlowVisualizer.currentPanel.extensionUri
+            );
+        }
+    } catch {
+        // Non-critical
+    }
+
+    return stampedCount;
+}
+
 class ConversionFinalizeTool implements vscode.LanguageModelTool<ConversionFinalizeInput> {
     async invoke(
         options: vscode.LanguageModelToolInvocationOptions<ConversionFinalizeInput>,
@@ -5110,38 +5169,7 @@ class ConversionFinalizeTool implements vscode.LanguageModelTool<ConversionFinal
                 ]);
             }
 
-            // Deterministically stamp MigrationMetadata into every generated workflow.json.
-            // Machine-generated data — no agent involvement, no rejection/retry loop.
-            const stampedCount = await applyWorkflowMigrationMetadata(plan, logger);
-
-            // Mark the flow as completed
-            const flow = conversionService.getFlows().find((f) => f.id === flowId);
-            if (flow) {
-                flow.status = 'completed';
-            }
-
-            // Mark flow as fully converted in DiscoveryCacheService
-            try {
-                const { DiscoveryCacheService } =
-                    await import('../stages/discovery/DiscoveryCacheService');
-                await DiscoveryCacheService.getInstance().markFlowConverted(flowId);
-            } catch {
-                // Non-critical
-            }
-
-            // Clear executing flag and refresh flow group selector
-            try {
-                const { SourceFlowVisualizer } =
-                    await import('../views/discovery/SourceFlowVisualizer');
-                SourceFlowVisualizer.executingGroupIds.delete(flowId);
-                if (SourceFlowVisualizer.currentPanel) {
-                    SourceFlowVisualizer.showFlowGroupSelector(
-                        SourceFlowVisualizer.currentPanel.extensionUri
-                    );
-                }
-            } catch {
-                // Non-critical
-            }
+            const stampedCount = await completeFlowConversion(flowId, plan, logger);
 
             // Open conversion webview
             void vscode.commands.executeCommand('logicAppsMigrationAgent.openConversionView');
