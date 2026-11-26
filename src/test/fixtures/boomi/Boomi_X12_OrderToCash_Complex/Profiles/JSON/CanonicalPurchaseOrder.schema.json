@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CanonicalPurchaseOrder",
+  "type": "object",
+  "required": [
+    "partnerId",
+    "purchaseOrderNumber",
+    "orderDate",
+    "lines"
+  ],
+  "properties": {
+    "partnerId": {
+      "type": "string"
+    },
+    "purchaseOrderNumber": {
+      "type": "string"
+    },
+    "orderDate": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "shipTo": {
+      "type": "object"
+    },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "lineNumber",
+          "quantity",
+          "uom",
+          "partnerSku"
+        ],
+        "properties": {
+          "lineNumber": {
+            "type": "integer"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "uom": {
+            "type": "string"
+          },
+          "partnerSku": {
+            "type": "string"
+          },
+          "internalSku": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}

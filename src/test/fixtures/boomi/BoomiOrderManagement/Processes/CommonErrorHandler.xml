@@ -1,0 +1,6 @@
+<syntheticBoomiProcess name="CommonErrorHandler" version="1.0" migrationTestArtifact="true">
+  <shapes>
+    <shape id="s1" type="LogError" />
+    <shape id="s2" type="NotifyOps" />
+  </shapes>
+</syntheticBoomiProcess>

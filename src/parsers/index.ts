@@ -5,6 +5,7 @@
  * - BizTalk Server (fully implemented)
  * - MuleSoft (fully implemented)
  * - TIBCO BusinessWorks (basic implementation)
+ * - Dell Boomi AtomSphere (processes, connections, operations, maps, profiles, trading partners)
  *
  * @module parsers
  */
@@ -54,6 +55,19 @@ export { MuleSoftFlowParser, MuleSoftDataWeaveParser, MuleSoftProjectParser } fr
 // TIBCO Parsers (basic implementation)
 export { TIBCOProjectParser, TIBCOProcessParser } from './tibco';
 
+// Dell Boomi Parsers
+export {
+    BoomiProjectParser,
+    BoomiProcessParser,
+    BoomiConnectorParser,
+    BoomiMapParser,
+    BoomiProfileParser,
+    BoomiTradingPartnerParser,
+    BoomiComponentParser,
+    BoomiApiParser,
+    BoomiScriptParser,
+} from './boomi';
+
 // Stub Parsers (work in progress)
 export { MuleSoftAPISpecParser, GenericXMLParser } from './stubs';
 
@@ -72,6 +86,17 @@ import {
 } from './biztalk';
 import { MuleSoftFlowParser, MuleSoftDataWeaveParser, MuleSoftProjectParser } from './mulesoft';
 import { TIBCOProjectParser, TIBCOProcessParser } from './tibco';
+import {
+    BoomiProjectParser,
+    BoomiProcessParser,
+    BoomiConnectorParser,
+    BoomiMapParser,
+    BoomiProfileParser,
+    BoomiTradingPartnerParser,
+    BoomiComponentParser,
+    BoomiApiParser,
+    BoomiScriptParser,
+} from './boomi';
 import { MuleSoftAPISpecParser, GenericXMLParser } from './stubs';
 
 /**
@@ -98,6 +123,17 @@ export function initializeParsers(): void {
     // TIBCO parsers (basic implementation)
     defaultParserRegistry.register(new TIBCOProjectParser());
     defaultParserRegistry.register(new TIBCOProcessParser());
+
+    // Dell Boomi parsers (content-detected; only claim Boomi component files)
+    defaultParserRegistry.register(new BoomiProjectParser());
+    defaultParserRegistry.register(new BoomiProcessParser());
+    defaultParserRegistry.register(new BoomiConnectorParser());
+    defaultParserRegistry.register(new BoomiMapParser());
+    defaultParserRegistry.register(new BoomiProfileParser());
+    defaultParserRegistry.register(new BoomiTradingPartnerParser());
+    defaultParserRegistry.register(new BoomiComponentParser());
+    defaultParserRegistry.register(new BoomiApiParser());
+    defaultParserRegistry.register(new BoomiScriptParser());
 
     // MuleSoft API spec parser (stub — RAML/OAS parsing planned)
     defaultParserRegistry.register(new MuleSoftAPISpecParser());

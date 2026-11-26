@@ -1,0 +1,10 @@
+<syntheticBoomiProcess name="OrderProcessing" version="1.0" migrationTestArtifact="true">
+  <shapes>
+    <shape id="s1" type="ValidateOrder" />
+    <shape id="s2" type="CustomerLookup" />
+    <shape id="s3" type="OrderToERPMap" />
+    <shape id="s4" type="ERPUpsert" />
+    <shape id="s5" type="PublishOrderEvent" />
+    <shape id="s6" type="CommonErrorHandler" />
+  </shapes>
+</syntheticBoomiProcess>

@@ -1,0 +1,6 @@
+{
+  "name": "OrderManagementAPI",
+  "type": "HTTP",
+  "endpoint": "${ORDERMANAGEMENTAPI_ENDPOINT}",
+  "credential": "${ORDERMANAGEMENTAPI_SECRET}"
+}

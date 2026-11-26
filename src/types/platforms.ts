@@ -10,7 +10,7 @@
 /**
  * Supported source platform identifiers.
  */
-export type SourcePlatform = 'biztalk' | 'mulesoft' | 'tibco';
+export type SourcePlatform = 'biztalk' | 'mulesoft' | 'tibco' | 'boomi';
 
 /**
  * Platform display metadata.
@@ -53,6 +53,13 @@ export const SUPPORTED_PLATFORMS: PlatformInfo[] = [
         description: 'TIBCO BW5/BW6 projects and process definitions',
         icon: '$(symbol-event)',
         filePatterns: ['tibco.xml', 'TIBCO.xml', 'module.bwm', '.process', '.bwp'],
+    },
+    {
+        id: 'boomi',
+        label: 'Dell Boomi AtomSphere',
+        description: 'Dell Boomi processes, connectors, maps and profiles',
+        icon: '$(circuit-board)',
+        filePatterns: ['migration-manifest.json', 'Processes/*.xml', 'Connections/*.xml'],
     },
 ];
 

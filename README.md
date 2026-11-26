@@ -1,6 +1,6 @@
 # Logic Apps Migration Agent
 
-> **VS Code Extension for migrating BizTalk, MuleSoft, TIBCO, and other integration platforms to Azure Logic Apps Standard**
+> **VS Code Extension for migrating BizTalk, MuleSoft, TIBCO, Dell Boomi, and other integration platforms to Azure Logic Apps Standard**
 
 [![VS Code](https://img.shields.io/badge/VS%20Code-Extension-007ACC?logo=visual-studio-code)](https://code.visualstudio.com)
 [![Azure](https://img.shields.io/badge/Azure-Logic%20Apps-0078D4?logo=microsoft-azure)](https://azure.microsoft.com)
@@ -20,11 +20,12 @@ The **Logic Apps Migration Agent** is a VS Code extension that automates the mig
 
 ### Supported Source Platforms
 
-| Platform                                  | Status            | Parser   | Current coverage                                      |
-| ----------------------------------------- | ----------------- | -------- | ----------------------------------------------------- |
-| **BizTalk Server** (2016, 2020)           | Fully implemented | Built-in | Projects, orchestrations, maps, schemas, and bindings |
-| **MuleSoft Anypoint** (Mule 3, Mule 4)    | Partial support   | Built-in | Projects, Mule 4 flows, and DataWeave                 |
-| **TIBCO BusinessWorks** (BW5, BW6)        | Partial support   | Built-in | Project discovery and process metadata                |
+| Platform                               | Status            | Parser   | Current coverage                                                              |
+| -------------------------------------- | ----------------- | -------- | ----------------------------------------------------------------------------- |
+| **BizTalk Server** (2016, 2020)        | Fully implemented | Built-in | Projects, orchestrations, maps, schemas, and bindings                         |
+| **MuleSoft Anypoint** (Mule 3, Mule 4) | Partial support   | Built-in | Projects, Mule 4 flows, and DataWeave                                         |
+| **TIBCO BusinessWorks** (BW5, BW6)     | Partial support   | Built-in | Project discovery and process metadata                                        |
+| **Dell Boomi AtomSphere**              | Partial support   | Built-in | Processes, connections, maps, profiles, scripts, and X12/AS2 trading partners |
 
 Partial support includes platform detection, built-in parsing, and platform-specific guidance across the migration workflow. Coverage of source components and generated mappings continues to expand.
 
@@ -37,16 +38,16 @@ This is an open-source project — contributions are welcome! To add support for
 
 ## Features
 
-| Feature                       | Description                                                                                           |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------- |
-| 🔄 **Multi-Platform Support** | Built-in support for BizTalk, MuleSoft, and TIBCO, plus extensible parsers for partner platforms      |
-| 🎯 **5-Stage Workflow**       | Structured migration from Discovery through Deployment                                                |
-| 🧠 **Copilot Integration**    | AI-powered analysis, planning, and conversion via VS Code Language Model API                          |
-| 🏗️ **Built-in Parsers**       | TypeScript-based parsers for supported BizTalk, MuleSoft, and TIBCO artifacts                         |
-| 🔌 **Parser Plugin System**   | Partner teams can contribute parsers via VS Code extensions                                           |
-| 📊 **Flow Visualization**     | Interactive architecture diagrams, message flows, gap analysis, and dependency tracking               |
-| 🤖 **AI Agents**              | Three specialized Copilot agents: `@migration-analyser`, `@migration-planner`, `@migration-converter` |
-| ☁️ **Azure Deployment**       | Direct deployment configuration via Azure settings                                                    |
+| Feature                       | Description                                                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 🔄 **Multi-Platform Support** | Built-in support for BizTalk, MuleSoft, TIBCO, and Dell Boomi, plus extensible parsers for partner platforms |
+| 🎯 **5-Stage Workflow**       | Structured migration from Discovery through Deployment                                                       |
+| 🧠 **Copilot Integration**    | AI-powered analysis, planning, and conversion via VS Code Language Model API                                 |
+| 🏗️ **Built-in Parsers**       | TypeScript-based parsers for supported BizTalk, MuleSoft, TIBCO, and Dell Boomi artifacts                    |
+| 🔌 **Parser Plugin System**   | Partner teams can contribute parsers via VS Code extensions                                                  |
+| 📊 **Flow Visualization**     | Interactive architecture diagrams, message flows, gap analysis, and dependency tracking                      |
+| 🤖 **AI Agents**              | Three specialized Copilot agents: `@migration-analyser`, `@migration-planner`, `@migration-converter`        |
+| ☁️ **Azure Deployment**       | Direct deployment configuration via Azure settings                                                           |
 
 ## Migration Stages
 
@@ -67,7 +68,7 @@ Discovery → Planning → Conversion → Validation → Deployment
 ## Quick Start
 
 1. Install the extension from VS Code Marketplace
-2. Open your BizTalk, MuleSoft, or TIBCO project folder in VS Code
+2. Open your BizTalk, MuleSoft, TIBCO, or Dell Boomi project folder in VS Code
 3. Click the **Logic Apps Migration Agent** icon in the Activity Bar
 4. Select your source folder when prompted (or use the command palette: `Logic Apps Migration Agent: Select Source Folder`)
 5. Follow the guided 5-stage workflow
@@ -81,6 +82,7 @@ The planner generates **one selected scenario**, not several complete alternativ
 The Planning view keeps a concise decision summary and modernization table in the **Summary** section at the bottom of the overview. Expand **Planning details** for timelines, assumptions, alternatives, and rationale. **Regenerate Plan** reuses choices and preserves history; use **Suggest a Change** to request different choices. The view always displays the current plan used by Conversion, without a saved-version comparison table. DOCX reports include the current plan and saved scenario comparison for stakeholder review.
 
 Choices are persisted in `.vscode/migration/planning/{flowId}/planning-preferences.json`; every finalized plan is archived under `history/`. `plan.json` remains the current conversion input. Existing plans remain readable and appear as legacy plans without recorded choices. A full migration reset removes planning data and history.
+
 ### Exporting reports
 
 Use **Export Report** in a flow's Analysis or Planning tab to save a Word document.
@@ -113,8 +115,8 @@ interactive tabs retain their existing formats.
 
 Configure via `Settings > Extensions > Logic Apps Migration Agent`:
 
-| Setting                                            | Description                                       | Default                              |
-| -------------------------------------------------- | ------------------------------------------------- | ------------------------------------ |
+| Setting                                        | Description                                       | Default                              |
+| ---------------------------------------------- | ------------------------------------------------- | ------------------------------------ |
 | `logicAppsMigrationAgent.deploymentModel`      | Target deployment model for Logic Apps Standard   | `workflow-service-plan`              |
 | `logicAppsMigrationAgent.azure.subscriptionId` | Azure subscription ID for deployment              | (empty)                              |
 | `logicAppsMigrationAgent.azure.resourceGroup`  | Azure resource group for provisioning and testing | `integration-migration-tool-test-rg` |
@@ -145,6 +147,7 @@ Parsers are **TypeScript modules** that transform source platform artifacts into
 │  • BizTalk (.btp, bindings)│                                │
 │  • MuleSoft flows/projects │                                │
 │  • TIBCO processes/projects│                                │
+│  • Dell Boomi components   │                                │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -193,7 +196,7 @@ The Flow Visualizer provides an interactive webview for exploring your integrati
 
 ## Migration tests
 
-Run the BizTalk and TIBCO stage tests before submitting a pull request:
+Run the BizTalk, TIBCO, and Dell Boomi stage tests before submitting a pull request:
 
 ```powershell
 npm ci --ignore-scripts
@@ -451,7 +454,7 @@ src/
 ├── copilot/                   # Copilot integration (LM tools, context builder)
 ├── errors/                    # Error types and handler
 ├── ir/                        # Intermediate Representation (types, validation, serialization)
-├── parsers/                   # Parser system (BizTalk, MuleSoft, TIBCO, plugin loader)
+├── parsers/                   # Parser system (BizTalk, MuleSoft, TIBCO, Boomi, plugin loader)
 ├── services/                  # Core services (state, config, logging, telemetry)
 ├── stages/                    # Stage implementations (discovery, planning, conversion)
 ├── types/                     # Shared type definitions

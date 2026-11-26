@@ -1,0 +1,6 @@
+{
+  "name": "RetailHubAS2",
+  "type": "AS2",
+  "endpoint": "${RETAILHUBAS2_ENDPOINT}",
+  "credential": "${RETAILHUBAS2_SECRET}"
+}

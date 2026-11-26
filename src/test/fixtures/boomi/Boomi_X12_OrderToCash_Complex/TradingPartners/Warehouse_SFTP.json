@@ -1,0 +1,17 @@
+{
+  "name": "Warehouse_SFTP",
+  "standard": "X12",
+  "version": "004010",
+  "communication": "SFTP",
+  "senderId": "12:WAREHOUSE01",
+  "receiverId": "ZZ:SYNTHSUPPLIER",
+  "documents": [
+    "850",
+    "997",
+    "855",
+    "856",
+    "810"
+  ],
+  "archiveRaw": true,
+  "secrets": "placeholders only"
+}

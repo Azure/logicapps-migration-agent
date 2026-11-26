@@ -1,0 +1,126 @@
+---
+name: logic-apps-planning-rules
+description: Rules for planning the migration of a Dell Boomi flow to Azure Logic Apps Standard. Covers workflow split policy, 1-flow-to-1-workflow rule, source coverage requirements, planning artifact store sequence, and design constraints.
+---
+
+# Skill: Logic Apps Planning Rules
+
+> **Purpose**: Authoritative rules for how an AI agent should plan the target Logic Apps Standard architecture for a Dell Boomi migration. Follow exactly.
+
+> **⚠️ DEPENDENCY PREREQUISITE**: Whenever source behavior required to fully implement the workflows exists only in Groovy/JavaScript Data Process scripts, Boomi Custom Library JARs, or custom connectors, you MUST follow skill `dependency-and-decompilation-analysis` to analyse dependencies BEFORE designing the target architecture. This applies to flows and any workflow-critical logic — Groovy/JavaScript scripts, Map scripting functions, custom connectors, and shared Custom Library JARs. Do NOT proceed with planning until all relevant dependencies are analysed and their logic is understood.
+
+---
+
+## 1. Workflow Split Policy
+
+- **Every discovered flow** (including sub-processes invoked via a Process Call shape) MUST map to its own separate Logic Apps workflow.
+- Do NOT collapse sub-processes into local functions or merge them into a parent workflow.
+- Use the Workflow action type (`InvokeWorkflow`) to call child workflows from parent workflows, mirroring the Boomi Process Call shape.
+- Small, simple sub-processes (2–3 shapes, no branching) MAY be inlined into the parent workflow if it simplifies the design — document this explicitly.
+- You MUST enumerate ALL discovered flows and scenarios (happy path + branch/error/contingency paths) before deciding the workflow split.
+
+---
+
+## 2. Source Coverage Requirement
+
+Build a one-to-one source coverage map: every discovered process/sub-process/shape MUST appear in:
+
+- workflow definitions, OR
+- action mappings, OR
+- an explicit gap entry.
+
+Nothing from the source may be silently dropped.
+
+---
+
+## 3. Design Constraints
+
+### 3.00 Integration Account Decision Rule
+
+- Explicitly decide during planning whether this flow needs an Integration Account.
+- Use an Integration Account only for Integration Account-specific capabilities, especially B2B/EDI scenarios such as X12, EDIFACT, AS2, trading partners, agreements, or centrally managed shared B2B artifacts.
+- Do NOT choose Integration Account when Logic Apps Standard artifact folders are sufficient for schemas, maps, templates, and other workflow-local artifacts.
+- If Integration Account is used, use it consistently for the flow's deployable artifacts. Do NOT split artifacts between Integration Account and Logic App artifact folders for the same flow.
+- If Integration Account is used, the plan MUST include a provisioning task that deploys the Integration Account first, then captures the deployed resource ID and callback URL into `local.settings.json` as `WORKFLOWS_INTEGRATION_ACCOUNT_ID` and `WORKFLOW_INTEGRATION_ACCOUNT_CALLBACK_URL`.
+- If Integration Account is used, the plan MUST include a follow-on artifact upload task that uploads the required Integration Account artifacts after provisioning succeeds.
+
+### 3.0 Preserve Source Design
+
+> **⚠️ MANDATORY DESIGN PRESERVATION RULE:** Do NOT independently simplify, optimize, refactor, merge, reorder, or redesign the source flow. The target plan MUST preserve the **same source design and execution intent** unless there is a documented platform gap or the user explicitly asks for a redesign.
+
+- Preserve the original flow boundaries, sub-process call structure, Decision/Route branching, Branch-shape ordering, document batching and Flow Control, sequencing, and Try/Catch / Exception decomposition as closely as Logic Apps permits.
+- Do NOT combine separate source shapes into one target step merely because it looks simpler, unless the source already treated them as one logical unit or an unavoidable platform limitation requires it.
+- Do NOT remove intermediate steps, Set Properties shapes, Notify steps, Stop shapes, or Map stages unless they are explicitly proven redundant from the source behavior.
+- If any deviation from source design is unavoidable, document it explicitly in action mappings and gaps with the exact reason.
+
+### 3.1 SplitOn over ForEach
+
+When a trigger returns an array (batch of messages), ALWAYS use `splitOn` on the trigger instead of wrapping actions in a `For_each` loop. SplitOn debatches the array so each item fires a separate workflow run. Only use `For_each` if splitOn is not supported by that trigger type.
+
+### 3.2 File System Trigger Semantics
+
+Do NOT add delete/remove/cleanup actions that remove the trigger input file by default. The runtime does not re-trigger on the same unchanged file, so deleting is unnecessary unless the user explicitly requests it.
+
+### 3.3 Component Priority Ladder
+
+> **⚠️ MANDATORY OVERRIDE — READ THIS FIRST:**
+> Source custom code — Groovy/JavaScript Data Process scripts, Map scripting functions, Custom Library JARs, custom connectors — MUST **ALWAYS** map to **.NET local functions**. Do NOT simplify custom code to expressions, inline code, or any other level. This overrides the ladder below. Translate the real business logic from source code — never approximate with expressions.
+
+For all **other** (non-custom-code) components:
+
+1. Built-in actions (HTTP, Compose, Parse JSON, Select, SQL Connector, Service Bus, Transform XML/Xslt, XmlParse, XmlValidation, Flat File Decode/Encode) → 2. Expressions → 3. Data Mapper/Liquid (for Boomi Map conversions) → 4. Inline Code → 5. .NET local functions → 6. Azure Functions (last resort).
+
+> **AUTO-APPLY RULE**: Always choose the HIGHEST applicable level without asking the user. If a built-in action exists (e.g. SQL Connector for a Database connector operation, HTTP for an HTTP Client connector), use it — do NOT fall back to expressions or ask.
+
+> **BOOMI MAP PROCESSING RULE**: For Boomi Map components (`.json`/`.xml` map exports, Map shapes), assess complexity. Direct field links and standard functions (string, date, number formatting) → Liquid templates, Data Mapper or XSLT. Maps with scripting functions, cross-reference lookups, user-defined functions with branching, or document cache joins → .NET local functions or Transform + Lookup actions. Always flag Map conversions as gaps requiring review.
+
+### 3.5 Boomi Execution Semantics
+
+- **Documents, not messages**: A Boomi process carries a set of documents. Shapes run once per document unless the shape combines documents. A connector Get that returns many documents → `splitOn` or `For_each`. Data Process "Combine Documents" → `Compose`/`join()`, and "Split Documents" → `For_each`.
+- **Branch shape** runs branch 1 to completion, then branch 2, and so on. Map it to sequential scopes, NOT parallel branches, unless the branches are proven independent.
+- **Process properties / Dynamic Process Properties / Dynamic Document Properties** → workflow variables or parameters. **Persisted process properties** survive between executions, so they need durable storage (Table Storage, Blob or SQL), NOT a variable.
+- **Try/Catch shape** → `Scope` with a `runAfter: ["Failed","TimedOut"]` catch scope. **Exception shape** → `Terminate` (Failed) with the same message. **Stop shape** → `Terminate` (Succeeded) or skip the remaining actions.
+- **Return Documents** in a sub-process → `Response` action in the child workflow.
+- **Cross Reference Tables** → a lookup source (Integration Account map parameters, an App Settings JSON, Table Storage or a SQL lookup). Preserve the table content.
+- **Trading partners, X12/EDIFACT profiles, AS2** → Integration Account partners, agreements, schemas and the AS2/X12/EDIFACT built-in actions. Interchange/group control numbers and 997/999 generation move to the agreement settings. Duplicate checks map to agreement duplicate detection or an explicit idempotency store.
+- **Process Route / Route shapes** → `Switch` on the route key + `InvokeWorkflow`.
+- **Atom/Environment extensions** (connection URLs, credentials, property overrides) → `parameters.json` + `local.settings.json` app settings, with Key Vault references for secrets.
+
+---
+
+### 3.4 Local-Function Result Contracts
+
+- Before planning any local function or its consumers, read `dotnet-local-functions-logic-apps` section 10. Its signature rules apply during planning, not only code generation.
+- Every local function MUST return `Task<T>` where `T` is a class with public get/set properties. Do NOT plan raw `Task<bool>`, `Task<string>`, or other scalar results.
+- When source code returns a scalar, preserve that value in a named result property and update every consumer to select that property. For example, return `Task<LoggingFlagResult>` with `public bool Enabled { get; set; }` and assign `@body('Read_logging_flag')?['Enabled']` to a Boolean variable, not the entire function body.
+- Record each function name, result class, property names/types, and consumer expressions in the relevant action-mapping notes. Reuse an existing compatible result contract when available; do not rename properties independently in producer and consumer tasks.
+- Passing the whole result body is valid only when the consumer expects the complete object. Check Boolean/string assignments, conditions, workflow outputs, and parameters passed to other functions against the planned property types.
+- Reconcile all producer/consumer contracts before storing workflow definitions and finalizing the plan. Do not defer a known signature conflict to conversion or silently change source behavior.
+
+## 4. Reference Lookup (MANDATORY)
+
+Before generating any workflow definition:
+
+1. Read the skill `source-to-logic-apps-mapping` to look up the exact Logic Apps Standard equivalent for every Dell Boomi shape.
+2. Call `migration_searchReferenceWorkflows` and `migration_readReferenceWorkflow` to find real reference examples.
+3. Use the operation names from the mapping skill as search terms.
+4. Copy exact `serviceProviderConfiguration` and `operationId` values from references — do NOT invent these.
+5. If the first search returns no relevant results, RETRY 2-4 more times with different word combinations.
+6. Also call `migration_readReferenceDoc` to verify connector capabilities.
+
+---
+
+## 5. Required Planning Store Sequence
+
+Store planning results in THIS order:
+
+1. `migration_planning_storeMeta` — flowId, flowName, explanation, summary.
+2. `migration_planning_storeArchitecture` — flowId and Mermaid `flowchart TB` diagram.
+3. `migration_planning_storeWorkflowDefinition` — call once PER workflow. Each call MUST include `flowId`, `name`, `workflowDefinition` (with `definition.triggers`, `definition.actions` with `runAfter`, `type` for each action), and a `mermaid` field with a `flowchart TB` diagram. The mermaid field is ENFORCED and will be rejected if missing when multiple workflows exist.
+4. `migration_planning_storeAzureComponents` — flowId and components array.
+5. `migration_planning_storeActionMappings` — flowId and mappings array (source → target for each component; include `workflowName` when multiple workflows exist).
+6. `migration_planning_storeGaps` — flowId and gaps array (empty if none).
+7. `migration_planning_storePatterns` — flowId and patterns array (empty if none).
+8. `migration_planning_storeArtifactDispositions` — flowId and dispositions array. ONLY include artifacts that need conversion or upload: Boomi Maps (→ Liquid/XSLT/Data Mapper), X12/EDIFACT profiles (→ Integration Account schemas), RAML/OAS specs, JSON/XML schemas, Groovy/JavaScript scripts (.groovy/.js → local function), certificates. Do NOT include flow XMLs or property files. Each entry needs: artifactName, artifactType, conversionRequired, uploadDestination (integration-account / logic-app-artifact-folder / azure-function / not-applicable), uploadNotes (REQUIRED). When conversionRequired=true, also include conversionFrom, conversionTo, conversionNotes. If the plan uses Integration Account, artifact dispositions must consistently use `integration-account` instead of mixing destinations.
+9. `migration_planning_finalize` — flowId to validate and display the plan.
+

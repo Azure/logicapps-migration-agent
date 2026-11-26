@@ -57,6 +57,9 @@ const PLATFORM_FILE_PATTERNS: Record<
         { patterns: ['*.substvar'], confidence: 'medium' },
         { patterns: ['*.xsd', '*.wsdl', '*.xsl', '*.xslt'], confidence: 'low' },
     ],
+    boomi: [
+        { patterns: ['migration-manifest.json'], confidence: 'medium' }, // Need to check content
+    ],
     generic: [{ patterns: ['*.xml', '*.json'], confidence: 'low' }],
 };
 

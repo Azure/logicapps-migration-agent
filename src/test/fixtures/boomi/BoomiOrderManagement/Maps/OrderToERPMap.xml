@@ -1,0 +1,1 @@
+<syntheticBoomiMap name="OrderToERPMap"><field source="orderId" target="OrderNumber"/><field source="total" target="Amount"/><field source="customerId" target="CustomerNumber"/></syntheticBoomiMap>

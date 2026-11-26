@@ -1,0 +1,13 @@
+{
+  "name": "Invoice_To_X12_810",
+  "source": "Invoice JSON",
+  "target": "X12 004010 810",
+  "synthetic": true,
+  "controlNumberStrategy": "environment sequence",
+  "rules": [
+    "partner-specific envelope",
+    "loop creation",
+    "code conversion",
+    "trailer count calculation"
+  ]
+}
