@@ -473,10 +473,6 @@ export class UserPrompts {
         return format('Failed to open conversion: {0}', errorMsg);
     }
 
-    static failedToExecute(errorMsg: string): string {
-        return format('Failed to execute: {0}', errorMsg);
-    }
-
     static readonly NO_PROJECT_FOLDER = 'No project folder found.';
     static readonly NO_CODE_WORKSPACE_FILE =
         'No .code-workspace file found. Run Execute first to generate the project.';
