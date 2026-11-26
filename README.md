@@ -204,6 +204,11 @@ This strictly compiles TypeScript and runs all unit and stage-handoff integratio
 The tests use fixed agent responses; they do not call Copilot or Azure. Skipped and
 focused (`.only`) tests fail the suite.
 
+Test fixtures and reference assets must be original content created by Microsoft for
+this repository. Do not add vendor or customer samples, vendor schemas, connector
+definitions, or real business data. Use synthetic names such as Contoso and
+`example.com` namespaces.
+
 The `Migration tests` GitHub Actions check runs for every pull request targeting
 `main` (the default branch) or `master`, pushes to those branches, and merge-queue
 requests, without path filters.
@@ -471,6 +476,13 @@ docs/
 ├── SourceFlowVisualization.md # Source flow visualization documentation
 └── UserFlow.md                # User flow documentation
 ```
+
+## Trademarks and disclaimer
+
+MuleSoft, TIBCO, TIBCO BusinessWorks, IBM, Boomi, Workato, and other third-party
+product names are trademarks of their respective owners. They are used here only to
+describe the source platforms this extension can help migrate from. Microsoft is not
+affiliated with, sponsored by, or endorsed by these vendors.
 
 ## License
 

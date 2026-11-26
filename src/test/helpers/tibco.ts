@@ -11,17 +11,8 @@ import { ConversionFileService } from '../../stages/conversion/ConversionFileSer
 import { FlowMigrationPlan, PlanningFlow } from '../../stages/planning/types';
 import { ConversionTaskPlan } from '../../stages/conversion/types';
 
-export const fixturePath = path.resolve(
-    __dirname,
-    '../../../src/test/fixtures/tibco/CommonLogging'
-);
-export const processPath = path.join(
-    fixturePath,
-    'Processes',
-    'commonlogging',
-    'sh',
-    'invokeSyncLogEvent.bwp'
-);
+export const fixturePath = path.resolve(__dirname, '../../../src/test/fixtures/tibco/OrderAudit');
+export const processPath = path.join(fixturePath, 'Processes', 'orderaudit', 'LogOrderEvent.bwp');
 
 export async function scanSample() {
     return ArtifactScanner.getInstance().scan(fixturePath, 'tibco');
@@ -30,7 +21,7 @@ export async function scanSample() {
 export async function preparePlanning(): Promise<PlanningFlow> {
     const scan = await scanSample();
     assert.deepEqual(scan.parseErrors, []);
-    await InventoryService.getInstance().createFromScanResult(scan, 'CommonLogging', '6.x');
+    await InventoryService.getInstance().createFromScanResult(scan, 'OrderAudit', '6.x');
     const flows = PlanningService.getInstance().buildFlowsFromDiscovery();
     assert.equal(flows.length, 1);
     assert.equal(flows[0].name, sample.processName);

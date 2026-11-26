@@ -54,7 +54,7 @@ describe('TIBCO Discovery stage', () => {
         assert.equal(process.ir.metadata.source.artifact.fileType, 'bwp');
         assert.equal(process.ir.metadata.migration.complexity, 'medium');
         assert.deepEqual(process.ir.extensions?.tibco, {
-            sourceFile: 'invokeSyncLogEvent.bwp',
+            sourceFile: 'LogOrderEvent.bwp',
             activityCount: 5,
             transitionCount: 0,
             starterTypes: ['tibex:StartEvent'],
@@ -74,7 +74,7 @@ describe('TIBCO Discovery stage', () => {
         assert.ok(result.ir);
         assert.equal(result.ir.metadata.source.platform, 'tibco');
         assert.equal(result.ir.metadata.source.platformVersion, '6.x');
-        assert.equal(result.ir.metadata.name, 'CommonLogging');
+        assert.equal(result.ir.metadata.name, 'OrderAudit');
         const artifacts = await parser.getProjectArtifacts(fixturePath);
         assert.equal(artifacts.length, 1);
         assert.equal(artifacts[0].path, processPath);
@@ -87,8 +87,8 @@ describe('TIBCO Discovery stage', () => {
 
     it('builds stable inventory IDs across scans without losing platform and version', async () => {
         const builder = new InventoryBuilder();
-        const first = builder.build(scan, 'CommonLogging', '6.x');
-        const second = builder.build(await scanSample(), 'CommonLogging', '6.x');
+        const first = builder.build(scan, 'OrderAudit', '6.x');
+        const second = builder.build(await scanSample(), 'OrderAudit', '6.x');
         assert.equal(first.platform, 'tibco');
         assert.equal(first.platformVersion, '6.x');
         assert.equal(first.statistics.totalCount, sample.files.length);
@@ -101,7 +101,7 @@ describe('TIBCO Discovery stage', () => {
     });
 
     it('accepts the same process XML through the supported .process extension', async () => {
-        const alternate = path.join(workspace, 'invokeSyncLogEvent.process');
+        const alternate = path.join(workspace, 'LogOrderEvent.process');
         fs.copyFileSync(processPath, alternate);
         const parser = new TIBCOProcessParser();
         assert.equal(parser.canParse(alternate), true);

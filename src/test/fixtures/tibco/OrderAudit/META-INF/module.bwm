@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic BusinessWorks 6 style module descriptor authored for this repository's tests. -->
+<sca:composite xmlns:sca="http://www.osoa.org/xmlns/sca/1.0"
+    name="OrderAudit" targetNamespace="http://example.com/orderaudit/composite">
+  <sca:property name="MODULE.NAME" type="string">OrderAudit</sca:property>
+  <sca:property name="MODULE.VERSION" type="string">1.0.0</sca:property>
+</sca:composite>
