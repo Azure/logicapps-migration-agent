@@ -23,7 +23,7 @@ describe('TIBCO migration stage handoff (deterministic agent responses)', () => 
         const scan = await scanSample();
         assert.deepEqual(scan.parseErrors, []);
         const inventory = InventoryService.getInstance();
-        await inventory.createFromScanResult(scan, 'CommonLogging', detection.version);
+        await inventory.createFromScanResult(scan, 'OrderAudit', detection.version);
         inventory.dispose();
         await InventoryService.getInstance().initialize();
         assert.equal(InventoryService.getInstance().getInventory()?.platform, 'tibco');

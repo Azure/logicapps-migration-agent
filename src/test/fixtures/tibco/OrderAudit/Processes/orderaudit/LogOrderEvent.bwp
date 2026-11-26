@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic BusinessWorks 6 style process authored for this repository's tests. -->
+<bpws:process name="orderaudit.LogOrderEvent"
+    targetNamespace="http://example.com/orderaudit/processes"
+    xmlns:bpws="http://docs.oasis-open.org/wsbpel/2.0/process/executable"
+    xmlns:tibex="http://example.com/schemas/process-extensions">
+  <tibex:ProcessInfo createdBy="logicapps-migration-agent tests" description="Receive an order event, log it, and reply."/>
+  <bpws:variables>
+    <bpws:variable name="orderEvent" type="string"/>
+    <bpws:variable name="reply" type="string"/>
+  </bpws:variables>
+  <bpws:scope name="OrderAuditScope">
+    <bpws:flow name="OrderAuditFlow">
+      <bpws:links>
+        <bpws:link name="ReceiveToLog"/>
+        <bpws:link name="LogToReply"/>
+      </bpws:links>
+      <bpws:extensionActivity>
+        <tibex:receiveEvent name="ReceiveOrderEvent">
+          <tibex:eventSource>
+            <tibex:StartEvent/>
+          </tibex:eventSource>
+          <bpws:sources>
+            <bpws:source linkName="ReceiveToLog"/>
+          </bpws:sources>
+        </tibex:receiveEvent>
+      </bpws:extensionActivity>
+      <bpws:extensionActivity>
+        <tibex:activityExtension name="LogOrderEvent" inputVariable="orderEvent">
+          <bpws:targets>
+            <bpws:target linkName="ReceiveToLog"/>
+          </bpws:targets>
+          <bpws:sources>
+            <bpws:source linkName="LogToReply"/>
+          </bpws:sources>
+          <tibex:config level="info" message="Order event received"/>
+        </tibex:activityExtension>
+      </bpws:extensionActivity>
+      <bpws:extensionActivity>
+        <tibex:activityExtension name="ReplyToCaller" outputVariable="reply">
+          <bpws:targets>
+            <bpws:target linkName="LogToReply"/>
+          </bpws:targets>
+        </tibex:activityExtension>
+      </bpws:extensionActivity>
+    </bpws:flow>
+  </bpws:scope>
+</bpws:process>
