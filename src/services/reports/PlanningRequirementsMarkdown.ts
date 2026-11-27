@@ -388,13 +388,13 @@ function table(headers: readonly string[], rows: readonly (readonly unknown[])[]
     ].join('\n');
 }
 
-/** Table cell: escape pipes (and a backslash that precedes one) and keep line breaks as `<br>`. */
+/** Table cell: escape backslashes and pipes, and keep line breaks as `<br>`. */
 function cell(value: unknown): string {
     const content = text(value)
         .split('\n')
         .map((line) => line.trim())
         .join('<br>')
-        .replace(/\\(?=\|)/g, '\\\\')
+        .replace(/\\/g, '\\\\')
         .replace(/\|/g, '\\|');
     return content || '—';
 }

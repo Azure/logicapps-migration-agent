@@ -111,7 +111,9 @@ export function checkTaskArtifacts(
 }
 
 function cell(value: string | undefined): string {
-    return (value ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>') || '—';
+    return (
+        (value ?? '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>') || '—'
+    );
 }
 
 /**

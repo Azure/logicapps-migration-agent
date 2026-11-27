@@ -131,6 +131,31 @@ describe('Conversion traceability', () => {
             /## Tasks[\s\S]*\| 1 \| Convert map and schemas \| pending \| InvoiceToNotification, Invoice \| — \|[\s\S]*\| 2 \| Generate \\\| notification workflow \| completed \| InvoiceNotification \|/
         );
     });
+
+    it('escapes backslashes before pipes in table cells', () => {
+        const markdown = renderTraceabilityMarkdown(
+            {
+                flowId: 'f',
+                flowName: 'F',
+                generatedAt: '2026-01-01T00:00:00.000Z',
+                summary: '',
+                tasks: [
+                    {
+                        id: 't',
+                        type: 'convert-maps',
+                        name: 'Convert',
+                        description: '',
+                        dependsOn: [],
+                        status: 'pending',
+                        order: 1,
+                        artifactIds: ['a'],
+                    },
+                ],
+            },
+            () => ({ id: 'a', name: 'Odd\\|Name', type: 'map', sourcePath: 'Maps\\A.btm' })
+        );
+        assert.ok(markdown.includes('| Odd\\\\\\|Name | map | Maps\\\\A.btm |'));
+    });
 });
 
 describe('Conversion prompts', () => {

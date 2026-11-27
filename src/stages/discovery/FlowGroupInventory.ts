@@ -102,7 +102,9 @@ export function flowSearchText(group: FlowGroup, lookup: ArtifactLookup): string
 }
 
 function cell(value: string | undefined): string {
-    return (value ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>') || '—';
+    return (
+        (value ?? '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>') || '—'
+    );
 }
 
 /** Markdown inventory of all logical groups, shared and ungrouped artifacts. */

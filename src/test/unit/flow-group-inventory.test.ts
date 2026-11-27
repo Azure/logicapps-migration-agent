@@ -86,7 +86,7 @@ describe('Logical group inventory', () => {
         );
         assert.match(
             markdown,
-            /## Missing Referenced Projects[\s\S]*\| Common \| Orchestrations \| C:\\src\\Common\\Common\.btproj \|/
+            /## Missing Referenced Projects[\s\S]*\| Common \| Orchestrations \| C:\\\\src\\\\Common\\\\Common\.btproj \|/
         );
         assert.match(
             markdown,
