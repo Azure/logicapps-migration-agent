@@ -1573,7 +1573,7 @@
                 "displayName": "Store Conversion Task Plan",
                 "toolReferenceName": "migration_conversion_storeTaskPlan",
                 "canBeReferencedInPrompt": true,
-                "modelDescription": "Store the ordered conversion task plan for a flow. The task plan is determined by the agent based on the specific flow's planning results — there is no fixed list of task types. Each task has: id (unique string), type (short label like 'create-integration-account', 'convert-schemas', 'generate-workflow'), name (human-readable), description (short UI card text), executionPrompt (detailed agent instructions for execution), dependsOn (array of prerequisite task IDs), order (1-based execution sequence), and optionally estimatedMinutes and artifactIds. Tasks are displayed in the Conversion webview as an ordered checklist.",
+                "modelDescription": "Store the ordered conversion task plan for a flow. The task plan is determined by the agent based on the specific flow's planning results — there is no fixed list of task types. Each task has: id (unique string), type (short label like 'create-integration-account', 'convert-schemas', 'generate-workflow', 'generate-tests'), name (human-readable), description (short UI card text), executionPrompt (detailed agent instructions for execution), dependsOn (array of prerequisite task IDs), order (1-based execution sequence), artifactIds (IDs of the source artifacts the task converts or implements — required for schema, map, function, workflow and test tasks; shown to users for traceability), and optionally estimatedMinutes. Unknown artifact IDs are rejected; flow artifacts that no task lists are reported back. Tasks are displayed in the Conversion webview as an ordered checklist.",
                 "userDescription": "Store the conversion task plan for a flow",
                 "inputSchema": {
                     "type": "object",
@@ -1638,7 +1638,7 @@
                                         "items": {
                                             "type": "string"
                                         },
-                                        "description": "Optional artifact IDs this task operates on"
+                                        "description": "IDs of the source artifacts this task converts or implements (required for schema, map, function, workflow and test tasks)"
                                     },
                                     "estimatedMinutes": {
                                         "type": "number",
@@ -2010,6 +2010,19 @@
                     "type": "string",
                     "default": "eastus",
                     "description": "Azure region for provisioning resources"
+                },
+                "logicAppsMigrationAgent.azure.provisioningMode": {
+                    "type": "string",
+                    "enum": [
+                        "provision",
+                        "offline"
+                    ],
+                    "enumDescriptions": [
+                        "Conversion may create test resources without a local alternative (for example an Integration Account) in the configured resource group",
+                        "Never sign in to Azure or create resources: generate Bicep for required resources and test locally with emulators and mocked unit tests"
+                    ],
+                    "default": "provision",
+                    "markdownDescription": "Whether conversion may create Azure test resources. Use `offline` when you have no access to create resources in a subscription; the generated project still contains infrastructure templates and runnable tests."
                 },
                 "logicAppsMigrationAgent.discovery.groupingMode": {
                     "type": "string",

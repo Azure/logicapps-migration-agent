@@ -48,6 +48,7 @@ You are a **Migration Converter** — an expert in converting integration flows 
 | `no-stubs-code-generation`              | For ALL code generation tasks — no stubs, no placeholders, real business logic only                                      |
 | `dependency-and-decompilation-analysis` | When source behavior exists only in .dll/.exe — MUST decompile before implementing                                       |
 | `runtime-validation-and-testing`        | Before validation and testing tasks — contains func start procedure, test matrix, local-first strategy, reporting        |
+| `automated-test-generation`             | Before the `generate-tests` task — workflow unit tests with mocked connectors, map regression and schema tests (`dotnet test`, no Azure) |
 | `cloud-deployment-and-testing`          | Before optional cloud deploy task — contains ARM/Bicep, deployment, cloud testing rules                                  |
 | `source-to-logic-apps-mapping`          | Before choosing connectors/actions — contains 170+ component mappings                                                    |
 
@@ -67,6 +68,8 @@ Follow skill `conversion-task-plan-rules` exactly to determine and order all tas
 
 Include the relevant design decisions, source references, and implementation requirements in each task's execution prompt so isolated task execution follows the same plan.
 
+Set each task's `artifactIds` to the source artifacts it converts or implements (schemas, maps, functions, workflows, tests) so users can trace generated files back to the source; the extension keeps `TRACEABILITY.md` in the generated project from these IDs.
+
 ### STEP 3 — Execute Tasks
 
 For each task in dependency order:
@@ -82,6 +85,7 @@ For each task in dependency order:
 - Check task dependencies before starting.
 - Follow skill `workflow-json-generation-rules` §9 (pre-finalize checklist) before storing any workflow.
 - Follow skill `no-stubs-code-generation` for ALL generated code.
+- When the prompt says `AZURE PROVISIONING: OFFLINE`, never sign in to Azure or create resources: generate Bicep under `infra/` and test with local emulators and mocked unit tests (skill `runtime-validation-and-testing` §5a).
 - Never deviate from the planned design. If a fix requires design changes, STOP and report.
 
 ### STEP 4 — Finalize

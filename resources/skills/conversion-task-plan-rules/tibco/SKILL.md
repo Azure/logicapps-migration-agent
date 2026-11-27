@@ -39,7 +39,9 @@ After scaffold, add tasks for:
 - Local functions → using skill `dotnet-local-functions-logic-apps`
 - Workflows → `{outputLogicAppRoot}/<Name>/workflow.json`
 - Connections → `{outputLogicAppRoot}/connections.json`
-- Cloud resource provisioning (only for connectors with no local alternative)
+- Cloud resource provisioning (only for connectors with no local, Docker or emulator alternative, and only in provisioning mode `provision`). In OFFLINE mode, add a `generate-infrastructure` task instead that writes Bicep under `{outputProjectRoot}/infra/` without deploying; an Integration Account is then generated, not created, and its app settings become documented parameters.
+- Map functions (only when the plan's `map-strategy` is `azure-function`): a `generate-map-functions` task that creates an Azure Functions (.NET isolated) project under `{outputProjectRoot}/Functions/` with one function per map; keep the converted XSLT in `Artifacts/Maps` as the regression-test oracle.
+- Receiver / processor / sender workflows (only when the plan's `workflow-topology` is `receiver-processor-sender`): one workflow task per receiver, processor and sender workflow, each with its own `artifactIds`, so they can be generated and re-run individually.
 
 **IMPORTANT Integration Account decision rule:**
 
@@ -57,6 +59,13 @@ After scaffold, add tasks for:
 - Any Integration Account provisioning/configuration task MUST put that app setting requirement directly into its `executionPrompt`, not only in the high-level summary.
 - The task plan MUST make this choice explicit in the artifact task descriptions or execution prompts.
 
+### 2.2b Automated Tests (REQUIRED)
+
+- Type: `generate-tests`
+- After all schema, map, function and workflow tasks; before runtime validation.
+- Follow skill `automated-test-generation`: workflow unit tests with mocked connectors, map regression tests and schema tests under `{outputProjectRoot}/Tests/`, runnable with `dotnet test` without Azure.
+- `artifactIds`: the source orchestrations/flows, maps and schemas the tests cover.
+
 ### 2.3 Runtime Validation (REQUIRED)
 
 - Type: `validate-runtime`
@@ -68,7 +77,7 @@ After scaffold, add tasks for:
 - Type: `test-workflows`
 - Name: "End to End Testing (Local Environment)"
 - Must come after runtime validation.
-- Full test matrix (see skill `runtime-validation-and-testing`).
+- Full test matrix (see skill `runtime-validation-and-testing`), plus `dotnet test` for the generated tests.
 
 ### 2.5 Local Black Box Testing (OPTIONAL)
 
@@ -119,7 +128,7 @@ Each task needs:
 | `executionPrompt`  | string   | No       | Detailed agent-only instructions for execution    |
 | `dependsOn`        | string[] | Yes      | Prerequisite task IDs                             |
 | `order`            | number   | Yes      | 1-based execution sequence                        |
-| `artifactIds`      | string[] | No       | Artifact IDs this task operates on                |
+| `artifactIds`      | string[] | Yes*     | Source artifact IDs this task converts or implements (*may be empty only for scaffold, infrastructure, validation and deployment tasks). Every flow artifact that needs conversion must appear in at least one task. |
 | `estimatedMinutes` | number   | No       | Effort estimate                                   |
 | `optional`         | boolean  | No       | True for user-skippable tasks (e.g. cloud-deploy) |
 

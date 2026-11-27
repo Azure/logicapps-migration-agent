@@ -339,6 +339,10 @@ export class AgentFileProvisioner {
                 ),
             },
             {
+                folder: 'automated-test-generation',
+                content: this.buildSkillFromResource('automated-test-generation', platformFolder),
+            },
+            {
                 folder: 'workflow-json-generation-rules',
                 content: this.buildSkillFromResource(
                     'workflow-json-generation-rules',

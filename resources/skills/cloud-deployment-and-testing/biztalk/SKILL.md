@@ -13,6 +13,8 @@ description: Rules for optional cloud deployment and testing of Logic Apps Stand
 
 This task is OPTIONAL. The user decides whether to execute or skip it via the UI. It is excluded from "Execute All" and handled separately.
 
+**Offline provisioning mode**: when the prompt says `AZURE PROVISIONING: OFFLINE` (setting `logicAppsMigrationAgent.azure.provisioningMode`), do not sign in to Azure or deploy. Generate the Bicep templates, parameter files and app settings described below under `{outputProjectRoot}/infra/`, write `infra/README.md` with the exact deployment and cloud-test commands for the customer to run, and write `CLOUD-TEST-REPORT.md` stating that the Bicep templates were generated but not deployed, listing those commands and the cloud tests to run.
+
 ---
 
 ## 2. Deployment Steps

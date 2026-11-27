@@ -30,7 +30,7 @@ import { DiscoveryWebviewPanel, SourceFlowVisualizer } from '../views/discovery'
 import { PlanningWebviewPanel } from '../views/planning';
 import { ConversionWebviewPanel } from '../views/conversion';
 import { UserPrompts } from '../constants/UserMessages';
-import { ChatPrompts } from '../constants/ChatPrompts';
+import { ChatPrompts, ProvisioningMode } from '../constants/ChatPrompts';
 import type { GeneratedFlowResult } from '../services/LLMFlowGenerator';
 
 /**
@@ -936,6 +936,14 @@ export class CommandRegistry implements vscode.Disposable {
         );
     }
 
+    private getProvisioningMode(): ProvisioningMode {
+        return vscode.workspace
+            .getConfiguration('logicAppsMigrationAgent.azure')
+            .get<string>('provisioningMode', 'provision') === 'offline'
+            ? 'offline'
+            : 'provision';
+    }
+
     /**
      * Group the discovered artifacts from call chains, references and port bindings (no Copilot)
      * and show Home. Returns false when no orchestration/flow exists, so Copilot can group instead.
@@ -1276,6 +1284,7 @@ export class CommandRegistry implements vscode.Disposable {
                     outputProjectRoot,
                     outputLogicAppName,
                     outputLogicAppRoot,
+                    provisioningMode: this.getProvisioningMode(),
                 }),
             });
             logger.debug('[Conversion] Agent chat opened successfully');
@@ -1434,6 +1443,7 @@ export class CommandRegistry implements vscode.Disposable {
                     outputLogicAppRoot,
                     resourceGroup: rg,
                     location: loc,
+                    provisioningMode: this.getProvisioningMode(),
                 }),
             });
             logger.debug(`[Conversion] Agent chat opened for task: ${taskId}`);
@@ -1625,6 +1635,7 @@ export class CommandRegistry implements vscode.Disposable {
                     outputLogicAppRoot,
                     resourceGroup: rg2,
                     location: loc2,
+                    provisioningMode: this.getProvisioningMode(),
                 }),
             });
             logger.debug('[Conversion] Convert All agent chat opened successfully');

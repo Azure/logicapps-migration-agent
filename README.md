@@ -116,6 +116,14 @@ Markdown `requirements.md` for skill-based build pipelines: decisions, target
 architecture and per-workflow Mermaid diagrams, mapping and disposition tables, and
 acceptance criteria derived only from the plan.
 
+### Conversion output
+
+Each converted flow is generated under `out/<flow-name>/` and includes:
+
+- **Re-runnable tests** in `Tests/`: Logic Apps Standard workflow unit tests with mocked triggers and connectors, map regression tests (the converted XSLT stays the reference when maps move to functions), and schema validation tests. They run with `dotnet test` and need no Azure resources.
+- **`TRACEABILITY.md`**, which maps every source artifact to the tasks that implement it and the files they generated. Task cards in the Conversion view also list their source artifacts.
+- **Infrastructure templates** in `infra/` when `logicAppsMigrationAgent.azure.provisioningMode` is `offline`. In that mode conversion never signs in to Azure; it tests locally with Azurite and Docker emulators (including the Service Bus emulator) and mocked unit tests.
+
 ## Requirements
 
 | Requirement                                                                                                                      | Purpose                                               |
@@ -139,6 +147,7 @@ Configure via `Settings > Extensions > Logic Apps Migration Agent`:
 | `logicAppsMigrationAgent.azure.subscriptionId` | Azure subscription ID for deployment              | (empty)                              |
 | `logicAppsMigrationAgent.azure.resourceGroup`  | Azure resource group for provisioning and testing | `integration-migration-tool-test-rg` |
 | `logicAppsMigrationAgent.azure.location`       | Azure region for provisioning resources           | `eastus`                             |
+| `logicAppsMigrationAgent.azure.provisioningMode` | `provision` lets conversion create test resources without a local alternative; `offline` never signs in to Azure and generates Bicep plus local/mocked tests instead | `provision` |
 | `logicAppsMigrationAgent.discovery.groupingMode` | How logical groups are detected: `auto` (deterministic for BizTalk), `deterministic`, or `copilot` | `auto` |
 
 ## Command Palette
@@ -375,7 +384,9 @@ description: One-to-one mapping of every YourPlatform component to its Azure Log
 
 Create a `<your-platform>/SKILL.md` variant for each platform-specific skill. The
 MSMQ and SOAP built-in connector skills are shared fallbacks and apply whenever a
-platform maps a source component to those connectors.
+platform maps a source component to those connectors. The shared
+`automated-test-generation` skill applies to every platform; add a
+`<your-platform>/SKILL.md` variant only when your platform needs different test rules.
 
 | Skill                                   | Purpose                                                               | Agent                  |
 | --------------------------------------- | --------------------------------------------------------------------- | ---------------------- |
@@ -394,6 +405,7 @@ platform maps a source component to those connectors.
 | `dotnet-local-functions-logic-apps`     | Rules for generating .NET local functions                             | `@migration-converter` |
 | `no-stubs-code-generation`              | Rules ensuring generated code is complete (no stubs/placeholders)     | `@migration-converter` |
 | `runtime-validation-and-testing`        | Rules for runtime validation and testing                              | `@migration-converter` |
+| `automated-test-generation`             | Shared rules for re-runnable workflow unit, map and schema tests      | `@migration-converter` |
 | `cloud-deployment-and-testing`          | Rules for cloud deployment and testing                                | `@migration-converter` |
 
 **Tip**: Copy an existing platform's skills as a starting point (e.g., `biztalk/SKILL.md`) and adapt the content for your platform.

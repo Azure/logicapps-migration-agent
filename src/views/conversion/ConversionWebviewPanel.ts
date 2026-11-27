@@ -14,6 +14,7 @@ import * as path from 'path';
 import { LoggingService } from '../../services/LoggingService';
 import { ConversionService } from '../../stages/conversion/ConversionService';
 import { ConversionFileService } from '../../stages/conversion/ConversionFileService';
+import { InventoryService } from '../../stages/discovery/InventoryService';
 import {
     ConversionFlow,
     ConversionFlowStatus,
@@ -768,6 +769,11 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             color: var(--vscode-descriptionForeground);
             margin-bottom: 6px;
         }
+        .task-sources {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 6px;
+        }
         .task-meta {
             font-size: 11px;
             color: var(--vscode-descriptionForeground);
@@ -1128,6 +1134,7 @@ export class ConversionWebviewPanel implements vscode.Disposable {
                                 <div class="task-action">${taskActionHtml}</div>
                             </div>
                             <div class="task-desc">${this.escapeHtml(task.description)}</div>
+                            ${this.getTaskSourcesHtml(task.artifactIds)}
                             <div class="task-meta">
                                 <span class="task-meta-item">Type: ${this.escapeHtml(task.type)}</span>
                                 ${dependsOnHtml}
@@ -1178,6 +1185,21 @@ export class ConversionWebviewPanel implements vscode.Disposable {
             <div class="task-list">
                 ${taskCardsHtml}
             </div>`;
+    }
+
+    /**
+     * Source artifacts a task converts or implements, by name.
+     */
+    private getTaskSourcesHtml(artifactIds: readonly string[] | undefined): string {
+        if (!artifactIds || artifactIds.length === 0) {
+            return '';
+        }
+        const inventory = InventoryService.getInstance();
+        const names = artifactIds.map((id) => {
+            const item = inventory.getItem(id);
+            return item ? `${item.name} (${item.category})` : id;
+        });
+        return `<div class="task-sources" title="Source artifacts this task converts or implements">Source: ${this.escapeHtml(names.join(', '))}</div>`;
     }
 
     /**

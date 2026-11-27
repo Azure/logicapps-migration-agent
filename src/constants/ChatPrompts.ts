@@ -26,6 +26,26 @@ const SKILL_AUTHORITY =
 const GLOBAL_LOOKUP_POLICY =
     'SCOPE POLICY: Start from the selected flow/task artifacts, but if any required dependency, import/using, schema, map, connector, class, or configuration detail is missing or unclear, you MUST expand to full-project lookup using migration_listArtifacts, migration_searchArtifacts, migration_getArtifactDetails, and migration_readSourceFile. Do NOT assume dependencies are group-local. ';
 
+/** Whether conversion may create Azure test resources (`provision`) or must stay local (`offline`). */
+export type ProvisioningMode = 'provision' | 'offline';
+
+function azureSettings(
+    resourceGroup: string,
+    location: string,
+    mode: ProvisioningMode | undefined,
+    subscriptionSuffix = ''
+): string {
+    if (mode === 'offline') {
+        return (
+            '\nAZURE PROVISIONING: OFFLINE — do not sign in to Azure, run az/azd deployment commands, or create Azure resources. ' +
+            'Generate Bicep for every Azure resource the flow needs under "infra/" in the output project instead, ' +
+            'run locally with Azurite and Docker emulators (Service Bus emulator, SQL Server), and cover connectors without a local alternative with mocked unit tests (skill `automated-test-generation`). ' +
+            `Target values for the generated templates: Resource Group="${resourceGroup}", Location="${location}"${subscriptionSuffix}.\n`
+        );
+    }
+    return `\nAZURE SETTINGS: Resource Group="${resourceGroup}", Location="${location}"${subscriptionSuffix}.\n`;
+}
+
 // ============================================================================
 // ChatPrompts class
 // ============================================================================
@@ -47,6 +67,7 @@ interface ConversionForFlowParams {
     outputProjectRoot: string;
     outputLogicAppName: string;
     outputLogicAppRoot: string;
+    provisioningMode?: ProvisioningMode;
 }
 
 interface ExecuteSingleTaskParams {
@@ -66,6 +87,7 @@ interface ExecuteSingleTaskParams {
     outputLogicAppRoot: string;
     resourceGroup: string;
     location: string;
+    provisioningMode?: ProvisioningMode;
 }
 
 interface ExecuteAllTasksParams {
@@ -86,6 +108,7 @@ interface ExecuteAllTasksParams {
     outputLogicAppRoot: string;
     resourceGroup: string;
     location: string;
+    provisioningMode?: ProvisioningMode;
 }
 
 interface BlackBoxTestParams {
@@ -186,10 +209,16 @@ export class ChatPrompts {
             '- `no-stubs-code-generation` — all code must be fully implemented\n' +
             '- `dependency-and-decompilation-analysis` — MUST decompile any .dll/.exe whose source is missing before generating tasks\n' +
             '- `runtime-validation-and-testing` — validation, test matrix, reporting\n' +
+            '- `automated-test-generation` — re-runnable workflow unit, map and schema tests (dotnet test, no Azure)\n' +
             '- `cloud-deployment-and-testing` — optional cloud deploy task rules\n' +
             '- `source-to-logic-apps-mapping` — component equivalents\n' +
             '- `dotnet-local-functions-logic-apps` — .NET local function project structure\n' +
-            `\nAZURE SETTINGS: Resource Group="${params.azureResourceGroup}", Location="${params.azureLocation}"${subscriptionSuffix}.\n` +
+            azureSettings(
+                params.azureResourceGroup,
+                params.azureLocation,
+                params.provisioningMode,
+                subscriptionSuffix
+            ) +
             `OUTPUT PATHS: Workspace root="${params.outputProjectRoot}/", Logic App="${params.outputLogicAppRoot}/", ` +
             `Workspace file="${params.outputProjectRoot}/${params.outputProjectName}.code-workspace".\n` +
             `Scaffold params: workspaceName="${params.outputProjectName}", logicAppName="${params.outputLogicAppName}".\n` +
@@ -213,8 +242,8 @@ export class ChatPrompts {
             SKILL_AUTHORITY +
             GLOBAL_LOOKUP_POLICY +
             '\nREQUIRED SKILLS: Read `workflow-json-generation-rules`, `connections-json-generation-rules`, `no-stubs-code-generation`, ' +
-            '`dependency-and-decompilation-analysis` (decompile .dll/.exe when source is unavailable), `runtime-validation-and-testing`, `source-to-logic-apps-mapping` as needed for this task type.\n' +
-            `\nAZURE SETTINGS: Resource Group="${params.resourceGroup}", Location="${params.location}".\n` +
+            '`dependency-and-decompilation-analysis` (decompile .dll/.exe when source is unavailable), `runtime-validation-and-testing`, `automated-test-generation`, `source-to-logic-apps-mapping` as needed for this task type.\n' +
+            azureSettings(params.resourceGroup, params.location, params.provisioningMode) +
             `OUTPUT PATHS: Project="${params.outputProjectRoot}/", LogicApp="${params.outputLogicAppRoot}/".\n` +
             `\nTask details:\n- Type: ${params.taskType}\n- Description: ${params.taskDescription}\n` +
             `- Execution Prompt: ${params.taskExecutionPrompt}\n- Order: ${params.taskOrder}\n- Dependencies: ${params.taskDependsOn}\n` +
@@ -245,8 +274,9 @@ export class ChatPrompts {
             '- `no-stubs-code-generation` — all code fully implemented\n' +
             '- `dependency-and-decompilation-analysis` — MUST decompile any .dll/.exe whose source is missing before implementing\n' +
             '- `runtime-validation-and-testing` — validation, test matrix, local-first strategy, reporting\n' +
+            '- `automated-test-generation` — re-runnable workflow unit, map and schema tests (dotnet test, no Azure)\n' +
             '- `source-to-logic-apps-mapping` — component equivalents\n' +
-            `\nAZURE SETTINGS: Resource Group="${params.resourceGroup}", Location="${params.location}".\n` +
+            azureSettings(params.resourceGroup, params.location, params.provisioningMode) +
             `OUTPUT PATHS: Project="${params.outputProjectRoot}/", LogicApp="${params.outputLogicAppRoot}/".\n` +
             `\nCurrent task:\n- Type: ${params.nextTaskType}\n- Description: ${params.nextTaskDescription}\n` +
             `- Execution Prompt: ${params.nextTaskExecutionPrompt}\n- Order: ${params.nextTaskOrder}\n- Dependencies: ${params.nextTaskDependsOn}\n` +

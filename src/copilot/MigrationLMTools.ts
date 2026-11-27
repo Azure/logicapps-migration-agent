@@ -17,6 +17,7 @@
  */
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { InventoryService } from '../stages/discovery/InventoryService';
@@ -40,6 +41,12 @@ import { PlanningFileService, PLANNING_FILES } from '../stages/planning/Planning
 import { validateWorkflowDefinition } from '../workflowSchema';
 import { ConversionService } from '../stages/conversion/ConversionService';
 import { ConversionFileService } from '../stages/conversion/ConversionFileService';
+import {
+    checkTaskArtifacts,
+    renderTraceabilityMarkdown,
+    toOutputProjectName,
+    TraceableArtifact,
+} from '../stages/conversion/Traceability';
 import { MermaidValidationService } from '../services/MermaidValidationService';
 import type { ConversionTask, ConversionTaskOutput, ConversionTaskPlan } from '../stages/conversion/types';
 import { PlanningPreflightTool } from './PlanningPreflightTool';
@@ -4277,6 +4284,42 @@ class ConversionStoreTaskPlanTool implements vscode.LanguageModelTool<Conversion
                 ]);
             }
 
+            // Traceability: tasks must reference discovered source artifacts (names resolve to IDs)
+            const inventoryArtifacts: TraceableArtifact[] = (
+                await InventoryService.getInstance().getAllParsedArtifacts()
+            ).map((a) => ({ id: a.id, name: a.name, type: a.type, sourcePath: a.sourcePath }));
+            const flowArtifactIds = new Set(
+                SourceFlowVisualizer.getStaticCachedFlowGroups()?.groups.find(
+                    (g) => g.id === flowId
+                )?.artifactIds ?? []
+            );
+            const flowArtifacts = inventoryArtifacts.filter((a) => flowArtifactIds.has(a.id));
+            const artifactCheck =
+                inventoryArtifacts.length > 0
+                    ? checkTaskArtifacts(tasks, flowArtifacts, inventoryArtifacts)
+                    : undefined;
+            if (artifactCheck && artifactCheck.unknownReferences.length > 0) {
+                logger.warn(
+                    `[LMTool] migration_conversion_storeTaskPlan: REJECTED — unknown artifactIds: ${artifactCheck.unknownReferences.map((r) => r.reference).join(', ')}`
+                );
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({
+                            error:
+                                'REJECTED: task artifactIds must be IDs (or unique names) of discovered source artifacts so users can trace generated files back to the source. ' +
+                                'Fix the unknown references and re-submit the task plan.',
+                            unknownReferences: artifactCheck.unknownReferences.slice(0, 20),
+                            flowArtifacts: flowArtifacts
+                                .slice(0, 60)
+                                .map((a) => ({ id: a.id, name: a.name, type: a.type })),
+                        })
+                    ),
+                ]);
+            }
+            const resolvedArtifactIds = new Map(
+                (artifactCheck?.tasks ?? []).map((t) => [t.id, t.artifactIds])
+            );
+
             const summarizeForCard = (text: string): string => {
                 const normalized = text.replace(/\s+/g, ' ').trim();
                 if (!normalized) {
@@ -4350,7 +4393,7 @@ class ConversionStoreTaskPlanTool implements vscode.LanguageModelTool<Conversion
                     dependsOn: t.dependsOn || [],
                     order: t.order,
                     status: 'pending' as const,
-                    artifactIds: t.artifactIds,
+                    artifactIds: resolvedArtifactIds.get(t.id) ?? t.artifactIds,
                     estimatedMinutes: t.estimatedMinutes,
                     optional:
                         t.type === 'cloud-deploy-test' ||
@@ -4435,6 +4478,16 @@ class ConversionStoreTaskPlanTool implements vscode.LanguageModelTool<Conversion
                         taskCount: tasks.length,
                         tasks: tasks.map((t) => ({ id: t.id, name: t.name, order: t.order })),
                         message: `Conversion task plan stored with ${tasks.length} tasks. The tasks are now visible in the Conversion webview. You can proceed to execute tasks when the user asks.`,
+                        ...(artifactCheck && artifactCheck.uncoveredArtifacts.length > 0
+                            ? {
+                                  traceabilityWarning:
+                                      'These flow artifacts are not listed in any task artifactIds, so users cannot see which task converts them. ' +
+                                      'Re-store the task plan with the artifactIds of the tasks that convert or implement them; artifacts that need no conversion can stay unlisted.',
+                                  uncoveredArtifacts: artifactCheck.uncoveredArtifacts
+                                      .slice(0, 30)
+                                      .map((a) => ({ id: a.id, name: a.name, type: a.type })),
+                              }
+                            : {}),
                     })
                 ),
             ]);
@@ -4464,6 +4517,36 @@ class ConversionStoreTaskPlanTool implements vscode.LanguageModelTool<Conversion
 }
 
 // --------------- migration_conversion_storeTaskOutput ---------------
+
+/**
+ * Keep `TRACEABILITY.md` in the generated project (out/<flow>/) mapping source artifacts
+ * to the tasks that implement them and the files those tasks generated.
+ */
+async function writeTraceabilityFile(plan: ConversionTaskPlan): Promise<void> {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceRoot) {
+        return;
+    }
+    const projectDir = path.join(
+        workspaceRoot,
+        'out',
+        toOutputProjectName(plan.flowName || plan.flowId)
+    );
+    if (!fs.existsSync(projectDir)) {
+        return;
+    }
+    const artifacts = new Map(
+        (await InventoryService.getInstance().getAllParsedArtifacts()).map((a) => [
+            a.id,
+            { id: a.id, name: a.name, type: a.type, sourcePath: a.sourcePath },
+        ])
+    );
+    await fs.promises.writeFile(
+        path.join(projectDir, 'TRACEABILITY.md'),
+        renderTraceabilityMarkdown(plan, (id) => artifacts.get(id)),
+        'utf-8'
+    );
+}
 
 class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<ConversionStoreTaskOutputInput> {
     async invoke(
@@ -4829,6 +4912,31 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
             }
         }
 
+        // Enforce re-runnable automated tests: generated under Tests/ and executed with dotnet test
+        if (task && (task.type === 'generate-tests' || task.type === 'generate-automated-tests')) {
+            const normalizedGeneratedFiles = (generatedFiles || []).map((f) =>
+                (f || '').replace(/\\/g, '/').toLowerCase()
+            );
+            const hasTestFiles = normalizedGeneratedFiles.some(
+                (f) => f.includes('/tests/') || f.startsWith('tests/')
+            );
+            if (!hasTestFiles || !summaryLower.includes('dotnet test')) {
+                logger.warn(
+                    `[LMTool] migration_conversion_storeTaskOutput: REJECTED generate-tests — test files or dotnet test results missing`
+                );
+                logTaskRejected('tests-not-run');
+                return new vscode.LanguageModelToolResult([
+                    new vscode.LanguageModelTextPart(
+                        JSON.stringify({
+                            error:
+                                'REJECTED: Automated test generation is complete only when the generated test files under {outputProjectRoot}/Tests/ are listed in generatedFiles ' +
+                                'and `dotnet test` was run and passed. Follow skill `automated-test-generation` and report the dotnet test pass/fail counts in the summary.',
+                        })
+                    ),
+                ]);
+            }
+        }
+
         // Enforce local black box testing completeness — BLACKBOX-TEST-REPORT.md is mandatory
         // Also reject agent self-skips: this task requires user-provided test data via folder picker.
         if (task && task.type === 'local-blackbox-test') {
@@ -4907,6 +5015,14 @@ class ConversionStoreTaskOutputTool implements vscode.LanguageModelTool<Conversi
             const taskPlan2 = conversionService.getTaskPlan(flowId);
             const updatedTask = taskPlan2?.tasks.find((t) => t.id === taskId);
             const actualStatus = updatedTask?.status || 'completed';
+
+            if (taskPlan2) {
+                await writeTraceabilityFile(taskPlan2).catch((traceError) =>
+                    logger.debug(
+                        `[LMTool] Failed to update TRACEABILITY.md: ${traceError instanceof Error ? traceError.message : String(traceError)}`
+                    )
+                );
+            }
 
             logger.debug(
                 `[LMTool] migration_conversion_storeTaskOutput: stored output for task "${taskId}" in flow "${flowId}" (status: ${actualStatus})`
