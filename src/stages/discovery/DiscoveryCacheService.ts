@@ -39,10 +39,8 @@ export interface DiscoveryFlowGroup extends FlowGroup {
 /**
  * Flow groups result with per-flow discovery status.
  */
-export interface DiscoveryFlowGroupsResult {
+export interface DiscoveryFlowGroupsResult extends Omit<FlowGroupsResult, 'groups'> {
     groups: DiscoveryFlowGroup[];
-    ungroupedArtifactIds: string[];
-    explanation: string;
 }
 
 /**
@@ -97,20 +95,25 @@ export class DiscoveryCacheService {
     // =========================================================================
 
     /**
-     * Store flow groups (from initial detection).
-     * Sets all flows to `discovered: false` unless they already have analysis on disk.
+     * Store flow groups (from initial detection or re-detection).
+     * Groups keep the analysis, planning and conversion progress saved under the same flow ID.
      */
     public async storeFlowGroups(flowGroupsResult: FlowGroupsResult): Promise<void> {
-        const discoveryGroups: DiscoveryFlowGroup[] = flowGroupsResult.groups.map((g) => ({
-            ...g,
-            discovered: this.hasAnalysis(g.id),
-        }));
+        this.ensureLoaded();
+        const previous = new Map((this.flowGroupsCache?.groups ?? []).map((g) => [g.id, g]));
+        const discoveryGroups: DiscoveryFlowGroup[] = flowGroupsResult.groups.map((g) => {
+            const earlier = previous.get(g.id);
+            return {
+                ...g,
+                discovered: this.hasAnalysis(g.id),
+                ...(earlier?.planned ? { planned: true } : {}),
+                ...(earlier?.tasksCreated ? { tasksCreated: true } : {}),
+                ...(earlier?.converted ? { converted: true } : {}),
+            };
+        });
 
-        this.flowGroupsCache = {
-            groups: discoveryGroups,
-            ungroupedArtifactIds: flowGroupsResult.ungroupedArtifactIds,
-            explanation: flowGroupsResult.explanation,
-        };
+        this.flowGroupsCache = { ...flowGroupsResult, groups: discoveryGroups };
+        this.reconcileFlowStates();
 
         await this.saveFlowGroupsToDisk();
         this.logger.debug(`[DiscoveryCache] Stored ${discoveryGroups.length} flow groups`);

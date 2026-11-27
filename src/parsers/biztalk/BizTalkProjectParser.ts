@@ -570,6 +570,7 @@ export class BizTalkProjectParser extends AbstractParser implements IProjectPars
                     projectName: projectInfo.name,
                     projectNamespace: projectInfo.namespace,
                     assemblyVersion: projectInfo.version,
+                    projectReferences: [...projectInfo.projectReferences],
                 },
             },
         };

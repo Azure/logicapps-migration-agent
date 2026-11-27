@@ -127,6 +127,7 @@ export class ChatPrompts {
             SKILL_AUTHORITY +
             '\nREQUIRED SKILLS: Read `detect-logical-groups` first and follow it exactly.\n' +
             'The skill contains all grouping rules, fallback logic, and required output fields.\n' +
+            'Start from the deterministic proposedGroups returned by migration_detectFlowGroups: keep their ids, artifactIds, endpointNames and shared artifacts, and only improve names and descriptions.\n' +
             'Do NOT read source files or generate architecture diagrams — only detect and store groups.'
         );
     }
@@ -278,9 +279,9 @@ export class ChatPrompts {
             '- `dependency-and-decompilation-analysis` — DLL decompilation, missing dependency classification\n' +
             '- `source-to-logic-apps-mapping` — component equivalents, service provider IDs, operation names\n' +
             `\nPROCEDURE:\n` +
-            `1. Call migration_detectFlowGroups with groupId="${params.flowId}" to retrieve the cached group artifact list.\n` +
+            `1. Call migration_detectFlowGroups with groupId="${params.flowId}" to retrieve the cached group artifact list. If it lists endpointNames, only those ports belong to this flow; ports of other flows in shared binding files are out of scope.\n` +
             '2. Call migration_getArtifactDetails and migration_readSourceFile for EVERY artifact per skill `analyse-source-design`.\n' +
-            '3. If any required dependency/detail is unresolved, expand to full-project lookup (all artifacts), then continue analysis.\n' +
+            '3. If any required dependency/detail is unresolved, expand to full-project lookup (all artifacts), then continue analysis. Record what you find outside the group as external dependencies, not as components of this flow.\n' +
             '4. Perform dependency analysis per skill `dependency-and-decompilation-analysis` (decompile DLLs/JARs, classify missing deps).\n' +
             '5. Look up every component in skill `source-to-logic-apps-mapping`, then search reference docs with those names.\n' +
             '6. Generate Mermaid architecture diagram per skill `analyse-source-design` rules.\n' +

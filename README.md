@@ -72,6 +72,16 @@ Discovery → Planning → Conversion → Validation → Deployment
 4. Select your source folder when prompted (or use the command palette: `Logic Apps Migration Agent: Select Source Folder`)
 5. Follow the guided 5-stage workflow
 
+### Logical groups
+
+After discovery, the extension groups BizTalk artifacts into logical flows without Copilot, in seconds, and returns the same groups and IDs for the same source:
+
+- Orchestrations linked by Call/Start Orchestration form one flow, named after the entry orchestration. Receive locations and send ports bound to it (or subscribed to its receive ports) belong to it; receive ports routed only by send-port filters become messaging routes.
+- Maps, message schemas, pipelines and projects belong to the flows that reference them. Artifacts used by several flows — for example canonical schemas from a shared canonical data model project or one application binding file — are **shared**: they appear in each flow that uses them instead of merging flows, and analysis of a flow only covers its own ports.
+- Referenced projects missing from the source folder are reported right away. After adding them, **Rescan Artifacts** offers to re-detect groups; flows that keep their ID keep their analysis, plan and conversion progress. You can also run **Re-detect Logical Groups** at any time.
+
+Set `logicAppsMigrationAgent.discovery.groupingMode` to `copilot` to let Copilot group the artifacts instead, starting from the same proposal. MuleSoft and TIBCO use Copilot grouping by default.
+
 ### Decision-first planning
 
 Planning resolves important choices before generating workflow definitions. It reuses discovery results and saved answers, asks a short hosting question when no explicit deployment setting exists, then asks only consequential unresolved questions (typically broker choice and/or preserve-code versus native-first modernization). Minor, behavior-preserving mappings are chosen automatically. Canceling pauses planning without inventing answers; already answered choices are saved.
@@ -119,6 +129,7 @@ Configure via `Settings > Extensions > Logic Apps Migration Agent`:
 | `logicAppsMigrationAgent.azure.subscriptionId` | Azure subscription ID for deployment              | (empty)                              |
 | `logicAppsMigrationAgent.azure.resourceGroup`  | Azure resource group for provisioning and testing | `integration-migration-tool-test-rg` |
 | `logicAppsMigrationAgent.azure.location`       | Azure region for provisioning resources           | `eastus`                             |
+| `logicAppsMigrationAgent.discovery.groupingMode` | How logical groups are detected: `auto` (deterministic for BizTalk), `deterministic`, or `copilot` | `auto` |
 
 ## Command Palette
 
@@ -127,6 +138,7 @@ Configure via `Settings > Extensions > Logic Apps Migration Agent`:
 | `Logic Apps Migration Agent: Select Source Folder` | Start migration by selecting a source project folder |
 | `Logic Apps Migration Agent: Reset Migration`      | Reset all migration state and start over             |
 | `Logic Apps Migration Agent: Show Extension Logs`  | Open the extension output channel for debugging      |
+| `Logic Apps Migration Agent: Re-detect Logical Groups` | Re-group the current inventory, keeping progress of flows whose ID is unchanged |
 
 ## Architecture
 

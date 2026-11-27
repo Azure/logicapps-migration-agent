@@ -15,6 +15,13 @@ import { StateManager } from '../services/StateManager';
 import { ErrorHandler } from '../errors/ErrorHandler';
 import { MsiExtractorService } from '../services/MsiExtractorService';
 import { DiscoveryService } from '../stages/discovery';
+import { InventoryService } from '../stages/discovery/InventoryService';
+import {
+    compareInventoryWithGroups,
+    detectFlowGroups,
+    FlowGroupingMode,
+    resolveGroupingMode,
+} from '../stages/discovery/FlowGroupDetector';
 import { PlanningService } from '../stages/planning';
 import { ConversionService } from '../stages/conversion';
 import { AgentFileProvisioner } from '../services/AgentFileProvisioner';
@@ -120,6 +127,11 @@ export class CommandRegistry implements vscode.Disposable {
                 id: 'logicAppsMigrationAgent.viewDependencyGraph',
                 handler: this.handleViewDependencyGraph.bind(this),
                 title: 'View Dependency Graph',
+            },
+            {
+                id: 'logicAppsMigrationAgent.redetectFlowGroups',
+                handler: this.handleRedetectFlowGroups.bind(this),
+                title: 'Re-detect Logical Groups',
             },
             // Planning Stage Commands
             {
@@ -780,13 +792,32 @@ export class CommandRegistry implements vscode.Disposable {
                     UserPrompts.rescanComplete(result.inventory?.statistics.totalCount || 0)
                 );
 
-                // Auto-start logical group detection if groups are not available yet
+                // Auto-start logical group detection if groups are not available yet;
+                // otherwise offer to re-detect them when the inventory changed.
                 try {
                     const { DiscoveryCacheService } =
                         await import('../stages/discovery/DiscoveryCacheService');
-                    const hasGroups = DiscoveryCacheService.getInstance().hasFlowGroups();
-                    if (!hasGroups) {
+                    const discoveryCache = DiscoveryCacheService.getInstance();
+                    const flowGroups = discoveryCache.getFlowGroups();
+                    if (!discoveryCache.hasFlowGroups() || !flowGroups) {
                         await this.handleViewFlowVisualization();
+                    } else {
+                        const inventoryIds = (
+                            await InventoryService.getInstance().getAllParsedArtifacts()
+                        ).map((artifact) => artifact.id);
+                        const change = compareInventoryWithGroups(inventoryIds, flowGroups);
+                        if (change.added.length > 0 || change.removed.length > 0) {
+                            const choice = await vscode.window.showInformationMessage(
+                                UserPrompts.inventoryChangedSinceGrouping(
+                                    change.added.length,
+                                    change.removed.length
+                                ),
+                                UserPrompts.BUTTON_REDETECT_GROUPS
+                            );
+                            if (choice === UserPrompts.BUTTON_REDETECT_GROUPS) {
+                                await this.handleRedetectFlowGroups();
+                            }
+                        }
                     }
                 } catch (autoDetectError) {
                     LoggingService.getInstance().debug(
@@ -875,8 +906,64 @@ export class CommandRegistry implements vscode.Disposable {
             return;
         }
 
-        // No cache at all — open webview with loading state, then start flow group detection
+        // No cache at all — detect the logical groups
+        if (
+            this.getGroupingMode() === 'deterministic' &&
+            (await this.detectFlowGroupsDeterministically(extensionUri))
+        ) {
+            return;
+        }
+        await this.startCopilotFlowGroupDetection(extensionUri);
+    }
 
+    private getGroupingMode(): FlowGroupingMode {
+        return resolveGroupingMode(
+            vscode.workspace
+                .getConfiguration('logicAppsMigrationAgent')
+                .get<string>('discovery.groupingMode', 'auto'),
+            StateManager.getInstance().getState().sourcePlatform
+        );
+    }
+
+    /**
+     * Group the discovered artifacts from call chains, references and port bindings (no Copilot)
+     * and show Home. Returns false when no orchestration/flow exists, so Copilot can group instead.
+     */
+    private async detectFlowGroupsDeterministically(extensionUri: vscode.Uri): Promise<boolean> {
+        const artifacts = await InventoryService.getInstance().getAllParsedArtifacts();
+        const result = detectFlowGroups(artifacts);
+        if (result.groups.length === 0) {
+            LoggingService.getInstance().info(
+                '[Discovery] No orchestrations or flows to group deterministically; using Copilot'
+            );
+            return false;
+        }
+
+        await SourceFlowVisualizer.applyFlowGroups(result, extensionUri);
+        TelemetryService.getInstance().logStep('flowgroups.detection.completed', {
+            mode: 'deterministic',
+            flowGroupCount: result.groups.length,
+            sharedArtifactCount: result.sharedArtifactIds?.length ?? 0,
+            ungroupedArtifactCount: result.ungroupedArtifactIds.length,
+            missingProjectCount: result.missingProjects?.length ?? 0,
+        });
+        void vscode.window.showInformationMessage(
+            UserPrompts.flowGroupsDetected(
+                result.groups.length,
+                result.sharedArtifactIds?.length ?? 0
+            )
+        );
+        if (result.missingProjects && result.missingProjects.length > 0) {
+            void vscode.window.showWarningMessage(
+                UserPrompts.missingReferencedProjects(
+                    result.missingProjects.map((missing) => missing.project)
+                )
+            );
+        }
+        return true;
+    }
+
+    private async startCopilotFlowGroupDetection(extensionUri: vscode.Uri): Promise<void> {
         // Open webview immediately with a loading spinner
         SourceFlowVisualizer.showLoading(extensionUri, 'Detecting logical groups...');
         SourceFlowVisualizer.isInitialGenerating = true;
@@ -894,6 +981,32 @@ export class CommandRegistry implements vscode.Disposable {
                 )
             );
         }
+    }
+
+    /**
+     * Re-detect logical groups for the current inventory (e.g. after adding projects).
+     * Flow IDs are stable, so analysis, plans and conversions of unchanged flows are kept.
+     */
+    private async handleRedetectFlowGroups(): Promise<void> {
+        if (SourceFlowVisualizer.isAnyFlowBusy || SourceFlowVisualizer.isInitialGenerating) {
+            vscode.window.showWarningMessage(UserPrompts.FLOW_WORK_IN_PROGRESS);
+            return;
+        }
+        const inventory = DiscoveryService.getInstance().getCurrentInventory();
+        if (!inventory || inventory.statistics.totalCount === 0) {
+            vscode.window.showWarningMessage(UserPrompts.NO_ARTIFACTS_RUN_DISCOVERY);
+            return;
+        }
+        const extensionUri =
+            vscode.extensions.getExtension('logicapps-migration-agent')?.extensionUri ??
+            vscode.Uri.file(__dirname);
+        if (
+            this.getGroupingMode() === 'deterministic' &&
+            (await this.detectFlowGroupsDeterministically(extensionUri))
+        ) {
+            return;
+        }
+        await this.startCopilotFlowGroupDetection(extensionUri);
     }
 
     /**

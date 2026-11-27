@@ -205,6 +205,26 @@ export class SourceFlowVisualizer implements vscode.Disposable {
     }
 
     /**
+     * Store a complete set of detected flow groups (replacing earlier groups) and show Home.
+     * Progress saved under unchanged flow IDs is kept.
+     */
+    public static async applyFlowGroups(
+        result: FlowGroupsResult,
+        extensionUri: vscode.Uri
+    ): Promise<void> {
+        const { DiscoveryCacheService } =
+            await import('../../stages/discovery/DiscoveryCacheService');
+        const discoveryCacheService = DiscoveryCacheService.getInstance();
+        await discoveryCacheService.storeFlowGroups(result);
+        SourceFlowVisualizer.setStaticCachedFlowGroups(
+            discoveryCacheService.getFlowGroups() ?? result,
+            true
+        );
+        SourceFlowVisualizer.isInitialGenerating = false;
+        SourceFlowVisualizer.showFlowGroupSelector(extensionUri);
+    }
+
+    /**
      * Show a flow group selector page listing all detected flow groups.
      * The user picks a flow to analyse. If the flow is already discovered
      * (cached), it loads instantly; otherwise it triggers the agent.
@@ -906,8 +926,18 @@ export class SourceFlowVisualizer implements vscode.Disposable {
 
     /**
      * Store flow groups in the static cache and persist via DiscoveryCacheService.
+     * With `replace`, groups missing from the new result are dropped instead of merged back.
      */
-    public static setStaticCachedFlowGroups(flowGroups: FlowGroupsResult): void {
+    public static setStaticCachedFlowGroups(flowGroups: FlowGroupsResult, replace = false): void {
+        if (replace) {
+            this.cachedFlowGroupsResult = flowGroups;
+            LoggingService.getInstance().debug(
+                `[FlowViz] Replaced cached flow groups (${flowGroups.groups.length} groups)`
+            );
+            void vscode.commands.executeCommand('logicAppsMigrationAgent.refreshViews');
+            return;
+        }
+
         const existingMap = new Map(
             (this.cachedFlowGroupsResult?.groups ?? []).map((g) => [g.id, g])
         );

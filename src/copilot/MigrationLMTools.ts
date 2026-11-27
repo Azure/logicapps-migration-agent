@@ -21,6 +21,12 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { InventoryService } from '../stages/discovery/InventoryService';
 import { ParsedArtifact } from '../stages/discovery/types';
+import {
+    detectFlowGroups,
+    findCrossGroupDependencies,
+    findUndeclaredSharedArtifacts,
+    scopeEndpointsToFlow,
+} from '../stages/discovery/FlowGroupDetector';
 import { LoggingService } from '../services/LoggingService';
 import { TelemetryService } from '../services/TelemetryService';
 import { ContextBuilder, ContextScope } from './ContextBuilder';
@@ -112,9 +118,12 @@ interface StoreFlowGroupsInput {
         artifactIds: string[];
         entryPoint?: { type: string; name: string; messageType?: string };
         exitPoints?: { type: string; name: string; messageType?: string }[];
+        endpointNames?: string[];
     }[];
     /** IDs of artifacts not belonging to any group */
     ungroupedArtifactIds?: string[];
+    /** Artifacts used by several groups; listed in each group that uses them */
+    sharedArtifactIds?: string[];
     /** Explanation of how groups were determined */
     explanation?: string;
 }
@@ -1137,15 +1146,28 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
                         );
                     }
 
-                    // Build compact summaries for only this group's artifacts
+                    // Build compact summaries for only this group's artifacts. Shared binding
+                    // files hold every port of the application, so keep only this flow's ports.
+                    const sharedIds = new Set(cachedFlowGroups.sharedArtifactIds ?? []);
                     const artifactSummaries = groupArtifacts.map((a) => {
                         const summary: Record<string, unknown> = {
                             id: a.id,
                             name: a.name,
                             type: a.type,
                         };
-                        if (a.ir.endpoints?.receive && a.ir.endpoints.receive.length > 0) {
-                            summary.receiveEndpoints = a.ir.endpoints.receive.map((ep) => {
+                        if (sharedIds.has(a.id)) {
+                            summary.sharedWithOtherFlows = true;
+                        }
+                        const scoped = scopeEndpointsToFlow(
+                            a.ir.endpoints?.receive ?? [],
+                            a.ir.endpoints?.send ?? [],
+                            group.endpointNames
+                        );
+                        if (scoped.omitted > 0) {
+                            summary.endpointsOfOtherFlowsOmitted = scoped.omitted;
+                        }
+                        if (scoped.receive.length > 0) {
+                            summary.receiveEndpoints = scoped.receive.map((ep) => {
                                 const sourceMapping = ep.sourceMapping as
                                     | { biztalk?: { receivePortName?: string } }
                                     | undefined;
@@ -1157,8 +1179,8 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
                                 };
                             });
                         }
-                        if (a.ir.endpoints?.send && a.ir.endpoints.send.length > 0) {
-                            summary.sendEndpoints = a.ir.endpoints.send.map((ep) => {
+                        if (scoped.send.length > 0) {
+                            summary.sendEndpoints = scoped.send.map((ep) => {
                                 const result: Record<string, unknown> = { name: ep.name };
                                 if ('transport' in ep) {
                                     result.transport = ep.transport;
@@ -1199,6 +1221,11 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
                                     description: group.description,
                                     category: group.category,
                                     artifactIds: group.artifactIds,
+                                    ...(group.entryPoint ? { entryPoint: group.entryPoint } : {}),
+                                    ...(group.exitPoints ? { exitPoints: group.exitPoints } : {}),
+                                    ...(group.endpointNames
+                                        ? { endpointNames: group.endpointNames }
+                                        : {}),
                                 },
                                 totalArtifactsInGroup: group.artifactIds.length,
                                 artifacts: artifactSummaries,
@@ -1211,7 +1238,11 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
                                     'This is a CACHED flow group. The artifacts listed belong to this group. ' +
                                     'Call migration_getArtifactDetails and migration_readSourceFile for each artifact to extract configuration details, ' +
                                     'then generate the Mermaid diagram and proceed with your workflow. ' +
-                                    'If any required dependency or detail is unresolved, expand to full-project lookup using migration_listArtifacts/migration_searchArtifacts and read additional artifacts outside this group before finalizing results.',
+                                    'FLOW SCOPE: when group.endpointNames is present, ONLY those receive locations/ports and send ports belong to this flow. ' +
+                                    'Binding files and artifacts marked sharedWithOtherFlows also contain ports, schemas or code of OTHER flows — ' +
+                                    'ignore the parts that are not used by this flow and never draw ports or adapters of other flows in this flow diagram, components or message flow. ' +
+                                    'If any required dependency or detail is unresolved, expand to full-project lookup using migration_listArtifacts/migration_searchArtifacts and read additional artifacts outside this group; ' +
+                                    'report what you find there as external dependencies of this flow rather than as part of it.',
                             })
                         ),
                     ]);
@@ -1328,26 +1359,37 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
                 `[LMTool] migration_detectFlowGroups: ${parsedArtifacts.length} artifacts, ${connections.length} connections, ${receiveLocationCount} receive location(s)`
             );
 
+            // Deterministic proposal: same inventory → same groups and IDs
+            const proposal = detectFlowGroups(parsedArtifacts);
+
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
                         success: true,
                         totalArtifacts: parsedArtifacts.length,
                         receiveLocationCount,
+                        proposedGroups: proposal.groups,
+                        proposedSharedArtifactIds: proposal.sharedArtifactIds ?? [],
+                        proposedUngroupedArtifactIds: proposal.ungroupedArtifactIds,
+                        proposalExplanation: proposal.explanation,
+                        missingProjects: proposal.missingProjects ?? [],
                         artifacts: artifactSummaries,
                         connectionGraph: connections,
                         instructions:
-                            'Use the artifacts and connectionGraph to determine logical flow groups. ' +
-                            'CRITICAL: The connectionGraph includes orchestration-calls edges when one orchestration calls/starts another (Call Orchestration or Start Orchestration). ' +
-                            'Orchestrations linked by orchestration-calls edges (directly or transitively) MUST be in the SAME group — do NOT create separate groups for caller and callee orchestrations. ' +
-                            'Example: If Orch-A calls Orch-B and Orch-B calls Orch-C, all three belong in ONE group with all their related schemas/maps/pipelines. ' +
-                            'Each group should follow: exactly ONE Receive Location → Receive Port → MessageBox → Orchestration(s) → Send Port(s). ' +
-                            'A single Receive Port can contain multiple Receive Locations — each Receive Location becomes its own flow group. ' +
-                            'Transitively connected artifacts (A→B→C in the graph) belong in the SAME group. ' +
-                            'If there are N receive locations, expect at least N flow groups. ' +
-                            'If receiveLocationCount is 0, DO NOT return empty groups: use fallback grouping in this order — orchestration-root grouping (one group per connected orchestration cluster based on orchestration-calls edges), then trigger-capability grouping, then connected-component grouping. ' +
-                            'Only mark artifacts ungrouped if truly isolated. For fallback groups, use entryPoint types such as orchestration, trigger, adapter, or internal-entry (not receive-location). ' +
-                            'Proceed with your workflow using the detected flow groups.',
+                            'proposedGroups were computed deterministically from Call/Start Orchestration chains, map/schema references, port bindings and subscription filters. ' +
+                            'Store them with migration_discovery_storeFlowGroups, keeping each proposed group id, artifactIds, endpointNames, entryPoint and exitPoints unchanged, ' +
+                            'and pass proposedSharedArtifactIds as sharedArtifactIds and proposedUngroupedArtifactIds as ungroupedArtifactIds. ' +
+                            'You may improve name and description from the artifact names and endpoints; do not read source files for this. ' +
+                            'Do NOT split a proposed group. Merge proposed groups only with direct evidence of a call relationship the parser missed (e.g. orchestrations that exist only in compiled assemblies), and state that evidence in explanation. ' +
+                            'Grouping rules when proposedGroups is empty or incomplete: one group per orchestration cluster linked by orchestration-calls edges (directly or transitively); ' +
+                            'all receive locations and ports that feed the same orchestration belong to that orchestration group; ' +
+                            'a receive port routed only to send ports by subscription filter (no orchestration) is its own messaging route group. ' +
+                            'Artifacts used by more than one group — canonical/common schemas, shared pipelines or helper code, and binding files holding the ports of several flows — ' +
+                            'must be listed in sharedArtifactIds AND in the artifactIds of every group that uses them, instead of merging those groups. ' +
+                            'Set each group endpointNames to the receive locations/ports and send ports of that flow so shared binding files are scoped per flow. ' +
+                            'Only leave artifacts ungrouped when no group references them. ' +
+                            'When receiveLocationCount is 0, use entryPoint types such as orchestration, trigger, adapter or internal-entry (not receive-location). ' +
+                            'If missingProjects is not empty, mention it in explanation: referenced projects are missing from the source folder and must be added before analysis.',
                     })
                 ),
             ]);
@@ -1444,59 +1486,39 @@ class StoreFlowGroupsTool implements vscode.LanguageModelTool<StoreFlowGroupsInp
             ]);
         }
 
-        // Enforce group independence for testing:
-        // reject group sets that introduce cross-group runtime/design dependencies.
-        const groupByArtifactId = new Map<string, { id: string; name: string }>();
-        for (const group of input.groups) {
-            for (const artifactId of group.artifactIds || []) {
-                groupByArtifactId.set(artifactId, { id: group.id, name: group.name });
-            }
+        // Enforce group independence for testing: reject group sets that introduce
+        // cross-group runtime/design dependencies. Shared artifacts (canonical schemas,
+        // binding files, common code) may be used by several groups.
+        const sharedArtifactIds = new Set(
+            (input.sharedArtifactIds ?? []).filter((id) => inventoryArtifactIds.has(id))
+        );
+        const undeclaredShared = findUndeclaredSharedArtifacts(input.groups, sharedArtifactIds);
+        if (undeclaredShared.length > 0) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(
+                    JSON.stringify({
+                        error: 'Some artifacts are listed in more than one group but not in sharedArtifactIds. Add them to sharedArtifactIds (they stay in every group that uses them) or keep each in one group.',
+                        artifacts: undeclaredShared.slice(0, 12),
+                    })
+                ),
+            ]);
         }
 
         const connectionGraph =
             LLMFlowGenerator.getInstance().buildArtifactConnectionGraph(parsedArtifacts);
-        const blockingConnectionTypes = new Set([
-            'subscription-filter',
-            'message-type-subscription',
-            'map-source-schema',
-            'map-target-schema',
-            'orchestration-uses-map',
-            'orchestration-calls',
-            'binding-references',
-        ]);
-
-        const crossGroupDependencies = connectionGraph.connections.filter((c) => {
-            if (!blockingConnectionTypes.has(c.type)) {
-                return false;
-            }
-            const fromGroup = groupByArtifactId.get(c.fromId);
-            const toGroup = groupByArtifactId.get(c.toId);
-            if (!fromGroup || !toGroup) {
-                return false;
-            }
-            return fromGroup.id !== toGroup.id;
-        });
+        const crossGroupDependencies = findCrossGroupDependencies(
+            input.groups,
+            connectionGraph.connections,
+            sharedArtifactIds
+        );
 
         if (crossGroupDependencies.length > 0) {
-            const dependencySample = crossGroupDependencies.slice(0, 12).map((c) => {
-                const fromGroup = groupByArtifactId.get(c.fromId);
-                const toGroup = groupByArtifactId.get(c.toId);
-                return {
-                    fromGroup: fromGroup?.name || fromGroup?.id || 'unknown',
-                    toGroup: toGroup?.name || toGroup?.id || 'unknown',
-                    fromArtifactId: c.fromId,
-                    toArtifactId: c.toId,
-                    dependencyType: c.type,
-                    evidence: c.evidence,
-                };
-            });
-
             return new vscode.LanguageModelToolResult([
                 new vscode.LanguageModelTextPart(
                     JSON.stringify({
-                        error: 'Group independence validation failed: one or more groups depend on artifacts in another group. Groups must be independently testable. Merge dependent artifacts into the same group or move shared dependencies to external mocks/stubs.',
+                        error: 'Group independence validation failed: one or more groups depend on artifacts in another group. Groups must be independently testable. Merge groups only when their orchestrations call each other; otherwise list the depended-on artifacts (e.g. canonical schemas, binding files, common code) in sharedArtifactIds and in the artifactIds of every group that uses them.',
                         dependencyCount: crossGroupDependencies.length,
-                        dependencies: dependencySample,
+                        dependencies: crossGroupDependencies.slice(0, 12),
                     })
                 ),
             ]);
@@ -1534,54 +1556,43 @@ class StoreFlowGroupsTool implements vscode.LanguageModelTool<StoreFlowGroupsInp
         }
 
         try {
-            const { DiscoveryCacheService } =
-                await import('../stages/discovery/DiscoveryCacheService');
-            const discoveryCacheService = DiscoveryCacheService.getInstance();
-
-            // Store flow groups
-            await discoveryCacheService.storeFlowGroups({
-                groups: input.groups.map((g) => ({
-                    id: g.id,
-                    name: g.name,
-                    description: g.description,
-                    category: (g.category || 'message-flow') as FlowGroup['category'],
-                    artifactIds: g.artifactIds,
-                    entryPoint: g.entryPoint as FlowGroup['entryPoint'],
-                    exitPoints: g.exitPoints as FlowGroup['exitPoints'],
-                })),
-                ungroupedArtifactIds: input.ungroupedArtifactIds ?? [],
-                explanation: input.explanation ?? '',
-            });
-
-            // Also store in SourceFlowVisualizer static cache for backward compat
-            SourceFlowVisualizer.setStaticCachedFlowGroups({
-                groups: input.groups.map((g) => ({
-                    id: g.id,
-                    name: g.name,
-                    description: g.description,
-                    category: (g.category || 'message-flow') as FlowGroup['category'],
-                    artifactIds: g.artifactIds,
-                })),
-                ungroupedArtifactIds: input.ungroupedArtifactIds ?? [],
-                explanation: input.explanation ?? '',
-            });
-
-            // Show flow group selector in the webview
             const extensionUri =
                 vscode.extensions.getExtension('logicapps-migration-agent')?.extensionUri ??
                 vscode.Uri.file(__dirname);
+            const missingProjects = detectFlowGroups(parsedArtifacts).missingProjects ?? [];
 
-            SourceFlowVisualizer.showFlowGroupSelector(extensionUri);
-
-            // Clear generation flags
-            SourceFlowVisualizer.isInitialGenerating = false;
+            // Store flow groups (replacing earlier ones) and show the flow group selector
+            await SourceFlowVisualizer.applyFlowGroups(
+                {
+                    groups: input.groups.map((g) => ({
+                        id: g.id,
+                        name: g.name,
+                        description: g.description,
+                        category: (g.category || 'message-flow') as FlowGroup['category'],
+                        artifactIds: g.artifactIds,
+                        entryPoint: g.entryPoint as FlowGroup['entryPoint'],
+                        exitPoints: g.exitPoints as FlowGroup['exitPoints'],
+                        ...(g.endpointNames && g.endpointNames.length > 0
+                            ? { endpointNames: g.endpointNames }
+                            : {}),
+                    })),
+                    ungroupedArtifactIds: input.ungroupedArtifactIds ?? [],
+                    sharedArtifactIds: [...sharedArtifactIds],
+                    missingProjects,
+                    explanation: input.explanation ?? '',
+                    detectionMode: 'copilot',
+                },
+                extensionUri
+            );
 
             logger.debug(
                 `[LMTool] migration_discovery_storeFlowGroups: stored ${input.groups.length} groups`
             );
 
             TelemetryService.getInstance().logStep('flowgroups.detection.completed', {
+                mode: 'copilot',
                 flowGroupCount: input.groups.length,
+                sharedArtifactCount: sharedArtifactIds.size,
                 flows: input.groups
                     .map((g) => `${g.id}|${g.name}|${g.category ?? 'message-flow'}`)
                     .join('; ')

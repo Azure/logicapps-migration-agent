@@ -178,7 +178,7 @@
                 "displayName": "Detect Flow Groups",
                 "toolReferenceName": "migration_detectFlowGroups",
                 "canBeReferencedInPrompt": true,
-                "modelDescription": "Builds a deterministic connection graph from all discovered integration artifacts. Returns artifact summaries (with receive/send endpoints, schemas, maps, filters) and a connection graph showing how artifacts are linked (subscription filters, schema references, map source/target, orchestration-calls via Call/Start Orchestration, etc.). Use this data to determine logical flow groups yourself. CRITICAL RULE: The connectionGraph includes 'orchestration-calls' edges when one orchestration calls or starts another via Call Orchestration or Start Orchestration shapes — orchestrations linked by these edges (directly or transitively) MUST be placed in the SAME group. If Orch-A calls Orch-B and Orch-B calls Orch-C, all three belong in ONE group. Each group should have one or more Orchestrations, related schemas/maps/pipelines, and entry/exit points. Transitively connected artifacts belong in the same group. If receiveLocationCount is 0, use fallback grouping: orchestration-root (one group per connected orchestration cluster), then trigger-capability, then connected-component. Pass the groups you determine to migration_discovery_storeFlowGroups. If you already know the groupId of a specific flow group (e.g. when generating a visualization for a specific group selected from the dropdown), pass groupId to retrieve the cached group and its artifact summaries directly — this avoids re-detecting all groups.",
+                "modelDescription": "Returns a deterministic grouping proposal (proposedGroups, proposedSharedArtifactIds, proposedUngroupedArtifactIds, missingProjects) computed from Call/Start Orchestration chains, map/schema references, port bindings and subscription filters, plus artifact summaries and the artifact connection graph. Store the proposed groups with migration_discovery_storeFlowGroups, keeping their ids, artifactIds and endpointNames; you may improve names and descriptions. Do not split proposed groups. Orchestrations linked by Call/Start Orchestration (directly or transitively) belong in ONE group; receive locations feeding the same orchestration belong to that orchestration's group. Artifacts used by several groups (canonical schemas, binding files, common code) are shared: list them in sharedArtifactIds and in every group that uses them instead of merging groups. Pass groupId to retrieve one cached group: its artifacts are returned with binding endpoints scoped to the flow's endpointNames and shared artifacts flagged.",
                 "userDescription": "Analyze artifact connections and build connection graph",
                 "inputSchema": {
                     "type": "object",
@@ -195,7 +195,7 @@
                 "displayName": "Store Flow Groups",
                 "toolReferenceName": "migration_discovery_storeFlowGroups",
                 "canBeReferencedInPrompt": true,
-                "modelDescription": "Stores the detected flow groups and shows a flow group selector in the webview. Call this after determining logical flow groups from the artifact connection graph returned by migration_detectFlowGroups. Each group must have an id, name, description, category, and a non-empty artifactIds array. The user will then select individual flows from the webview to trigger detailed analysis.",
+                "modelDescription": "Stores the detected flow groups (replacing earlier groups) and shows the flow group selector in the webview. Each group must have an id, name, description, category, and a non-empty artifactIds array. Artifacts used by several groups must be listed in sharedArtifactIds and in every group that uses them; other artifacts may belong to only one group, and groups may not depend on each other's non-shared artifacts. Set endpointNames to the receive locations/ports and send ports of each flow. The user will then select individual flows from the webview to trigger detailed analysis.",
                 "userDescription": "Store detected flow groups and show flow selector",
                 "inputSchema": {
                     "type": "object",
@@ -261,6 +261,13 @@
                                                 }
                                             }
                                         }
+                                    },
+                                    "endpointNames": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Receive locations/ports, send ports and send port groups that belong to this flow (scopes shared binding files)"
                                     }
                                 },
                                 "required": [
@@ -277,6 +284,13 @@
                                 "type": "string"
                             },
                             "description": "IDs of artifacts not belonging to any group"
+                        },
+                        "sharedArtifactIds": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "IDs of artifacts used by more than one group (e.g. canonical schemas, binding files, common code); list them in every group that uses them"
                         },
                         "explanation": {
                             "type": "string",
@@ -1777,6 +1791,12 @@
                 "category": "Logic Apps Migration Agent"
             },
             {
+                "command": "logicAppsMigrationAgent.redetectFlowGroups",
+                "title": "Re-detect Logical Groups",
+                "category": "Logic Apps Migration Agent",
+                "icon": "$(refresh)"
+            },
+            {
                 "command": "logicAppsMigrationAgent.openPlanningView",
                 "title": "Open Planning View",
                 "category": "Logic Apps Migration Agent",
@@ -1967,6 +1987,21 @@
                     "type": "string",
                     "default": "eastus",
                     "description": "Azure region for provisioning resources"
+                },
+                "logicAppsMigrationAgent.discovery.groupingMode": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "deterministic",
+                        "copilot"
+                    ],
+                    "enumDescriptions": [
+                        "Deterministic for BizTalk; Copilot for other platforms",
+                        "Group by orchestration call chains, references and port bindings without Copilot (fast and repeatable)",
+                        "Let Copilot group the artifacts, starting from the deterministic proposal"
+                    ],
+                    "default": "auto",
+                    "markdownDescription": "How logical groups are detected. Deterministic grouping takes seconds, returns the same groups for the same source, and marks artifacts used by several flows (for example canonical schemas or binding files) as shared instead of merging flows."
                 }
             }
         }

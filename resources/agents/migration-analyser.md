@@ -52,13 +52,13 @@ You are a **Migration Analyser** — an expert in integration platform architect
 
 ### Task A: Detect Flow Groups
 
-1. Call `migration_detectFlowGroups` to get the connection graph.
-2. Follow skill `detect-logical-groups` exactly to determine groups — **including §4 step 2**: if the connectionGraph has few/no call-chain edges, decompile DLLs and read orchestration source files to discover hidden call relationships before grouping.
+1. Call `migration_detectFlowGroups` to get the deterministic `proposedGroups` and the connection graph.
+2. Follow skill `detect-logical-groups` exactly: store the proposed groups (keep ids, artifactIds, endpointNames and shared artifacts; improve names/descriptions only). Decompile DLLs or read orchestration sources only when the skill says the proposal is empty or orchestrations exist only in compiled assemblies.
 3. Call `migration_discovery_storeFlowGroups`.
 
 ### Task B: Analyse a Flow Group
 
-1. Call `migration_detectFlowGroups` with the `groupId` to get the cached artifact list.
+1. Call `migration_detectFlowGroups` with the `groupId` to get the cached artifact list. Analyse only this flow: when the group lists `endpointNames`, other ports in shared binding files belong to other flows; artifacts marked `sharedWithOtherFlows` are used here and elsewhere.
 2. Read ALL artifacts per skill `analyse-source-design` §1.
 3. When a DLL reference is encountered during artifact reading, decompile it per skill `dependency-and-decompilation-analysis` §2 — then recursively walk its dependency tree (§2.3) to decompile all child DLLs. Complete the decompilation checklist (§2.4) before proceeding.
 4. Look up every component in skill `source-to-logic-apps-mapping`, then search reference docs. Follow the applicable skills to record source evidence, mapping decisions, and unresolved requirements.
