@@ -982,18 +982,29 @@ export class CommandRegistry implements vscode.Disposable {
         return true;
     }
 
-    private async startCopilotFlowGroupDetection(extensionUri: vscode.Uri): Promise<void> {
-        // Open webview immediately with a loading spinner
-        SourceFlowVisualizer.showLoading(extensionUri, 'Detecting logical groups...');
-        SourceFlowVisualizer.isInitialGenerating = true;
+    private async startCopilotFlowGroupDetection(
+        extensionUri: vscode.Uri,
+        keepCurrentGroups = false
+    ): Promise<void> {
+        // Initial detection shows a spinner until the agent stores groups. Re-detection keeps
+        // Home usable with the current groups, so a stopped or failed agent run cannot lock it.
+        if (!keepCurrentGroups) {
+            SourceFlowVisualizer.showLoading(extensionUri, 'Detecting logical groups...');
+            SourceFlowVisualizer.isInitialGenerating = true;
+        }
 
         try {
             await vscode.commands.executeCommand('workbench.action.chat.open', {
                 mode: 'agent',
                 query: ChatPrompts.flowGroupDetection(),
             });
+            if (keepCurrentGroups) {
+                void vscode.window.showInformationMessage(UserPrompts.COPILOT_REDETECTING_GROUPS);
+            }
         } catch (error) {
-            SourceFlowVisualizer.isInitialGenerating = false;
+            if (!keepCurrentGroups) {
+                SourceFlowVisualizer.isInitialGenerating = false;
+            }
             vscode.window.showErrorMessage(
                 UserPrompts.flowGroupDetectionFailed(
                     error instanceof Error ? error.message : String(error)
@@ -1025,7 +1036,11 @@ export class CommandRegistry implements vscode.Disposable {
         ) {
             return;
         }
-        await this.startCopilotFlowGroupDetection(extensionUri);
+        const { DiscoveryCacheService } = await import('../stages/discovery/DiscoveryCacheService');
+        await this.startCopilotFlowGroupDetection(
+            extensionUri,
+            DiscoveryCacheService.getInstance().hasFlowGroups()
+        );
     }
 
     /**

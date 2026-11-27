@@ -469,7 +469,8 @@ export class BizTalkProjectParser extends AbstractParser implements IProjectPars
         for (const refElement of projectRefElements) {
             const include = getAttr(refElement, 'Include');
             if (include) {
-                references.push(path.resolve(projectDir, include));
+                // Project files use Windows separators; resolve them on any OS
+                references.push(path.resolve(projectDir, include.replace(/[\\/]+/g, path.sep)));
             }
         }
 

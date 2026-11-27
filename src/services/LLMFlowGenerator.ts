@@ -10,6 +10,7 @@
  */
 
 import { ParsedArtifact } from '../stages/discovery/types';
+import { simpleName } from '../stages/discovery/FlowGroupDetector';
 
 /**
  * Component detail for educational view
@@ -544,12 +545,10 @@ export class LLMFlowGenerator {
                     const targetRef = map.target?.schemaRef || btmMap.targetSchema;
 
                     if (sourceRef) {
-                        // Find artifacts that define this source schema
+                        // Find artifacts that define this source schema (exact simple name:
+                        // substring matches link "Order" to "PurchaseOrder")
                         for (const [schemaKey, schemaArtifactIds] of artifactsBySchema) {
-                            if (
-                                sourceRef.includes(schemaKey) ||
-                                schemaKey.includes(sourceRef.replace(/.*\//, ''))
-                            ) {
+                            if (simpleName(sourceRef) === simpleName(schemaKey)) {
                                 for (const saId of schemaArtifactIds) {
                                     if (saId !== a.id) {
                                         connections.push({
@@ -566,10 +565,7 @@ export class LLMFlowGenerator {
 
                     if (targetRef) {
                         for (const [schemaKey, schemaArtifactIds] of artifactsBySchema) {
-                            if (
-                                targetRef.includes(schemaKey) ||
-                                schemaKey.includes(targetRef.replace(/.*\//, ''))
-                            ) {
+                            if (simpleName(targetRef) === simpleName(schemaKey)) {
                                 for (const saId of schemaArtifactIds) {
                                     if (saId !== a.id) {
                                         connections.push({

@@ -194,6 +194,8 @@ export class UserPrompts {
     }
 
     static readonly BUTTON_REDETECT_GROUPS = 'Re-detect Groups';
+    static readonly COPILOT_REDETECTING_GROUPS =
+        'Copilot is re-detecting the logical groups in chat. Home keeps the current groups until new ones are stored.';
     static readonly NO_FLOW_GROUPS_TO_EXPORT =
         'No logical groups detected yet. Run discovery and open Home first.';
     static readonly FLOW_GROUP_INVENTORY_SAVED = 'Logical group inventory saved.';

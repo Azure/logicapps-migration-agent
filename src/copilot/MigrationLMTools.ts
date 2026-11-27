@@ -1119,7 +1119,12 @@ class DetectFlowGroupsTool implements vscode.LanguageModelTool<DetectFlowGroupsI
 
         // If a groupId is provided, try to return cached flow group data
         if (input.groupId) {
-            const cachedFlowGroups = SourceFlowVisualizer.getStaticCachedFlowGroups();
+            // The disk-backed discovery cache holds the complete groups (endpoint scopes, shared artifacts)
+            const { DiscoveryCacheService } =
+                await import('../stages/discovery/DiscoveryCacheService');
+            const cachedFlowGroups =
+                DiscoveryCacheService.getInstance().getFlowGroups() ??
+                SourceFlowVisualizer.getStaticCachedFlowGroups();
             if (cachedFlowGroups) {
                 const group = cachedFlowGroups.groups.find((g) => g.id === input.groupId);
                 if (group) {
@@ -2215,22 +2220,11 @@ class DiscoveryFinalizeTool implements vscode.LanguageModelTool<DiscoveryFinaliz
                 ]);
             }
 
-            // Also store in old SourceFlowVisualizer caches for backward compat
-
-            // Set flow groups in static cache if not already set
+            // Keep the static cache in sync with the full flow groups (including endpoint scopes
+            // and shared artifacts used by later analyses)
             const flowGroupsResult = discoveryCacheService.getFlowGroups();
             if (flowGroupsResult) {
-                SourceFlowVisualizer.setStaticCachedFlowGroups({
-                    groups: flowGroupsResult.groups.map((g) => ({
-                        id: g.id,
-                        name: g.name,
-                        description: g.description,
-                        category: g.category,
-                        artifactIds: g.artifactIds,
-                    })),
-                    ungroupedArtifactIds: flowGroupsResult.ungroupedArtifactIds,
-                    explanation: flowGroupsResult.explanation,
-                });
+                SourceFlowVisualizer.setStaticCachedFlowGroups(flowGroupsResult, true);
             }
 
             // Open the webview with the assembled result

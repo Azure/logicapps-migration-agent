@@ -16,6 +16,7 @@ import {
 } from '../../stages/discovery/FlowGroupDetector';
 import { ArtifactCategory, ParsedArtifact } from '../../stages/discovery/types';
 import { createEmptyIRDocument, IRDocument } from '../../ir/types';
+import { LLMFlowGenerator } from '../../services/LLMFlowGenerator';
 
 const appRoot = path.resolve('/contoso-app');
 
@@ -296,6 +297,88 @@ describe('Deterministic flow group detection', () => {
         ]) {
             assert.deepEqual(detectFlowGroups(order), expected);
         }
+    });
+
+    it('keeps the IDs of same-named flows when their clusters change', () => {
+        const appA = artifact('c1111111', 'Process', 'orchestration', 'AppA/Process.odx');
+        const appB = (calls?: string) =>
+            artifact('c2222222', 'Process', 'orchestration', 'AppB/Process.odx', {
+                actions: calls
+                    ? [
+                          {
+                              type: 'call-workflow',
+                              sourceMapping: {
+                                  biztalk: {
+                                      shapeType: 'CallOrchestration',
+                                      calledOrchestration: calls,
+                                  },
+                              },
+                          },
+                      ]
+                    : [],
+            });
+        const idOf = (groups: { id: string; artifactIds: string[] }[], artifactId: string) =>
+            groups.find((group) => group.artifactIds.includes(artifactId))?.id;
+
+        const before = detectFlowGroups([appA, appB()]).groups;
+        const after = detectFlowGroups([
+            appA,
+            appB('Helper'),
+            artifact('c0000000', 'Helper', 'orchestration', 'AppB/Helper.odx'),
+        ]).groups;
+
+        assert.notEqual(idOf(before, 'c1111111'), idOf(before, 'c2222222'));
+        assert.match(idOf(before, 'c1111111') ?? '', /^flow-process-[0-9a-f]{6}$/);
+        assert.equal(idOf(after, 'c1111111'), idOf(before, 'c1111111'));
+        assert.equal(idOf(after, 'c2222222'), idOf(before, 'c2222222'));
+    });
+
+    it('links maps only to schemas with the exact referenced name', () => {
+        const artifacts = [
+            artifact('s-order', 'Order', 'schema', 'Schemas/Order.xsd', {
+                schemas: [{ id: 's1', name: 'Order', targetNamespace: 'urn:order' }],
+            }),
+            artifact('s-po', 'PurchaseOrder', 'schema', 'Schemas/PurchaseOrder.xsd', {
+                schemas: [{ id: 's2', name: 'PurchaseOrder', targetNamespace: 'urn:po' }],
+            }),
+            artifact('m-po', 'PurchaseOrderToInvoice', 'map', 'Maps/PO.btm', {
+                maps: [
+                    {
+                        id: 'm',
+                        name: 'PurchaseOrderToInvoice',
+                        sourceSchema: 'Company.Schemas.PurchaseOrder',
+                    },
+                ],
+            }),
+        ];
+        const edges = LLMFlowGenerator.getInstance()
+            .buildArtifactConnectionGraph(artifacts)
+            .connections.filter((c) => c.type === 'map-source-schema')
+            .map((c) => `${c.fromId}->${c.toId}`);
+        assert.deepEqual(edges, ['s-po->m-po']);
+    });
+
+    it('matches project references written with either path separator', () => {
+        const references = [
+            `${appRoot}/Cdm/Cdm.btproj`,
+            [appRoot, 'Common', 'Common.btproj'].join('\\'),
+        ];
+        const missing = findMissingProjectReferences([
+            artifact(
+                'project-orch',
+                'Orchestrations',
+                'custom-code',
+                'Orch/Orchestrations.btproj',
+                {
+                    extensions: { biztalk: { projectReferences: references } },
+                }
+            ),
+            artifact('project-cdm', 'Cdm', 'custom-code', 'Cdm/Cdm.btproj'),
+        ]);
+        assert.deepEqual(
+            missing.map((m) => m.project),
+            ['Common']
+        );
     });
 
     it('does not merge orchestrations whose names only overlap', () => {

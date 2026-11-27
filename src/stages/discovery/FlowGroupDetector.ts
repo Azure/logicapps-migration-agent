@@ -101,8 +101,9 @@ export function simpleName(reference: string): string {
 }
 
 function normalizePath(filePath: string): string {
+    // BizTalk projects record Windows separators; normalize them on every OS
     return path
-        .resolve(filePath)
+        .resolve(filePath.replace(/[\\/]+/g, path.sep))
         .replace(/[\\/]+$/, '')
         .toLowerCase();
 }
@@ -417,7 +418,7 @@ export function findMissingProjectReferences(
                 continue;
             }
             const entry = missing.get(key) ?? {
-                project: path.basename(reference).replace(/\.[^.]+$/, ''),
+                project: (reference.split(/[\\/]/).pop() ?? reference).replace(/\.[^.]+$/, ''),
                 path: reference,
                 referencedBy: [],
             };
@@ -777,19 +778,24 @@ function buildGroups(
         const entryRoots = roots.filter((root) => !calledRoots.has(root.id));
         const primary = entryRoots[0] ?? roots[0];
         const baseName = primary ? primary.name : (cluster.routePort ?? 'flow');
-        return { cluster, roots, primary, baseName };
+        // Stable identity: the entry orchestration/flow, or the route's binding and port
+        const identity = primary ? primary.id : cluster.key;
+        return { cluster, roots, primary, baseName, identity };
     });
-    candidates.sort(
-        (a, b) => byName(slug(a.baseName), slug(b.baseName)) || byName(a.cluster.key, b.cluster.key)
-    );
+    const slugCounts = new Map<string, number>();
+    for (const candidate of candidates) {
+        const base = slug(candidate.baseName);
+        slugCounts.set(base, (slugCounts.get(base) ?? 0) + 1);
+    }
 
-    const usedIds = new Set<string>();
-    const groups = candidates.map(({ cluster, roots, primary, baseName }) => {
-        let id = `flow-${slug(baseName)}`;
-        if (usedIds.has(id)) {
-            id = `flow-${slug(baseName)}-${shortHash(cluster.key)}`;
-        }
-        usedIds.add(id);
+    const groups = candidates.map(({ cluster, roots, primary, baseName, identity }) => {
+        // Flows sharing a name are all suffixed from their own identity, so re-detection
+        // can never hand one flow's ID (and saved progress) to another flow.
+        const base = slug(baseName);
+        const id =
+            (slugCounts.get(base) ?? 0) > 1
+                ? `flow-${base}-${shortHash(identity)}`
+                : `flow-${base}`;
 
         const artifactIds = [...cluster.members].sort(byName);
         const maps = artifactIds
