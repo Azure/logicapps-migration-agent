@@ -1849,6 +1849,12 @@
                 "title": "Export Planning Report",
                 "category": "Logic Apps Migration Agent",
                 "icon": "$(file-text)"
+            },
+            {
+                "command": "logicAppsMigrationAgent.exportPlanMarkdown",
+                "title": "Export Planning Requirements (Markdown)",
+                "category": "Logic Apps Migration Agent",
+                "icon": "$(markdown)"
             }
         ],
         "viewsContainers": {
@@ -1956,6 +1962,10 @@
                 },
                 {
                     "command": "logicAppsMigrationAgent.exportPlanReport",
+                    "when": "false"
+                },
+                {
+                    "command": "logicAppsMigrationAgent.exportPlanMarkdown",
                     "when": "false"
                 }
             ]

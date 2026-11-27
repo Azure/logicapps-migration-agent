@@ -3,7 +3,8 @@
  *
  * Generates professional DOCX reports from migration analysis (discovery)
  * and planning data. Embeds Mermaid diagrams as images with white
- * background / black lines for stakeholder-ready output.
+ * background / black lines for stakeholder-ready output. Finalized plans
+ * can also be exported as a Markdown `requirements.md`.
  */
 
 import * as vscode from 'vscode';
@@ -37,6 +38,7 @@ import { ConfigurationService } from './ConfigurationService';
 import { DiscoveryCacheService } from '../stages/discovery/DiscoveryCacheService';
 import { InventoryService } from '../stages/discovery/InventoryService';
 import { createBizTalkDiscoveryReport } from './reports/BizTalkDiscoveryReport';
+import { renderPlanningRequirementsMarkdown } from './reports/PlanningRequirementsMarkdown';
 
 // ─── Color palette ───
 const COLORS = {
@@ -102,8 +104,9 @@ export class ReportExporterService {
                             );
                         }
                         const artifacts = group
-                            ? (await InventoryService.getInstance().getAllParsedArtifacts())
-                                  .filter((artifact) => artifactIds.has(artifact.id))
+                            ? (await InventoryService.getInstance().getAllParsedArtifacts()).filter(
+                                  (artifact) => artifactIds.has(artifact.id)
+                              )
                             : [];
                         doc = createBizTalkDiscoveryReport({
                             flowName,
@@ -146,22 +149,8 @@ export class ReportExporterService {
         flowId: string,
         planId?: string
     ): Promise<string | undefined> {
-        let planResult: FlowPlanningResult | undefined;
-        try {
-            const cache = PlanningCacheService.getInstance();
-            planResult = planId ? cache.getVersion(flowId, planId) : cache.get(flowId);
-        } catch (error) {
-            this.logger.error(
-                '[ReportExporter] Could not read planning data',
-                error instanceof Error ? error : new Error(String(error))
-            );
-            void vscode.window.showErrorMessage(
-                `Failed to read planning data: ${error instanceof Error ? error.message : String(error)}`
-            );
-            return undefined;
-        }
+        const planResult = this.loadPlanningResult(flowId, planId);
         if (!planResult) {
-            vscode.window.showWarningMessage('No planning data available for this flow.');
             return undefined;
         }
 
@@ -218,6 +207,75 @@ export class ReportExporterService {
                 }
             }
         );
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  PUBLIC: Generate Planning Requirements (Markdown)
+    // ════════════════════════════════════════════════════════════════
+
+    public async generatePlanningMarkdown(
+        flowId: string,
+        planId?: string
+    ): Promise<string | undefined> {
+        const planResult = this.loadPlanningResult(flowId, planId);
+        if (!planResult) {
+            return undefined;
+        }
+
+        try {
+            const markdown = renderPlanningRequirementsMarkdown(planResult);
+            const safeName = (planResult.flowName || flowId).replace(/[^a-zA-Z0-9_-]/g, '_');
+            const fileName = `${safeName}-requirements.md`;
+            const defaultUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+            const saveUri = await vscode.window.showSaveDialog({
+                defaultUri: defaultUri
+                    ? vscode.Uri.joinPath(defaultUri, fileName)
+                    : vscode.Uri.file(fileName),
+                filters: { Markdown: ['md'] },
+                title: 'Save Planning Requirements',
+            });
+            if (!saveUri) {
+                this.logger.debug('[ReportExporter] Planning requirements export cancelled');
+                return undefined;
+            }
+
+            fs.writeFileSync(saveUri.fsPath, markdown, 'utf-8');
+            this.logger.debug(`[ReportExporter] Planning requirements saved: ${saveUri.fsPath}`);
+            return saveUri.fsPath;
+        } catch (err) {
+            this.logger.error(
+                `[ReportExporter] Planning requirements export failed: ${err instanceof Error ? err.message : String(err)}`
+            );
+            vscode.window.showErrorMessage(
+                `Failed to export planning requirements: ${err instanceof Error ? err.message : String(err)}`
+            );
+            return undefined;
+        }
+    }
+
+    /**
+     * Read the current (or a specific) finalized plan, reporting read failures
+     * and missing plans to the user.
+     */
+    private loadPlanningResult(flowId: string, planId?: string): FlowPlanningResult | undefined {
+        let planResult: FlowPlanningResult | undefined;
+        try {
+            const cache = PlanningCacheService.getInstance();
+            planResult = planId ? cache.getVersion(flowId, planId) : cache.get(flowId);
+        } catch (error) {
+            this.logger.error(
+                '[ReportExporter] Could not read planning data',
+                error instanceof Error ? error : new Error(String(error))
+            );
+            void vscode.window.showErrorMessage(
+                `Failed to read planning data: ${error instanceof Error ? error.message : String(error)}`
+            );
+            return undefined;
+        }
+        if (!planResult) {
+            vscode.window.showWarningMessage('No planning data available for this flow.');
+        }
+        return planResult;
     }
 
     // ════════════════════════════════════════════════════════════════

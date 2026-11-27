@@ -111,6 +111,11 @@ are likewise evidence-based; the exporter does not infer them or calculate a new
 complexity score. Planning reports, other source-platform reports, and the
 interactive tabs retain their existing formats.
 
+Use **Export requirements.md** in the Planning tab to save the finalized plan as a
+Markdown `requirements.md` for skill-based build pipelines: decisions, target
+architecture and per-workflow Mermaid diagrams, mapping and disposition tables, and
+acceptance criteria derived only from the plan.
+
 ## Requirements
 
 | Requirement                                                                                                                      | Purpose                                               |

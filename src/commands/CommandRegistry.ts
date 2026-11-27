@@ -187,6 +187,11 @@ export class CommandRegistry implements vscode.Disposable {
                 handler: this.handleExportPlanReport.bind(this),
                 title: 'Export Planning Report',
             },
+            {
+                id: 'logicAppsMigrationAgent.exportPlanMarkdown',
+                handler: this.handleExportPlanMarkdown.bind(this),
+                title: 'Export Planning Requirements (Markdown)',
+            },
         ];
 
         for (const command of commands) {
@@ -1852,6 +1857,43 @@ export class CommandRegistry implements vscode.Disposable {
         if (filePath) {
             const openAction = await vscode.window.showInformationMessage(
                 `Planning report saved successfully.`,
+                'Open File',
+                'Open Folder'
+            );
+            if (openAction === 'Open File') {
+                await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
+            } else if (openAction === 'Open Folder') {
+                const folderPath = (await import('path')).dirname(filePath);
+                await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(folderPath));
+            }
+        }
+    }
+
+    /**
+     * Export the finalized plan as a Markdown requirements.md
+     */
+    private async handleExportPlanMarkdown(flowId?: string, planId?: string): Promise<void> {
+        const logger = LoggingService.getInstance();
+
+        if (!flowId) {
+            vscode.window.showWarningMessage('No flow specified for requirements export.');
+            return;
+        }
+
+        logger.debug(`[Export] Generating planning requirements (Markdown) for flow: ${flowId}`);
+        const { ReportExporterService } = await import('../services/ReportExporterService');
+        const exporter = ReportExporterService.getInstance();
+        const filePath = await exporter.generatePlanningMarkdown(flowId, planId);
+
+        TelemetryService.getInstance().logStep('report.exported', {
+            type: 'planning-markdown',
+            flowId,
+            success: !!filePath,
+        });
+
+        if (filePath) {
+            const openAction = await vscode.window.showInformationMessage(
+                `Planning requirements saved successfully.`,
                 'Open File',
                 'Open Folder'
             );
