@@ -65,6 +65,25 @@ export function entryLabel(route: FlowRoute): string {
         : route.entry;
 }
 
+/**
+ * Small flows without custom code can skip decompilation and broad reference lookups.
+ * Project files are containers, not code to decompile.
+ */
+export function isSimpleFlow(
+    artifacts: readonly (InventoryArtifactInfo | undefined)[],
+    maxArtifacts = 6
+): boolean {
+    if (artifacts.length === 0 || artifacts.length > maxArtifacts) {
+        return false;
+    }
+    return artifacts.every(
+        (artifact) =>
+            !!artifact &&
+            (artifact.type !== 'custom-code' ||
+                /\.(btproj|csproj|vbproj|sln)$/i.test(artifact.sourcePath ?? ''))
+    );
+}
+
 /** Lower-case text a Home search box matches against. */
 export function flowSearchText(group: FlowGroup, lookup: ArtifactLookup): string {
     const artifacts = group.artifactIds.map((id) => lookup(id)?.name ?? '');

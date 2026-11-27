@@ -101,7 +101,7 @@ When needed, include the source routing expression, required predefined connecti
 
 Before generating any workflow definition:
 
-1. Read the skill `source-to-logic-apps-mapping` to look up the exact Logic Apps Standard equivalent for every component.
+1. Look up each component with `migration_lookupMapping`, which returns the matching rows of skill `source-to-logic-apps-mapping` (read the full skill only when a lookup finds nothing) to find the exact Logic Apps Standard equivalent for every component.
 2. Call `migration_searchReferenceWorkflows` and `migration_readReferenceWorkflow` to find real reference examples.
 3. Use the operation names from the mapping skill as search terms.
 4. Copy exact provider IDs, `operationId` values, and configuration structure from references. Only when dynamic connections are needed, read the `DynamicConnections` references and adapt `connectionName` to the source routing expression.

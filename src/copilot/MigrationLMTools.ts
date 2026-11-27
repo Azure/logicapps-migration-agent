@@ -30,6 +30,8 @@ import {
 } from '../stages/discovery/FlowGroupDetector';
 import { LoggingService } from '../services/LoggingService';
 import { TelemetryService } from '../services/TelemetryService';
+import { StateManager } from '../services/StateManager';
+import { searchMappingSkill } from '../services/MappingSkillLookup';
 import { ContextBuilder, ContextScope } from './ContextBuilder';
 import { SourceFlowVisualizer } from '../views/discovery/SourceFlowVisualizer';
 import { GeneratedFlowResult, LLMFlowGenerator, FlowGroup } from '../services/LLMFlowGenerator';
@@ -4516,6 +4518,102 @@ class ConversionStoreTaskPlanTool implements vscode.LanguageModelTool<Conversion
     }
 }
 
+// --------------- migration_lookupMapping ---------------
+
+interface LookupMappingInput {
+    /** Components to look up, e.g. "FILE adapter, XMLReceive, Call Orchestration" */
+    query: string;
+    maxResults?: number;
+}
+
+/**
+ * Read the mapping skill for the current platform: the provisioned workspace copy
+ * (which includes team overrides) first, then the bundled resource.
+ */
+function readMappingSkill(): { markdown: string; source: string } | undefined {
+    const platform = (StateManager.getInstance().getState().sourcePlatform || 'biztalk')
+        .toString()
+        .toLowerCase();
+    const platformFolder = platform === 'mulesoft' || platform === 'tibco' ? platform : 'biztalk';
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const candidates = [
+        workspaceRoot
+            ? path.join(
+                  workspaceRoot,
+                  '.github',
+                  'skills',
+                  'source-to-logic-apps-mapping',
+                  'SKILL.md'
+              )
+            : undefined,
+        path.join(
+            __dirname,
+            '..',
+            'resources',
+            'skills',
+            'source-to-logic-apps-mapping',
+            platformFolder,
+            'SKILL.md'
+        ),
+    ];
+    for (const candidate of candidates) {
+        if (candidate && fs.existsSync(candidate)) {
+            return { markdown: fs.readFileSync(candidate, 'utf-8'), source: candidate };
+        }
+    }
+    return undefined;
+}
+
+/**
+ * migration_lookupMapping — Return only the rows of the `source-to-logic-apps-mapping`
+ * skill that mention the given components, instead of loading the whole skill.
+ */
+class LookupMappingTool implements vscode.LanguageModelTool<LookupMappingInput> {
+    async invoke(
+        options: vscode.LanguageModelToolInvocationOptions<LookupMappingInput>,
+        _token: vscode.CancellationToken
+    ): Promise<vscode.LanguageModelToolResult> {
+        const query = (options.input.query || '').trim();
+        if (!query) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(JSON.stringify({ error: 'query is required' })),
+            ]);
+        }
+        const skill = readMappingSkill();
+        if (!skill) {
+            return new vscode.LanguageModelToolResult([
+                new vscode.LanguageModelTextPart(
+                    JSON.stringify({
+                        error: 'Mapping skill not found. Read .github/skills/source-to-logic-apps-mapping/SKILL.md instead.',
+                    })
+                ),
+            ]);
+        }
+        const limit = Math.min(Math.max(Math.trunc(options.input.maxResults ?? 25), 1), 60);
+        const matches = searchMappingSkill(skill.markdown, query, limit);
+        return new vscode.LanguageModelToolResult([
+            new vscode.LanguageModelTextPart(
+                JSON.stringify({
+                    query,
+                    matchCount: matches.length,
+                    matches,
+                    instructions:
+                        matches.length > 0
+                            ? 'These rows come from the authoritative source-to-logic-apps-mapping skill. Use them for azureEquivalent, connector, service provider ID and operation decisions. Look up any component that is not covered with its adapter, shape or connector name.'
+                            : 'No mapping rows matched. Retry with the adapter, shape or connector name (for example "WCF-SQL" or "Construct Message"), or read .github/skills/source-to-logic-apps-mapping/SKILL.md.',
+                })
+            ),
+        ]);
+    }
+
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<LookupMappingInput>,
+        _token: vscode.CancellationToken
+    ): Promise<vscode.PreparedToolInvocation | undefined> {
+        return { invocationMessage: `Looking up Logic Apps mappings for: ${options.input.query}` };
+    }
+}
+
 // --------------- migration_conversion_storeTaskOutput ---------------
 
 /**
@@ -5403,6 +5501,7 @@ export function registerMigrationLMTools(context: vscode.ExtensionContext): vsco
     disposables.push(
         vscode.lm.registerTool('migration_getDiscoveryAnalysis', new GetDiscoveryAnalysisTool())
     );
+    disposables.push(vscode.lm.registerTool('migration_lookupMapping', new LookupMappingTool()));
 
     // Planning file tools (multi-file architecture)
     disposables.push(

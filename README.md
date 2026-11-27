@@ -196,9 +196,19 @@ The extension provisions three GitHub Copilot agents into your workspace:
 | `@migration-planner`   | Creates per-flow migration plans with action mappings and gap analysis                    |
 | `@migration-converter` | Executes conversion tasks to generate Logic Apps workflows and connections                |
 
+### Team standards and skill customization
+
+The agents follow skills provisioned into `.github/skills/<skill>/SKILL.md`. The extension owns those files and updates them with new versions. To add your team's rules without losing them on updates:
+
+- Put rules for one skill in `.github/skills/<skill>/CUSTOM.md`. They are appended to that skill as a **Customer Overrides** section, which wins when it conflicts with the rest of the skill.
+- Put cross-cutting standards (target architecture, naming, broker topics, test conventions) in `.github/skills/customer-standards/SKILL.md`. The agents read it before every other skill.
+- If you edited a provisioned `SKILL.md` directly, the next update saves your version as `SKILL.md.bak` and tells you which skills to move into `CUSTOM.md`.
+
+To keep prompts small, the agents look up component mappings with the `migration_lookupMapping` tool instead of loading the whole `source-to-logic-apps-mapping` skill. Small flows without custom code also skip decompilation and broad reference-doc searches.
+
 ### LM Tools
 
-The extension registers **25 Language Model tools** with VS Code that the AI agents use to read artifacts, store results, and manage the migration workflow.
+The extension registers **34 Language Model tools** with VS Code that the AI agents use to read artifacts, look up mappings, store results, and manage the migration workflow.
 
 ## Source Flow Visualization
 

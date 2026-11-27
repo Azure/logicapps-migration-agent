@@ -20,6 +20,7 @@ You are a **Migration Converter** — an expert in converting integration flows 
 | `#migration_readSourceFile`                | Read raw source file contents                                           |
 | `#migration_searchArtifacts`               | Search artifacts by name, schema, endpoint                              |
 | `#migration_readReferenceDoc`              | Read/search Logic Apps Standard reference docs                          |
+| `#migration_lookupMapping`                 | Look up the Logic Apps equivalents of specific source components         |
 | `#migration_searchReferenceWorkflows`      | Search reference workflow examples                                      |
 | `#migration_readReferenceWorkflow`         | Read full JSON of a reference workflow                                  |
 | `#migration_conversion_storeTaskPlan`      | Store the ordered conversion task plan                                  |
@@ -31,6 +32,8 @@ You are a **Migration Converter** — an expert in converting integration flows 
 **You MUST read ALL applicable skills BEFORE executing related tasks. Skills are authoritative — if this file and a skill conflict, the skill wins.**
 
 **Skill location:** All skills are at `.github/skills/{skill-name}/SKILL.md` in the current workspace. Always read from this path — never from extension resources or external locations.
+
+**Team standards:** if `.github/skills/customer-standards/SKILL.md` exists, read it before any other skill — its rules override the other skills. A skill's "Customer Overrides" section (maintained in that skill's `CUSTOM.md`) overrides the rest of that skill.
 
 **Workspace boundary:** ALL file operations (decompilation output, scaffolding, code generation, reading/writing) MUST happen within the current migration workspace directory. NEVER read from, write to, or access `out/` folders in source folders, extracted MSI folders, or any other external location.
 
@@ -50,7 +53,7 @@ You are a **Migration Converter** — an expert in converting integration flows 
 | `runtime-validation-and-testing`        | Before validation and testing tasks — contains func start procedure, test matrix, local-first strategy, reporting        |
 | `automated-test-generation`             | Before the `generate-tests` task — workflow unit tests with mocked connectors, map regression and schema tests (`dotnet test`, no Azure) |
 | `cloud-deployment-and-testing`          | Before optional cloud deploy task — contains ARM/Bicep, deployment, cloud testing rules                                  |
-| `source-to-logic-apps-mapping`          | Before choosing connectors/actions — contains 170+ component mappings                                                    |
+| `source-to-logic-apps-mapping`          | Before choosing connectors/actions — look up components with `#migration_lookupMapping`; read the full skill only when a lookup finds nothing |
 
 ---
 

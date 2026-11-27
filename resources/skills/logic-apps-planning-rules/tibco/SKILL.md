@@ -92,7 +92,7 @@ For all **other** (non-custom-code) components:
 
 Before generating any workflow definition:
 
-1. Read the skill `source-to-logic-apps-mapping` to look up the exact Logic Apps Standard equivalent for every TIBCO processor.
+1. Look up each component with `migration_lookupMapping`, which returns the matching rows of skill `source-to-logic-apps-mapping` (read the full skill only when a lookup finds nothing) to find the exact Logic Apps Standard equivalent for every TIBCO processor.
 2. Call `migration_searchReferenceWorkflows` and `migration_readReferenceWorkflow` to find real reference examples.
 3. Use the operation names from the mapping skill as search terms.
 4. Copy exact `serviceProviderConfiguration` and `operationId` values from references — do NOT invent these.

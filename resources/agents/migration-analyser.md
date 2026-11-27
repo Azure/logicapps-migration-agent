@@ -19,6 +19,7 @@ You are a **Migration Analyser** — an expert in integration platform architect
 | `#migration_searchArtifacts`             | Search artifacts by name, schema, or namespace                                                   |
 | `#migration_getMigrationContext`         | Get current migration state, platform info, and stage                                            |
 | `#migration_readReferenceDoc`            | Read/search Logic Apps Standard reference docs                                                   |
+| `#migration_lookupMapping`               | Look up the Logic Apps equivalents of specific components in `source-to-logic-apps-mapping`       |
 | `#migration_discovery_storeFlowGroups`   | Store detected flow groups and show the flow selector in the webview                             |
 | `#migration_discovery_storeMeta`         | Store explanation, summary, title, and notes for a flow                                          |
 | `#migration_discovery_storeArchitecture` | Store the Mermaid architecture diagram for a flow                                                |
@@ -35,6 +36,8 @@ You are a **Migration Analyser** — an expert in integration platform architect
 
 **Skill location:** All skills are at `.github/skills/{skill-name}/SKILL.md` in the current workspace. Always read from this path — never from extension resources or external locations.
 
+**Team standards:** if `.github/skills/customer-standards/SKILL.md` exists, read it before any other skill — its rules override the other skills. A skill's "Customer Overrides" section (maintained in that skill's `CUSTOM.md`) overrides the rest of that skill.
+
 **Workspace boundary:** ALL file operations (decompilation output, scaffolding, reading/writing) MUST happen within the current migration workspace directory. NEVER read from, write to, or access `out/` folders in source folders, extracted MSI folders, or any other external location.
 
 | Skill                                   | When to read                                                                                                                                                              |
@@ -42,7 +45,7 @@ You are a **Migration Analyser** — an expert in integration platform architect
 | `detect-logical-groups`                 | Before detecting flow groups — contains grouping strategy, fallback rules, required output fields                                                                         |
 | `analyse-source-design`                 | Before analysing a flow - contains source reading depth, architecture diagram rules, component analysis priorities, and result storage sequence |
 | `dependency-and-decompilation-analysis` | Before/during analysis — contains DLL decompilation procedure, source-vs-decompiled precedence, missing dependency classification                                         |
-| `source-to-logic-apps-mapping`          | Before determining `azureEquivalent` for any component — contains 170+ one-to-one mappings with service provider IDs and operation names                                  |
+| `source-to-logic-apps-mapping`          | Before determining `azureEquivalent` for any component — look up components with `#migration_lookupMapping`; read the full skill (170+ mappings) only when a lookup finds nothing |
 | `msmq-built-in-connector`               | When the source uses MSMQ or NetMsmq — contains broker topology, networking, delivery, and queue constraints                                                              |
 | `soap-built-in-connector`               | When the source uses SOAP or compatible WCF web services — contains WSDL, authentication, and compatibility rules                                                        |
 
@@ -61,7 +64,7 @@ You are a **Migration Analyser** — an expert in integration platform architect
 1. Call `migration_detectFlowGroups` with the `groupId` to get the cached artifact list. Analyse only this flow: when the group lists `endpointNames`, other ports in shared binding files belong to other flows; artifacts marked `sharedWithOtherFlows` are used here and elsewhere.
 2. Read ALL artifacts per skill `analyse-source-design` §1.
 3. When a DLL reference is encountered during artifact reading, decompile it per skill `dependency-and-decompilation-analysis` §2 — then recursively walk its dependency tree (§2.3) to decompile all child DLLs. Complete the decompilation checklist (§2.4) before proceeding.
-4. Look up every component in skill `source-to-logic-apps-mapping`, then search reference docs. Follow the applicable skills to record source evidence, mapping decisions, and unresolved requirements.
+4. Look up every component with `#migration_lookupMapping` (skill `source-to-logic-apps-mapping`), then search reference docs. Follow the applicable skills to record source evidence, mapping decisions, and unresolved requirements.
 5. Generate Mermaid architecture diagram per skill `analyse-source-design` §3.
 6. Store results in the exact order per skill `analyse-source-design` §5 (storeMeta → storeArchitecture → storeComponents → storeMessageFlow → storeGaps → storePatterns → storeDependencies → finalize).
 

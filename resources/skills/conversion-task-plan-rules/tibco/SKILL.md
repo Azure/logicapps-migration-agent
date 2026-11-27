@@ -148,7 +148,7 @@ Each task needs:
 
 - For each task, set `description` to a concise user-facing summary (1-2 lines).
 - Put all detailed implementation steps/rules into `executionPrompt`.
-- Workflow generation tasks MUST include: "Read skill `source-to-logic-apps-mapping` first, then search reference workflows."
+- Workflow generation tasks MUST include: "Look up components with migration_lookupMapping (skill `source-to-logic-apps-mapping`) first, then search reference workflows."
 - Connection generation tasks MUST include: "Search with `category=connection` to find exact `connections.json` format."
 - Local function tasks MUST reference skill `dotnet-local-functions-logic-apps`.
 - ALL code generation tasks MUST follow skill `no-stubs-code-generation`.

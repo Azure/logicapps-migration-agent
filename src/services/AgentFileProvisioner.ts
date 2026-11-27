@@ -18,6 +18,14 @@ import * as fs from 'fs';
 import { LoggingService } from './LoggingService';
 import { WORKFLOW_COMPLETENESS_DECOMPILE_INSTRUCTION } from './DecompilationGuidance';
 import { StateManager } from './StateManager';
+import {
+    composeSkill,
+    CUSTOM_SKILL_FILE,
+    isEditedManagedSkill,
+    sameSkillContent,
+    withContentHash,
+} from './SkillOverlay';
+import { UserPrompts } from '../constants/UserMessages';
 
 // =============================================================================
 // Constants
@@ -32,13 +40,13 @@ const CONVERTER_AGENT_FILENAME = 'migration-converter.agent.md';
  * A version stamp embedded as an HTML comment at the top of the generated file.
  * Bump this when the prompt content changes so existing files get updated.
  */
-const ANALYSER_AGENT_VERSION = '2.5.0';
+const ANALYSER_AGENT_VERSION = '2.6.0';
 const ANALYSER_VERSION_TAG = `<!-- migration-analyser-agent v${ANALYSER_AGENT_VERSION} -->`;
 
-const PLANNER_AGENT_VERSION = '2.10.0';
+const PLANNER_AGENT_VERSION = '2.11.0';
 const PLANNER_VERSION_TAG = `<!-- migration-planner-agent v${PLANNER_AGENT_VERSION} -->`;
 
-const CONVERTER_AGENT_VERSION = '2.21.0';
+const CONVERTER_AGENT_VERSION = '2.22.0';
 const CONVERTER_VERSION_TAG = `<!-- migration-converter-agent v${CONVERTER_AGENT_VERSION} -->`;
 
 // =============================================================================
@@ -245,7 +253,7 @@ export class AgentFileProvisioner {
     // Skills
     // -------------------------------------------------------------------------
 
-    private static readonly SKILLS_VERSION = '10.27.0';
+    private static readonly SKILLS_VERSION = '10.28.0';
     private static readonly SKILLS_VERSION_TAG = `<!-- skills v${AgentFileProvisioner.SKILLS_VERSION} -->`;
 
     /**
@@ -377,19 +385,35 @@ export class AgentFileProvisioner {
             },
         ];
 
+        const editedSkills: string[] = [];
         for (const skill of skills) {
             const skillDir = path.join(skillsDir, skill.folder);
             await fs.promises.mkdir(skillDir, { recursive: true });
             const skillFile = path.join(skillDir, 'SKILL.md');
-            // Check version — skip if already at current version
+            const customFile = path.join(skillDir, CUSTOM_SKILL_FILE);
+            const custom = fs.existsSync(customFile)
+                ? fs.readFileSync(customFile, 'utf-8')
+                : undefined;
+            const content = withContentHash(composeSkill(skill.content, custom, skill.folder));
             if (fs.existsSync(skillFile)) {
                 const existing = fs.readFileSync(skillFile, 'utf-8');
-                if (existing.includes(AgentFileProvisioner.SKILLS_VERSION_TAG)) {
+                if (sameSkillContent(existing, content)) {
                     continue;
                 }
+                // Keep direct edits before updating; teams should move them to CUSTOM.md
+                if (isEditedManagedSkill(existing)) {
+                    await fs.promises.writeFile(`${skillFile}.bak`, existing, 'utf-8');
+                    editedSkills.push(skill.folder);
+                }
             }
-            await fs.promises.writeFile(skillFile, skill.content, 'utf-8');
+            await fs.promises.writeFile(skillFile, content, 'utf-8');
             this.logger.debug(`[AgentFileProvisioner] Provisioned skill: ${skill.folder}/SKILL.md`);
+        }
+        if (editedSkills.length > 0) {
+            this.logger.warn(
+                `[AgentFileProvisioner] Backed up edited skills before updating: ${editedSkills.join(', ')}`
+            );
+            void vscode.window.showWarningMessage(UserPrompts.editedSkillsBackedUp(editedSkills));
         }
     }
 

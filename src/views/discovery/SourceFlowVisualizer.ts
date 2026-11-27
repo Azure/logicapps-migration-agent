@@ -23,6 +23,7 @@ import {
     describeFlowRoute,
     entryLabel,
     flowSearchText,
+    isSimpleFlow,
 } from '../../stages/discovery/FlowGroupInventory';
 import { GeneratedFlowResult, FlowGroupsResult } from '../../services/LLMFlowGenerator';
 import { UserPrompts } from '../../constants/UserMessages';
@@ -111,7 +112,32 @@ export class SourceFlowVisualizer implements vscode.Disposable {
      * Uses the multi-step discovery tools (storeMeta, storeComponents, storeMessageFlow, etc.)
      */
     public static buildFlowAnalysisPrompt(flowName: string, flowId: string): string {
-        return ChatPrompts.flowAnalysis({ flowName, flowId });
+        return ChatPrompts.flowAnalysis({
+            flowName,
+            flowId,
+            simpleFlow: SourceFlowVisualizer.isSimpleFlowGroup(flowId),
+        });
+    }
+
+    /**
+     * True when the flow is small and has no custom code (fast analysis and planning).
+     */
+    public static isSimpleFlowGroup(flowId: string): boolean {
+        const group = SourceFlowVisualizer.getStaticCachedFlowGroups()?.groups.find(
+            (g) => g.id === flowId
+        );
+        if (!group) {
+            return false;
+        }
+        const inventory = InventoryService.getInstance();
+        return isSimpleFlow(
+            group.artifactIds.map((id) => {
+                const item = inventory.getItem(id);
+                return item
+                    ? { name: item.name, type: item.category, sourcePath: item.sourcePath }
+                    : undefined;
+            })
+        );
     }
 
     /**

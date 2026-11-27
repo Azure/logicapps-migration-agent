@@ -223,6 +223,13 @@ export class UserPrompts {
         );
     }
 
+    static editedSkillsBackedUp(skills: string[]): string {
+        return format(
+            'Updated migration skills you had edited ({0}); your versions were saved as SKILL.md.bak. Move your rules to CUSTOM.md in the same folder so they are kept on future updates.',
+            skills.join(', ')
+        );
+    }
+
     // ========================================================================
     // Command Registry — Dependency Graph
     // ========================================================================

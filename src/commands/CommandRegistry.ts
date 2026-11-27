@@ -1173,6 +1173,7 @@ export class CommandRegistry implements vscode.Disposable {
                     flowId: flowId as string,
                     artifactList,
                     reconsiderChoices: trigger === 'review-choices',
+                    simpleFlow: SourceFlowVisualizer.isSimpleFlowGroup(flowId as string),
                 }),
             });
             logger.debug('[Planning] Agent chat opened successfully');

@@ -939,6 +939,30 @@
                 }
             },
             {
+                "name": "migration_lookupMapping",
+                "displayName": "Look Up Logic Apps Mapping",
+                "toolReferenceName": "migration_lookupMapping",
+                "canBeReferencedInPrompt": true,
+                "modelDescription": "Look up how specific source components map to Azure Logic Apps Standard (connector, built-in action, service provider ID, operation, notes) without loading the whole source-to-logic-apps-mapping skill. Pass the components as a comma-separated query (adapter, pipeline component, orchestration shape, functoid, connector or protocol names, e.g. 'FILE, WCF-SQL, XMLReceive, Construct Message'). Returns the matching table rows and rules with their section and column headers. Read the full skill only when a lookup finds nothing relevant.",
+                "userDescription": "Look up Logic Apps equivalents for source components",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Comma-separated component, adapter, shape or connector names to look up"
+                        },
+                        "maxResults": {
+                            "type": "number",
+                            "description": "Maximum number of matching rows to return (default 25, max 60)"
+                        }
+                    },
+                    "required": [
+                        "query"
+                    ]
+                }
+            },
+            {
                 "name": "migration_searchReferenceWorkflows",
                 "displayName": "Search Reference Workflows",
                 "toolReferenceName": "migration_searchReferenceWorkflows",

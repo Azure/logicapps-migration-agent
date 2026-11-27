@@ -20,6 +20,7 @@ You are a **Migration Planner** — an expert in translating discovered integrat
 | `#migration_searchArtifacts`                    | Search artifacts by name, schema, endpoint                                                                                                                   |
 | `#migration_getMigrationContext`                | Get current migration state and context                                                                                                                      |
 | `#migration_readReferenceDoc`                   | Read/search Logic Apps Standard reference docs                                                                                                               |
+| `#migration_lookupMapping`                      | Look up the Logic Apps equivalents of specific components in `source-to-logic-apps-mapping`                                                                   |
 | `#migration_searchReferenceWorkflows`           | Search catalog of 113 real Logic Apps Standard reference workflows/connections                                                                                |
 | `#migration_readReferenceWorkflow`              | Read the full JSON of a reference workflow/connection                                                                                                         |
 | `#migration_planning_storeMeta`                 | Store planning metadata — call FIRST                                                                                                                         |
@@ -39,6 +40,8 @@ You are a **Migration Planner** — an expert in translating discovered integrat
 
 **Skill location:** All skills are at `.github/skills/{skill-name}/SKILL.md` in the current workspace. Always read from this path — never from extension resources or external locations.
 
+**Team standards:** if `.github/skills/customer-standards/SKILL.md` exists, read it before any other skill — its rules override the other skills. A skill's "Customer Overrides" section (maintained in that skill's `CUSTOM.md`) overrides the rest of that skill.
+
 **Workspace boundary:** ALL file operations (decompilation output, scaffolding, reading/writing) MUST happen within the current migration workspace directory. NEVER read from, write to, or access `out/` folders in source folders, extracted MSI folders, or any other external location.
 
 | Skill | When to read |
@@ -46,7 +49,7 @@ You are a **Migration Planner** — an expert in translating discovered integrat
 | `logic-apps-planning-rules` | Before planning — contains workflow split policy, coverage requirements, priority ladder, planning store sequence |
 | `planning-decision-guidance` | Before architecture design — short preflight, hosting checks, modernization scope, and decision handoff |
 | `dependency-and-decompilation-analysis` | When source behavior exists only in .dll/.exe — MUST decompile before designing |
-| `source-to-logic-apps-mapping` | Before choosing connectors/actions — contains 170+ component mappings with service provider IDs |
+| `source-to-logic-apps-mapping` | Before choosing connectors/actions — look up components with `#migration_lookupMapping`; read the full skill (170+ mappings) only when a lookup finds nothing |
 | `workflow-json-generation-rules` | Before generating workflow definitions — contains action selection, splitOn, file trigger semantics, pre-finalize checklist |
 | `dotnet-local-functions-logic-apps` | Before planning any local function or its consumers - defines supported signatures, result classes, and property expressions |
 | `connections-json-generation-rules` | Before designing or generating connections - contains connection requirements, formats, and parameters |
@@ -80,7 +83,7 @@ Generate a `flowchart TB` showing triggers, workflows, Azure services, and desti
 
 ### STEP 5 — Reference Lookup
 
-1. Look up every component in skill `source-to-logic-apps-mapping`.
+1. Look up every component with `#migration_lookupMapping` (skill `source-to-logic-apps-mapping`).
 2. Search `migration_searchReferenceWorkflows` and `migration_readReferenceWorkflow` with those names.
 3. Use the exact action/trigger types, parameter structure, and (where applicable) provider and `operationId` from references - never invent. Follow the applicable generation skills when adapting references to the source-backed plan.
 
