@@ -1978,6 +1978,14 @@
                     "default": "workflow-service-plan",
                     "markdownDescription": "Target platform deployment model for Logic Apps Standard"
                 },
+                "logicAppsMigrationAgent.planning.defaultChoices": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "default": {},
+                    "markdownDescription": "Workspace-wide answers to planning questions, as a map of question ID to option ID, for example `{\"messaging\": \"azure-service-bus\", \"map-strategy\": \"azure-function\", \"workflow-topology\": \"receiver-processor-sender\"}`. When the planner asks a question with that ID and the option ID is one of the offered options, the answer is applied to every flow without prompting; answers already chosen for a flow are kept. Hosting still comes from `#logicAppsMigrationAgent.deploymentModel#`. Explicit requests to change planning choices still ask."
+                },
                 "logicAppsMigrationAgent.azure.subscriptionId": {
                     "type": "string",
                     "default": "",

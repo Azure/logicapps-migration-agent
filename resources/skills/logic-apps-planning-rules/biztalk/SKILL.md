@@ -21,6 +21,7 @@ Read and follow `planning-decision-guidance` before architecture generation. Res
 - Do NOT collapse sub-orchestrations into local functions or merge them into a parent workflow.
 - Use the Workflow action type (`InvokeWorkflow`) to call child workflows from parent workflows.
 - You MUST enumerate ALL discovered orchestrations and scenarios (happy path + branch/error/contingency paths) before deciding the workflow split.
+- **Receiver → processor → sender topology**: when the resolved `workflow-topology` choice is `receiver-processor-sender`, still map every orchestration to its own processor workflow as above (triggered by its broker subscription), and also plan one receiver workflow per receive location (receive, decode/validate, publish to the broker) and one sender workflow per send port (subscribe from the broker, encode, send), all in one Standard Logic App. Record the broker topics/subscriptions (Service Bus by default) in Azure components and give every action mapping its `workflowName`. Otherwise ports stay triggers/actions of the orchestration's workflow.
 
 ---
 
@@ -71,11 +72,13 @@ Do NOT add delete/remove/cleanup actions that remove the trigger input file by d
 
 For all **other** (non-custom-code) components:
 
-1. Built-in actions (XmlParse, XmlValidation, Xslt, Compose, Parse JSON, Select, Flat File Decode/Encode) → 2. Expressions → 3. Data Mapper/Liquid → 4. Inline Code → 5. .NET local functions → 6. Azure Functions (last resort).
+1. Built-in actions (XmlParse, XmlValidation, Xslt, Compose, Parse JSON, Select, Flat File Decode/Encode) → 2. Expressions → 3. Data Mapper/Liquid → 4. Inline Code → 5. .NET local functions → 6. Azure Functions (last resort, unless the user selected `map-strategy=azure-function` or an approved standard requires them).
 
 > **AUTO-APPLY RULE**: Always choose the HIGHEST applicable level without asking the user. If a built-in action exists (e.g. XmlParse for XML processing), use it — do NOT fall back to expressions or ask.
 
 > **XML PROCESSING RULE**: For XML parsing, validation, or structured access, ALWAYS use XmlParse / XmlValidation (built-in XML Operations) instead of `xpath()` expressions. XmlParse validates against schemas and returns structured JSON. xpath() skips validation and is verbose. This applies to all BizTalk XMLReceive pipeline replacements.
+
+> **MAP STRATEGY RULE**: Apply the resolved `map-strategy` choice to every map. `azure-function`: record each map's artifact disposition with `uploadDestination: azure-function`, plan an Azure Functions (.NET isolated) component in Azure components, and have workflows call the function (HTTP/Function action) instead of Transform XML; keep the converted XSLT as the test oracle. `local-function`: follow the .NET local-function path (section 3.5). `logic-app-xslt` or unanswered: baseline XSLT in `Artifacts/Maps` with Transform XML.
 
 ---
 

@@ -18,6 +18,7 @@ description: Rules for planning the migration of a MuleSoft flow to Azure Logic 
 - Use the Workflow action type (`InvokeWorkflow`) to call child workflows from parent workflows, mirroring the `flow-ref` pattern.
 - Small, simple sub-flows (2–3 processors, no branching) MAY be inlined into the parent workflow if it simplifies the design — document this explicitly.
 - You MUST enumerate ALL discovered flows and scenarios (happy path + branch/error/contingency paths) before deciding the workflow split.
+- **Receiver → processor → sender topology**: when the resolved `workflow-topology` choice is `receiver-processor-sender` (see `planning-decision-guidance`), still map every flow to its own processor workflow as above (triggered by its broker subscription), and also plan one receiver workflow per inbound listener/source (receive, validate, publish to the broker) and one sender workflow per outbound connector endpoint (subscribe from the broker, send), all in one Standard Logic App. Record the broker topics/subscriptions (Service Bus by default) in Azure components and give every action mapping its `workflowName`. Otherwise listeners and outbound connectors stay triggers/actions of the flow's workflow.
 
 ---
 
@@ -68,11 +69,13 @@ Do NOT add delete/remove/cleanup actions that remove the trigger input file by d
 
 For all **other** (non-custom-code) components:
 
-1. Built-in actions (HTTP, Compose, Parse JSON, Select, SQL Connector, Service Bus, Transform XML/Xslt, XmlParse, XmlValidation, Flat File Decode/Encode) → 2. Expressions → 3. Data Mapper/Liquid (for DataWeave conversions) → 4. Inline Code → 5. .NET local functions → 6. Azure Functions (last resort).
+1. Built-in actions (HTTP, Compose, Parse JSON, Select, SQL Connector, Service Bus, Transform XML/Xslt, XmlParse, XmlValidation, Flat File Decode/Encode) → 2. Expressions → 3. Data Mapper/Liquid (for DataWeave conversions) → 4. Inline Code → 5. .NET local functions → 6. Azure Functions (last resort, unless the user selected `map-strategy=azure-function` or an approved standard requires them).
 
 > **AUTO-APPLY RULE**: Always choose the HIGHEST applicable level without asking the user. If a built-in action exists (e.g. SQL Connector for db:select, HTTP for http:request), use it — do NOT fall back to expressions or ask.
 
 > **DATAWEAVE PROCESSING RULE**: For DataWeave transformations (`ee:transform`), assess complexity. Simple field mappings (payload.field, basic map/filter) → Liquid templates or Compose actions. Complex scripts with reduce, groupBy, match, custom functions → .NET local functions. Always flag DataWeave conversions as gaps requiring review.
+
+> **MAP STRATEGY RULE**: Apply the resolved `map-strategy` choice to every DataWeave map. `azure-function`: record each map's artifact disposition with `uploadDestination: azure-function`, plan an Azure Functions (.NET isolated) component in Azure components, and have workflows call the function (HTTP/Function action) instead of Transform XML/Liquid actions; keep the converted XSLT or Liquid map as the test oracle. `local-function`: follow the .NET local-function path (section 3.4). `logic-app-xslt` or unanswered: apply the DATAWEAVE PROCESSING RULE above.
 
 ---
 

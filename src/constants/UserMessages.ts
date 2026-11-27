@@ -38,6 +38,16 @@ export class UserPrompts {
         return format('Planning choices: {0}', flowId);
     }
 
+    static applyPlanningChoiceToAllFlows(question: string, choice: string): string {
+        return format(
+            'Use "{1}" for "{0}" in all flows of this workspace? Answers already chosen for a flow are kept.',
+            question,
+            choice
+        );
+    }
+
+    static readonly BUTTON_APPLY_TO_ALL_FLOWS = 'Apply to All Flows';
+
     static readonly PLANNING_CHOICES_PAUSED =
         'Planning paused. Your answered choices are saved; resume planning when ready.';
 

@@ -1,14 +1,19 @@
 import * as vscode from 'vscode';
 import { randomUUID } from 'crypto';
 import { UserPrompts } from '../../constants/UserMessages';
+import { LoggingService } from '../../services/LoggingService';
 import { PlanningFileService } from './PlanningFileService';
 import {
+    configuredDefaultOption,
     DEPLOYMENT_QUESTION,
     PlanningDecision,
     PlanningPreferences,
     PlanningQuestion,
     validatePlanningQuestion,
 } from './PlanningDecisions';
+
+const CONFIGURATION_SECTION = 'logicAppsMigrationAgent';
+const DEFAULT_CHOICES_SETTING = 'planning.defaultChoices';
 
 export class PlanningDecisionService {
     private static readonly resolving = new Set<string>();
@@ -61,20 +66,23 @@ export class PlanningDecisionService {
         const pending = new Map(
             (preferences.pendingQuestions ?? []).map((question) => [question.id, question])
         );
-        const inspected = vscode.workspace
-            .getConfiguration('logicAppsMigrationAgent')
-            .inspect<string>('deploymentModel');
+        const configuration = vscode.workspace.getConfiguration(CONFIGURATION_SECTION);
+        const inspected = configuration.inspect<string>('deploymentModel');
         // An extension default is not an explicit customer hosting decision.
         const configuredTarget =
             inspected?.workspaceFolderValue ?? inspected?.workspaceValue ?? inspected?.globalValue;
+        const defaultChoices = configuration.get<unknown>(DEFAULT_CHOICES_SETTING);
+        const configuredOption = (question: PlanningQuestion) =>
+            question.id === DEPLOYMENT_QUESTION.id
+                ? configuredTarget
+                : configuredDefaultOption(question, defaultChoices);
         const shouldReconsider = (question: PlanningQuestion) =>
             reconsider && (question.id !== DEPLOYMENT_QUESTION.id || questions.length === 0);
         const toResolve = [hostingQuestion, ...questions].filter((question) => {
             const existing = originalDecisions.get(question.id);
             const configurationChanged =
-                question.id === DEPLOYMENT_QUESTION.id &&
                 existing?.source === 'configuration' &&
-                configuredTarget !== existing.selectedOptionId;
+                configuredOption(question) !== existing.selectedOptionId;
             return (
                 pending.has(question.id) ||
                 shouldReconsider(question) ||
@@ -124,11 +132,11 @@ export class PlanningDecisionService {
                 let source: PlanningDecision['source'] = selectedOptionId ? 'user-request' : 'user';
                 if (
                     !selectedOptionId &&
-                    question.id === DEPLOYMENT_QUESTION.id &&
                     !shouldReconsider(question) &&
                     (!existing || existing.source === 'configuration')
                 ) {
-                    selectedOptionId = configuredTarget;
+                    // Only a configured host can be unsupported; defaults name offered options.
+                    selectedOptionId = configuredOption(question);
                     if (
                         selectedOptionId &&
                         !question.options.some((option) => option.id === selectedOptionId)
@@ -194,6 +202,20 @@ export class PlanningDecisionService {
                 pending.delete(question.id);
                 preferences.revision = randomUUID();
                 persist();
+                if (
+                    source === 'user' &&
+                    question.id !== DEPLOYMENT_QUESTION.id &&
+                    configuredOption(question) !== selectedOptionId
+                ) {
+                    // Offer reuse across flows without blocking the remaining prompts.
+                    this.offerDefaultChoice(question, selectedOptionId).catch((error: unknown) =>
+                        LoggingService.getInstance().warn(
+                            '[PlanningDecisions] Failed to save a workspace default choice',
+                            error instanceof Error ? error : new Error(String(error)),
+                            { questionId: question.id }
+                        )
+                    );
+                }
                 if (hostChanged && pending.size > 0) {
                     return preferences;
                 }
@@ -204,5 +226,27 @@ export class PlanningDecisionService {
         } finally {
             PlanningDecisionService.resolving.delete(flowId);
         }
+    }
+
+    private async offerDefaultChoice(question: PlanningQuestion, optionId: string): Promise<void> {
+        const label = question.options.find((option) => option.id === optionId)?.label ?? optionId;
+        const action = await vscode.window.showInformationMessage(
+            UserPrompts.applyPlanningChoiceToAllFlows(question.question, label),
+            UserPrompts.BUTTON_APPLY_TO_ALL_FLOWS
+        );
+        if (action !== UserPrompts.BUTTON_APPLY_TO_ALL_FLOWS) {
+            return;
+        }
+        // Read on click so defaults saved from other prompts meanwhile are kept; update only the
+        // workspace layer so user-level defaults are not copied into it.
+        const configuration = vscode.workspace.getConfiguration(CONFIGURATION_SECTION);
+        const saved = configuration.inspect<unknown>(DEFAULT_CHOICES_SETTING)?.workspaceValue;
+        const defaults =
+            typeof saved === 'object' && saved !== null && !Array.isArray(saved) ? saved : {};
+        await configuration.update(
+            DEFAULT_CHOICES_SETTING,
+            { ...defaults, [question.id]: optionId },
+            vscode.ConfigurationTarget.Workspace
+        );
     }
 }
