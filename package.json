@@ -1797,6 +1797,11 @@
                 "icon": "$(refresh)"
             },
             {
+                "command": "logicAppsMigrationAgent.exportFlowGroupInventory",
+                "title": "Export Logical Group Inventory",
+                "category": "Logic Apps Migration Agent"
+            },
+            {
                 "command": "logicAppsMigrationAgent.openPlanningView",
                 "title": "Open Planning View",
                 "category": "Logic Apps Migration Agent",

@@ -19,6 +19,11 @@ import { LoggingService } from '../../services/LoggingService';
 import { TelemetryService } from '../../services/TelemetryService';
 import { ParsedArtifact } from '../../stages/discovery/types';
 import { InventoryService } from '../../stages/discovery/InventoryService';
+import {
+    describeFlowRoute,
+    entryLabel,
+    flowSearchText,
+} from '../../stages/discovery/FlowGroupInventory';
 import { GeneratedFlowResult, FlowGroupsResult } from '../../services/LLMFlowGenerator';
 import { UserPrompts } from '../../constants/UserMessages';
 import { ChatPrompts } from '../../constants/ChatPrompts';
@@ -264,6 +269,23 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             const migrationBannerHtml = SourceFlowVisualizer.getMigrationBannerHtml(sourcePlatform);
             const isAnyFlowBusy = SourceFlowVisualizer.isAnyFlowBusy;
 
+            const inventory = InventoryService.getInstance();
+            const lookup = (id: string) => {
+                const item = inventory.getItem(id);
+                return item
+                    ? { name: item.name, type: item.category, sourcePath: item.sourcePath }
+                    : undefined;
+            };
+            const sharedIds = new Set(flowGroups.sharedArtifactIds ?? []);
+            const missingProjects = flowGroups.missingProjects ?? [];
+            const missingProjectsHtml =
+                missingProjects.length > 0
+                    ? `<div class="warning-banner">⚠ Referenced projects are missing from the source folder: <strong>${escapeHtml(missingProjects.map((p) => p.project).join(', '))}</strong>. Add them and run <em>Rescan Artifacts</em> so flows include their schemas and code.</div>`
+                    : '';
+            const explanationHtml = flowGroups.explanation
+                ? `<details class="grouping-explanation"><summary>How these groups were formed</summary><p>${escapeHtml(flowGroups.explanation)}</p></details>`
+                : '';
+
             const flowCards = flowGroups.groups
                 .map((g) => {
                     const isGenerating = SourceFlowVisualizer.generatingGroupIds.has(g.id);
@@ -377,17 +399,52 @@ export class SourceFlowVisualizer implements vscode.Disposable {
                         ? `<button class="btn btn-stop-flow" onclick="event.stopPropagation(); stopFlow('${g.id}')" title="Stop the running process for this flow (use if you stopped Copilot)">■ Stop</button>`
                         : '';
 
+                    const route = describeFlowRoute(g, lookup);
+                    const routeParts = [
+                        route.entry
+                            ? `<span class="route-label">In</span>${escapeHtml(entryLabel(route))}`
+                            : '',
+                        route.processes.length > 0
+                            ? `<span class="route-label">Process</span>${escapeHtml(route.processes.join(', '))}`
+                            : '',
+                        route.exits.length > 0
+                            ? `<span class="route-label">Out</span>${escapeHtml(route.exits.join(', '))}`
+                            : '',
+                    ].filter(Boolean);
+                    const routeHtml =
+                        routeParts.length > 0
+                            ? `<div class="flow-route">${routeParts.join('<span class="route-arrow">→</span>')}</div>`
+                            : '';
+                    const sharedCount = (g.artifactIds ?? []).filter((id) =>
+                        sharedIds.has(id)
+                    ).length;
+                    const artifactItems = (g.artifactIds ?? [])
+                        .map((id) => ({ id, info: lookup(id) }))
+                        .sort(
+                            (a, b) =>
+                                (a.info?.type ?? '').localeCompare(b.info?.type ?? '') ||
+                                (a.info?.name ?? a.id).localeCompare(b.info?.name ?? b.id)
+                        )
+                        .map(
+                            ({ id, info }) =>
+                                `<li><span class="artifact-type">${escapeHtml(info?.type ?? 'artifact')}</span>${escapeHtml(info?.name ?? id)}${sharedIds.has(id) ? '<span class="badge badge-shared" title="Also used by other flows">shared</span>' : ''}</li>`
+                        )
+                        .join('');
+
                     return `
-                    <div class="flow-card">
+                    <div class="flow-card" data-search="${escapeHtml(flowSearchText(g, lookup))}">
                         <div class="flow-card-header">
                             <span class="flow-name">${escapeHtml(g.name)}</span>
                             ${resetBtn}${stopBtn}
                         </div>
                         <div class="flow-desc">${escapeHtml(g.description)}</div>
+                        ${routeHtml}
                         <div class="flow-meta">
-                            <span class="meta-item">${artifactCount} artifacts</span>
+                            <span class="meta-item">${artifactCount} artifacts${sharedCount > 0 ? ` (${sharedCount} shared)` : ''}</span>
                             <span class="meta-item">${escapeHtml(g.category)}</span>
+                            <span class="meta-item flow-id" title="Flow ID">${escapeHtml(g.id)}</span>
                         </div>
+                        <details class="flow-artifacts"><summary>Artifacts</summary><ul>${artifactItems}</ul></details>
                         <div class="flow-steps">
                             ${analyseBtn}${stepArrow}${planBtn}${stepArrow}${createBtn}${stepArrow}${executeBtn}${stepArrow}${openBtn}
                         </div>
@@ -648,24 +705,127 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             display: flex;
             align-items: center;
         }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .page-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .page-actions .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+        .warning-banner {
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            border-radius: 6px;
+            border: 1px solid var(--vscode-inputValidation-warningBorder, #cca700);
+            background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.12));
+            font-size: 13px;
+        }
+        .grouping-explanation { margin: -12px 0 16px; font-size: 12px; color: var(--vscode-descriptionForeground); }
+        .grouping-explanation summary { cursor: pointer; }
+        .flow-filter { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .flow-filter input {
+            flex: 1;
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+        }
+        #flow-filter-count { font-size: 12px; color: var(--vscode-descriptionForeground); white-space: nowrap; }
+        .flow-route {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        .route-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 1px 6px;
+            margin-right: 4px;
+            border-radius: 8px;
+            background: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+        }
+        .route-arrow { opacity: 0.6; }
+        .flow-id { font-family: var(--vscode-editor-font-family); }
+        .flow-artifacts { margin-top: 8px; font-size: 12px; }
+        .flow-artifacts summary { cursor: pointer; color: var(--vscode-textLink-foreground); }
+        .flow-artifacts ul { margin: 6px 0 0; padding-left: 18px; columns: 2; }
+        .artifact-type {
+            display: inline-block;
+            min-width: 84px;
+            margin-right: 6px;
+            color: var(--vscode-descriptionForeground);
+        }
+        .badge-shared {
+            margin-left: 6px;
+            background: rgba(0, 123, 255, 0.15);
+            color: var(--vscode-textLink-foreground);
+        }
     </style>
 </head>
 <body>
-    <div style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="page-header">
         <h1>Discovered Logical Groups</h1>
-        <button class="btn btn-outline" onclick="refreshPage()" style="height:fit-content;">↻ Refresh</button>
+        <div class="page-actions">
+            <button class="btn btn-outline" onclick="exportInventory()" title="Save a Markdown inventory of every group with its ports and artifacts">⬇ Export Inventory</button>
+            <button class="btn btn-outline" onclick="redetectGroups()" ${isAnyFlowBusy ? 'disabled' : ''} title="Re-detect logical groups for the current inventory. Flows that keep their ID keep their progress.">⟳ Re-detect Groups</button>
+            <button class="btn btn-outline" onclick="refreshPage()">↻ Refresh</button>
+        </div>
     </div>
     ${migrationBannerHtml}
+    ${missingProjectsHtml}
     <p class="subtitle">Select a flow to analyse its architecture, components, and migration gaps.</p>
+    ${explanationHtml}
     <div class="stats-bar">
         <div class="stat-pill"><span class="stat-count">${flowGroups.groups.length}</span> Total Flows</div>
         <div class="stat-pill"><span class="stat-count">${flowGroups.groups.filter((g) => g.discovered).length}</span> Analysed</div>
         <div class="stat-pill"><span class="stat-count">${flowGroups.groups.filter((g) => g.planned).length}</span> Planned</div>
         <div class="stat-pill"><span class="stat-count">${flowGroups.groups.filter((g) => g.converted).length}</span> Converted</div>
+        ${sharedIds.size > 0 ? `<div class="stat-pill" title="Artifacts used by more than one flow"><span class="stat-count">${sharedIds.size}</span> Shared Artifacts</div>` : ''}
+    </div>
+    <div class="flow-filter">
+        <input id="flow-filter" type="search" placeholder="Filter by flow, orchestration, port, schema or map name" oninput="filterFlows(this.value)" />
+        <span id="flow-filter-count"></span>
     </div>
     ${flowCards}
     <script>
         const vscode = acquireVsCodeApi();
+        function filterFlows(value) {
+            const query = (value || '').trim().toLowerCase();
+            const cards = document.querySelectorAll('.flow-card');
+            let shown = 0;
+            cards.forEach((card) => {
+                const match = !query || (card.getAttribute('data-search') || '').includes(query);
+                card.style.display = match ? '' : 'none';
+                if (match) {
+                    shown++;
+                }
+            });
+            document.getElementById('flow-filter-count').textContent = query
+                ? shown + ' of ' + cards.length + ' flows'
+                : '';
+            vscode.setState(Object.assign({}, vscode.getState() || {}, { query: value || '' }));
+        }
+        function redetectGroups() {
+            vscode.postMessage({ command: 'redetectFlowGroups' });
+        }
+        function exportInventory() {
+            vscode.postMessage({ command: 'exportFlowGroupInventory' });
+        }
+        (function restoreFilter() {
+            const saved = (vscode.getState() || {}).query || '';
+            if (saved) {
+                document.getElementById('flow-filter').value = saved;
+                filterFlows(saved);
+            }
+        })();
         function selectFlow(flowId) {
             vscode.postMessage({ command: 'selectFlowFromSelector', data: flowId });
         }
@@ -1630,6 +1790,18 @@ export class SourceFlowVisualizer implements vscode.Disposable {
             case 'refreshFlowGroupSelector': {
                 this.logger.debug('[FlowViz] User requested refresh of flow group selector');
                 SourceFlowVisualizer.showFlowGroupSelector(this.extensionUri);
+                break;
+            }
+
+            case 'redetectFlowGroups': {
+                void vscode.commands.executeCommand('logicAppsMigrationAgent.redetectFlowGroups');
+                break;
+            }
+
+            case 'exportFlowGroupInventory': {
+                void vscode.commands.executeCommand(
+                    'logicAppsMigrationAgent.exportFlowGroupInventory'
+                );
                 break;
             }
 

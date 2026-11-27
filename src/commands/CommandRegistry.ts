@@ -22,6 +22,7 @@ import {
     FlowGroupingMode,
     resolveGroupingMode,
 } from '../stages/discovery/FlowGroupDetector';
+import { renderFlowGroupInventoryMarkdown } from '../stages/discovery/FlowGroupInventory';
 import { PlanningService } from '../stages/planning';
 import { ConversionService } from '../stages/conversion';
 import { AgentFileProvisioner } from '../services/AgentFileProvisioner';
@@ -132,6 +133,11 @@ export class CommandRegistry implements vscode.Disposable {
                 id: 'logicAppsMigrationAgent.redetectFlowGroups',
                 handler: this.handleRedetectFlowGroups.bind(this),
                 title: 'Re-detect Logical Groups',
+            },
+            {
+                id: 'logicAppsMigrationAgent.exportFlowGroupInventory',
+                handler: this.handleExportFlowGroupInventory.bind(this),
+                title: 'Export Logical Group Inventory',
             },
             // Planning Stage Commands
             {
@@ -1007,6 +1013,49 @@ export class CommandRegistry implements vscode.Disposable {
             return;
         }
         await this.startCopilotFlowGroupDetection(extensionUri);
+    }
+
+    /**
+     * Save a Markdown inventory mapping every logical group to its ports and artifacts.
+     */
+    private async handleExportFlowGroupInventory(): Promise<void> {
+        const { DiscoveryCacheService } = await import('../stages/discovery/DiscoveryCacheService');
+        const flowGroups = DiscoveryCacheService.getInstance().getFlowGroups();
+        if (!flowGroups || flowGroups.groups.length === 0) {
+            vscode.window.showWarningMessage(UserPrompts.NO_FLOW_GROUPS_TO_EXPORT);
+            return;
+        }
+
+        const inventory = InventoryService.getInstance();
+        const markdown = renderFlowGroupInventoryMarkdown(flowGroups, (id) => {
+            const item = inventory.getItem(id);
+            return item
+                ? { name: item.name, type: item.category, sourcePath: item.sourcePath }
+                : undefined;
+        });
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        const target = await vscode.window.showSaveDialog({
+            defaultUri: workspaceFolder
+                ? vscode.Uri.joinPath(workspaceFolder.uri, 'logical-groups.md')
+                : undefined,
+            filters: { Markdown: ['md'] },
+            title: 'Export Logical Group Inventory',
+        });
+        if (!target) {
+            return;
+        }
+
+        await fs.promises.writeFile(target.fsPath, markdown, 'utf-8');
+        TelemetryService.getInstance().logStep('flowgroups.inventory.exported', {
+            flowGroupCount: flowGroups.groups.length,
+        });
+        const open = await vscode.window.showInformationMessage(
+            UserPrompts.FLOW_GROUP_INVENTORY_SAVED,
+            UserPrompts.BUTTON_OPEN_FILE
+        );
+        if (open === UserPrompts.BUTTON_OPEN_FILE) {
+            await vscode.commands.executeCommand('vscode.open', target);
+        }
     }
 
     /**

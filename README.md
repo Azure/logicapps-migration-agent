@@ -80,6 +80,8 @@ After discovery, the extension groups BizTalk artifacts into logical flows witho
 - Maps, message schemas, pipelines and projects belong to the flows that reference them. Artifacts used by several flows — for example canonical schemas from a shared canonical data model project or one application binding file — are **shared**: they appear in each flow that uses them instead of merging flows, and analysis of a flow only covers its own ports.
 - Referenced projects missing from the source folder are reported right away. After adding them, **Rescan Artifacts** offers to re-detect groups; flows that keep their ID keep their analysis, plan and conversion progress. You can also run **Re-detect Logical Groups** at any time.
 
+Each Home card shows the flow's entry (receive location), orchestrations and exits (send ports), its ID, and an expandable artifact list with shared artifacts marked. Filter the cards by flow, orchestration, port, schema or map name, and use **Export Inventory** to save a Markdown map of every group with its ports, artifacts, shared and ungrouped artifacts.
+
 Set `logicAppsMigrationAgent.discovery.groupingMode` to `copilot` to let Copilot group the artifacts instead, starting from the same proposal. MuleSoft and TIBCO use Copilot grouping by default.
 
 ### Decision-first planning
@@ -139,6 +141,7 @@ Configure via `Settings > Extensions > Logic Apps Migration Agent`:
 | `Logic Apps Migration Agent: Reset Migration`      | Reset all migration state and start over             |
 | `Logic Apps Migration Agent: Show Extension Logs`  | Open the extension output channel for debugging      |
 | `Logic Apps Migration Agent: Re-detect Logical Groups` | Re-group the current inventory, keeping progress of flows whose ID is unchanged |
+| `Logic Apps Migration Agent: Export Logical Group Inventory` | Save a Markdown map of every logical group with its ports and artifacts |
 
 ## Architecture
 

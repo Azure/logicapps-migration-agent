@@ -184,6 +184,9 @@ export class UserPrompts {
     }
 
     static readonly BUTTON_REDETECT_GROUPS = 'Re-detect Groups';
+    static readonly NO_FLOW_GROUPS_TO_EXPORT =
+        'No logical groups detected yet. Run discovery and open Home first.';
+    static readonly FLOW_GROUP_INVENTORY_SAVED = 'Logical group inventory saved.';
     static readonly FLOW_WORK_IN_PROGRESS =
         'A flow is still being analysed, planned or converted. Stop it or wait before re-detecting logical groups.';
 
