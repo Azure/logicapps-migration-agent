@@ -13,6 +13,8 @@
  *   await vscode.commands.executeCommand('workbench.action.chat.open', { mode: 'agent', query });
  */
 
+import { CUSTOMER_STANDARDS_SKILL } from '../services/SkillOverlay';
+
 // ============================================================================
 // Shared prompt fragments (kept minimal — detail lives in skills)
 // ============================================================================
@@ -21,10 +23,37 @@ const AUTONOMOUS_MODE_SHORT =
     'AUTONOMOUS MODE: Execute ALL steps without asking for confirmation. Do NOT pause to ask questions. Run all tool calls directly. ';
 
 const SKILL_AUTHORITY =
-    'SKILL AUTHORITY: You MUST read every referenced skill BEFORE starting work. Treat skills as authoritative — if this prompt and a skill conflict, the skill wins. Your output will be rejected if it violates a skill. ';
+    'SKILL AUTHORITY: You MUST read every referenced skill BEFORE starting work. Treat skills as authoritative — if this prompt and a skill conflict, the skill wins. Your output will be rejected if it violates a skill. ' +
+    `TEAM STANDARDS: if \`.github/skills/${CUSTOMER_STANDARDS_SKILL}/SKILL.md\` exists, read it first; its rules override the other skills, and a skill's "Customer Overrides" section overrides the rest of that skill. `;
 
 const GLOBAL_LOOKUP_POLICY =
     'SCOPE POLICY: Start from the selected flow/task artifacts, but if any required dependency, import/using, schema, map, connector, class, or configuration detail is missing or unclear, you MUST expand to full-project lookup using migration_listArtifacts, migration_searchArtifacts, migration_getArtifactDetails, and migration_readSourceFile. Do NOT assume dependencies are group-local. ';
+
+const MAPPING_SKILL_LINE =
+    '- `source-to-logic-apps-mapping` — component equivalents, service provider IDs, operation names. Look up components with migration_lookupMapping; read the full skill only when a lookup finds nothing relevant\n';
+
+const FAST_PATH =
+    'FAST PATH: this flow is small and has no custom code. Do not decompile assemblies, look up components with migration_lookupMapping instead of reading the full `source-to-logic-apps-mapping` skill, and run at most one reference-doc search per adapter or connector.\n';
+
+/** Whether conversion may create Azure test resources (`provision`) or must stay local (`offline`). */
+export type ProvisioningMode = 'provision' | 'offline';
+
+function azureSettings(
+    resourceGroup: string,
+    location: string,
+    mode: ProvisioningMode | undefined,
+    subscriptionSuffix = ''
+): string {
+    if (mode === 'offline') {
+        return (
+            '\nAZURE PROVISIONING: OFFLINE — do not sign in to Azure, run az/azd deployment commands, or create Azure resources. ' +
+            'Generate Bicep for every Azure resource the flow needs under "infra/" in the output project instead, ' +
+            'run locally with Azurite and Docker emulators (Service Bus emulator, SQL Server), and cover connectors without a local alternative with mocked unit tests (skill `automated-test-generation`). ' +
+            `Target values for the generated templates: Resource Group="${resourceGroup}", Location="${location}"${subscriptionSuffix}.\n`
+        );
+    }
+    return `\nAZURE SETTINGS: Resource Group="${resourceGroup}", Location="${location}"${subscriptionSuffix}.\n`;
+}
 
 // ============================================================================
 // ChatPrompts class
@@ -35,6 +64,8 @@ interface PlanForFlowParams {
     flowId: string;
     artifactList: string;
     reconsiderChoices?: boolean;
+    /** Small flow without custom code: skip decompilation and broad lookups */
+    simpleFlow?: boolean;
 }
 
 interface ConversionForFlowParams {
@@ -47,6 +78,7 @@ interface ConversionForFlowParams {
     outputProjectRoot: string;
     outputLogicAppName: string;
     outputLogicAppRoot: string;
+    provisioningMode?: ProvisioningMode;
 }
 
 interface ExecuteSingleTaskParams {
@@ -66,6 +98,7 @@ interface ExecuteSingleTaskParams {
     outputLogicAppRoot: string;
     resourceGroup: string;
     location: string;
+    provisioningMode?: ProvisioningMode;
 }
 
 interface ExecuteAllTasksParams {
@@ -86,6 +119,7 @@ interface ExecuteAllTasksParams {
     outputLogicAppRoot: string;
     resourceGroup: string;
     location: string;
+    provisioningMode?: ProvisioningMode;
 }
 
 interface BlackBoxTestParams {
@@ -106,6 +140,8 @@ interface BlackBoxTestParams {
 interface FlowAnalysisParams {
     flowName: string;
     flowId: string;
+    /** Small flow without custom code: skip decompilation and broad lookups */
+    simpleFlow?: boolean;
 }
 
 interface OpenFlowChatParams {
@@ -127,6 +163,7 @@ export class ChatPrompts {
             SKILL_AUTHORITY +
             '\nREQUIRED SKILLS: Read `detect-logical-groups` first and follow it exactly.\n' +
             'The skill contains all grouping rules, fallback logic, and required output fields.\n' +
+            'Start from the deterministic proposedGroups returned by migration_detectFlowGroups: keep their ids, artifactIds, endpointNames and shared artifacts, and only improve names and descriptions.\n' +
             'Do NOT read source files or generate architecture diagrams — only detect and store groups.'
         );
     }
@@ -141,11 +178,12 @@ export class ChatPrompts {
             'DECISION-FIRST PLANNING: Reuse known choices, ask only critical unresolved questions through migration_planning_preflight, then generate ONE selected plan. Make minor behavior-preserving choices yourself. Never generate full alternatives just to compare them. Stop if the user cancels.\n' +
             SKILL_AUTHORITY +
             GLOBAL_LOOKUP_POLICY +
+            (params.simpleFlow ? FAST_PATH : '') +
             '\nREQUIRED SKILLS (read ALL before starting):\n' +
             '- `planning-decision-guidance` — concise preflight, hosting compatibility, modernization consent, and decision handoff\n' +
             '- `logic-apps-planning-rules` — workflow split policy, coverage requirements, planning store sequence\n' +
             '- `dependency-and-decompilation-analysis` — MUST decompile any .dll/.exe whose source is missing before designing workflows\n' +
-            '- `source-to-logic-apps-mapping` — component equivalents, service provider IDs, operation names\n' +
+            MAPPING_SKILL_LINE +
             '- `workflow-json-generation-rules` — workflow.json authoring, splitOn, file trigger semantics\n' +
             '- `connections-json-generation-rules` — connections.json format and connector parameters\n' +
             `\n${params.artifactList}\n` +
@@ -158,7 +196,7 @@ export class ChatPrompts {
             '3. If any dependency or detail cannot be resolved from this flow group context, run full-project artifact search and source reads before finalizing the plan.\n' +
             '4. Read migration_planning_preflight, resolve hosting first, validate target capabilities, and resolve any critical broker/modernization choices. Follow planning-decision-guidance before designing the selected architecture.\n' +
             '5. Generate Mermaid flowchart TB showing target architecture.\n' +
-            '6. Look up every component in skill `source-to-logic-apps-mapping`, then search reference workflows with those names.\n' +
+            '6. Look up every component with migration_lookupMapping (skill `source-to-logic-apps-mapping`), then search reference workflows with those names.\n' +
             '7. Store one plan in the order from logic-apps-planning-rules. Call storeMeta with startNew=true and a brief containing scenario, indicative timeline, assumptions, tradeoffs, and evidenced modernization opportunities. Finalize once; history is saved automatically.'
         );
     }
@@ -185,10 +223,16 @@ export class ChatPrompts {
             '- `no-stubs-code-generation` — all code must be fully implemented\n' +
             '- `dependency-and-decompilation-analysis` — MUST decompile any .dll/.exe whose source is missing before generating tasks\n' +
             '- `runtime-validation-and-testing` — validation, test matrix, reporting\n' +
+            '- `automated-test-generation` — re-runnable workflow unit, map and schema tests (dotnet test, no Azure)\n' +
             '- `cloud-deployment-and-testing` — optional cloud deploy task rules\n' +
-            '- `source-to-logic-apps-mapping` — component equivalents\n' +
+            MAPPING_SKILL_LINE +
             '- `dotnet-local-functions-logic-apps` — .NET local function project structure\n' +
-            `\nAZURE SETTINGS: Resource Group="${params.azureResourceGroup}", Location="${params.azureLocation}"${subscriptionSuffix}.\n` +
+            azureSettings(
+                params.azureResourceGroup,
+                params.azureLocation,
+                params.provisioningMode,
+                subscriptionSuffix
+            ) +
             `OUTPUT PATHS: Workspace root="${params.outputProjectRoot}/", Logic App="${params.outputLogicAppRoot}/", ` +
             `Workspace file="${params.outputProjectRoot}/${params.outputProjectName}.code-workspace".\n` +
             `Scaffold params: workspaceName="${params.outputProjectName}", logicAppName="${params.outputLogicAppName}".\n` +
@@ -212,8 +256,8 @@ export class ChatPrompts {
             SKILL_AUTHORITY +
             GLOBAL_LOOKUP_POLICY +
             '\nREQUIRED SKILLS: Read `workflow-json-generation-rules`, `connections-json-generation-rules`, `no-stubs-code-generation`, ' +
-            '`dependency-and-decompilation-analysis` (decompile .dll/.exe when source is unavailable), `runtime-validation-and-testing`, `source-to-logic-apps-mapping` as needed for this task type.\n' +
-            `\nAZURE SETTINGS: Resource Group="${params.resourceGroup}", Location="${params.location}".\n` +
+            '`dependency-and-decompilation-analysis` (decompile .dll/.exe when source is unavailable), `runtime-validation-and-testing`, `automated-test-generation`, `source-to-logic-apps-mapping` (look up components with migration_lookupMapping) as needed for this task type.\n' +
+            azureSettings(params.resourceGroup, params.location, params.provisioningMode) +
             `OUTPUT PATHS: Project="${params.outputProjectRoot}/", LogicApp="${params.outputLogicAppRoot}/".\n` +
             `\nTask details:\n- Type: ${params.taskType}\n- Description: ${params.taskDescription}\n` +
             `- Execution Prompt: ${params.taskExecutionPrompt}\n- Order: ${params.taskOrder}\n- Dependencies: ${params.taskDependsOn}\n` +
@@ -244,8 +288,9 @@ export class ChatPrompts {
             '- `no-stubs-code-generation` — all code fully implemented\n' +
             '- `dependency-and-decompilation-analysis` — MUST decompile any .dll/.exe whose source is missing before implementing\n' +
             '- `runtime-validation-and-testing` — validation, test matrix, local-first strategy, reporting\n' +
-            '- `source-to-logic-apps-mapping` — component equivalents\n' +
-            `\nAZURE SETTINGS: Resource Group="${params.resourceGroup}", Location="${params.location}".\n` +
+            '- `automated-test-generation` — re-runnable workflow unit, map and schema tests (dotnet test, no Azure)\n' +
+            MAPPING_SKILL_LINE +
+            azureSettings(params.resourceGroup, params.location, params.provisioningMode) +
             `OUTPUT PATHS: Project="${params.outputProjectRoot}/", LogicApp="${params.outputLogicAppRoot}/".\n` +
             `\nCurrent task:\n- Type: ${params.nextTaskType}\n- Description: ${params.nextTaskDescription}\n` +
             `- Execution Prompt: ${params.nextTaskExecutionPrompt}\n- Order: ${params.nextTaskOrder}\n- Dependencies: ${params.nextTaskDependsOn}\n` +
@@ -273,16 +318,17 @@ export class ChatPrompts {
             AUTONOMOUS_MODE_SHORT +
             SKILL_AUTHORITY +
             GLOBAL_LOOKUP_POLICY +
+            (params.simpleFlow ? FAST_PATH : '') +
             '\nREQUIRED SKILLS (read ALL before starting):\n' +
             '- `analyse-source-design` — source reading depth, Mermaid diagram rules, MessageBox modeling, orchestration shapes, component mapping priority ladder, store tool sequence\n' +
             '- `dependency-and-decompilation-analysis` — DLL decompilation, missing dependency classification\n' +
-            '- `source-to-logic-apps-mapping` — component equivalents, service provider IDs, operation names\n' +
+            MAPPING_SKILL_LINE +
             `\nPROCEDURE:\n` +
-            `1. Call migration_detectFlowGroups with groupId="${params.flowId}" to retrieve the cached group artifact list.\n` +
+            `1. Call migration_detectFlowGroups with groupId="${params.flowId}" to retrieve the cached group artifact list. If it lists endpointNames, only those ports belong to this flow; ports of other flows in shared binding files are out of scope.\n` +
             '2. Call migration_getArtifactDetails and migration_readSourceFile for EVERY artifact per skill `analyse-source-design`.\n' +
-            '3. If any required dependency/detail is unresolved, expand to full-project lookup (all artifacts), then continue analysis.\n' +
+            '3. If any required dependency/detail is unresolved, expand to full-project lookup (all artifacts), then continue analysis. Record what you find outside the group as external dependencies, not as components of this flow.\n' +
             '4. Perform dependency analysis per skill `dependency-and-decompilation-analysis` (decompile DLLs/JARs, classify missing deps).\n' +
-            '5. Look up every component in skill `source-to-logic-apps-mapping`, then search reference docs with those names.\n' +
+            '5. Look up every component with migration_lookupMapping (skill `source-to-logic-apps-mapping`), then search reference docs with those names.\n' +
             '6. Generate Mermaid architecture diagram per skill `analyse-source-design` rules.\n' +
             `7. Store discovery results in the exact order specified by skill \`analyse-source-design\` (storeMeta → storeArchitecture → storeComponents → storeMessageFlow → storeGaps → storePatterns → storeDependencies → finalize), all with flowId="${params.flowId}".`
         );

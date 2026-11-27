@@ -266,19 +266,24 @@ export class BizTalkMapParser extends AbstractParser implements IArtifactParser 
         // Look for SchemaReference elements or SrcTree/TrgTree
         const srcTreeElements = getAllElements(rootElement, 'SrcTree');
         const trgTreeElements = getAllElements(rootElement, 'TrgTree');
+        // Mapper output records the schema as <SrcTree><Reference Location="Ns.Schema" /></SrcTree>
+        const treeReference = (tree: Element): string =>
+            getAllElements(tree, 'Reference')
+                .map((reference) => getAttr(reference, 'Location') || '')
+                .find((location) => location.length > 0) || '';
 
         if (srcTreeElements.length > 0) {
             sourceSchema =
                 getAttr(srcTreeElements[0], 'RootType_Name') ||
                 getAttr(srcTreeElements[0], 'SchemaRef') ||
-                '';
+                treeReference(srcTreeElements[0]);
         }
 
         if (trgTreeElements.length > 0) {
             targetSchema =
                 getAttr(trgTreeElements[0], 'RootType_Name') ||
                 getAttr(trgTreeElements[0], 'SchemaRef') ||
-                '';
+                treeReference(trgTreeElements[0]);
         }
 
         // Parse functoids

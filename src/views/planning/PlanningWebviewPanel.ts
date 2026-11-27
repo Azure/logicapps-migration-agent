@@ -253,6 +253,20 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                 }
                 break;
             }
+
+            case 'exportPlanMarkdown': {
+                const flowId = message.data as string;
+                if (flowId) {
+                    this.logger.debug(
+                        `[PlanningWebview] Export requirements.md requested for flow: ${flowId}`
+                    );
+                    void vscode.commands.executeCommand(
+                        'logicAppsMigrationAgent.exportPlanMarkdown',
+                        flowId
+                    );
+                }
+                break;
+            }
         }
     }
     private getHtmlContent(
@@ -1597,6 +1611,11 @@ export class PlanningWebviewPanel implements vscode.Disposable {
             vscode.postMessage({ command: 'exportPlanReport', data: flowId });
         }
 
+        function exportPlanMarkdown(flowId) {
+            window._dbgLog('info', 'exportPlanMarkdown: ' + flowId);
+            vscode.postMessage({ command: 'exportPlanMarkdown', data: flowId });
+        }
+
         function refresh() {
             window._dbgLog('info', 'refresh');
             vscode.postMessage({ command: 'refresh' });
@@ -2244,6 +2263,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                             </div>
                             <button class="btn btn-sm btn-outline" title="Generate a new version; preserve history" onclick="replanFlow('${this.escapeHtml(result.flowId)}')">↻ Regenerate Plan</button>
                             <button class="btn btn-sm btn-outline" onclick="exportPlanReport('${this.escapeHtml(result.flowId)}')" title="Export planning report as DOCX">📄 Export Report</button>
+                            <button class="btn btn-sm btn-outline" onclick="exportPlanMarkdown('${this.escapeHtml(result.flowId)}')" title="Export plan as requirements.md (Markdown)">📝 Export requirements.md</button>
                         </div>
                     </div>
                 </div>
@@ -2316,6 +2336,7 @@ export class PlanningWebviewPanel implements vscode.Disposable {
                         </div>
                         <button class="btn btn-sm btn-outline" title="Generate a new version; preserve history" onclick="replanFlow('${this.escapeHtml(result.flowId)}')">↻ Regenerate Plan</button>
                         <button class="btn btn-sm btn-outline" onclick="exportPlanReport('${this.escapeHtml(result.flowId)}')" title="Export planning report as DOCX">📄 Export Report</button>
+                        <button class="btn btn-sm btn-outline" onclick="exportPlanMarkdown('${this.escapeHtml(result.flowId)}')" title="Export plan as requirements.md (Markdown)">📝 Export requirements.md</button>
                     </div>
                 </div>
                 <div class="plan-tabs" style="margin-top: 12px;">

@@ -38,6 +38,16 @@ export class UserPrompts {
         return format('Planning choices: {0}', flowId);
     }
 
+    static applyPlanningChoiceToAllFlows(question: string, choice: string): string {
+        return format(
+            'Use "{1}" for "{0}" in all flows of this workspace? Answers already chosen for a flow are kept.',
+            question,
+            choice
+        );
+    }
+
+    static readonly BUTTON_APPLY_TO_ALL_FLOWS = 'Apply to All Flows';
+
     static readonly PLANNING_CHOICES_PAUSED =
         'Planning paused. Your answered choices are saved; resume planning when ready.';
 
@@ -181,6 +191,45 @@ export class UserPrompts {
 
     static flowGroupDetectionFailed(errorMsg: string): string {
         return format('Failed to start flow group detection: {0}', errorMsg);
+    }
+
+    static readonly BUTTON_REDETECT_GROUPS = 'Re-detect Groups';
+    static readonly COPILOT_REDETECTING_GROUPS =
+        'Copilot is re-detecting the logical groups in chat. Home keeps the current groups until new ones are stored.';
+    static readonly NO_FLOW_GROUPS_TO_EXPORT =
+        'No logical groups detected yet. Run discovery and open Home first.';
+    static readonly FLOW_GROUP_INVENTORY_SAVED = 'Logical group inventory saved.';
+    static readonly FLOW_WORK_IN_PROGRESS =
+        'A flow is still being analysed, planned or converted. Stop it or wait before re-detecting logical groups.';
+
+    static missingReferencedProjects(projects: string[]): string {
+        return format(
+            'Referenced projects are missing from the source folder: {0}. Add them and run Rescan Artifacts so flows include their schemas and code.',
+            projects.join(', ')
+        );
+    }
+
+    static inventoryChangedSinceGrouping(added: number, removed: number): string {
+        return format(
+            'The rescan found {0} new and {1} removed artifact(s) that the logical groups do not reflect yet. Re-detect groups now? Progress on unchanged flows is kept.',
+            added,
+            removed
+        );
+    }
+
+    static flowGroupsDetected(count: number, shared: number): string {
+        return format(
+            'Detected {0} logical group(s) from orchestration call chains and port bindings; {1} artifact(s) are shared between groups.',
+            count,
+            shared
+        );
+    }
+
+    static editedSkillsBackedUp(skills: string[]): string {
+        return format(
+            'Updated migration skills you had edited ({0}); your versions were saved as SKILL.md.bak. Move your rules to CUSTOM.md in the same folder so they are kept on future updates.',
+            skills.join(', ')
+        );
     }
 
     // ========================================================================

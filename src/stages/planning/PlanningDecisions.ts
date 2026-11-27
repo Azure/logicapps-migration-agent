@@ -71,6 +71,31 @@ export const DEPLOYMENT_QUESTION: PlanningQuestion = {
     ],
 };
 
+/** Stable IDs of standard planning questions; workspace default choices match them verbatim. */
+export const PLANNING_QUESTION_IDS = {
+    messaging: 'messaging',
+    modernization: 'modernization',
+    mapStrategy: 'map-strategy',
+    workflowTopology: 'workflow-topology',
+} as const;
+
+/**
+ * Returns the workspace default answer (question ID → option ID) for a non-hosting question,
+ * only when that option is offered. Hosting comes from the deployment model setting instead.
+ */
+export function configuredDefaultOption(
+    question: PlanningQuestion,
+    defaults: unknown
+): string | undefined {
+    if (!isRecord(defaults) || question.id === DEPLOYMENT_QUESTION.id) {
+        return undefined;
+    }
+    const optionId = defaults[question.id];
+    return typeof optionId === 'string' && question.options.some((option) => option.id === optionId)
+        ? optionId
+        : undefined;
+}
+
 export function validatePlanningQuestion(value: unknown): asserts value is PlanningQuestion {
     if (
         !isRecord(value) ||

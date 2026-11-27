@@ -72,9 +72,23 @@ Discovery → Planning → Conversion → Validation → Deployment
 4. Select your source folder when prompted (or use the command palette: `Logic Apps Migration Agent: Select Source Folder`)
 5. Follow the guided 5-stage workflow
 
+### Logical groups
+
+After discovery, the extension groups BizTalk artifacts into logical flows without Copilot, in seconds, and returns the same groups and IDs for the same source:
+
+- Orchestrations linked by Call/Start Orchestration form one flow, named after the entry orchestration. Receive locations and send ports bound to it (or subscribed to its receive ports) belong to it; receive ports routed only by send-port filters become messaging routes.
+- Maps, message schemas, pipelines and projects belong to the flows that reference them. Artifacts used by several flows — for example canonical schemas from a shared canonical data model project or one application binding file — are **shared**: they appear in each flow that uses them instead of merging flows, and analysis of a flow only covers its own ports.
+- Referenced projects missing from the source folder are reported right away. After adding them, **Rescan Artifacts** offers to re-detect groups; flows that keep their ID keep their analysis, plan and conversion progress. You can also run **Re-detect Logical Groups** at any time.
+
+Each Home card shows the flow's entry (receive location), orchestrations and exits (send ports), its ID, and an expandable artifact list with shared artifacts marked. Filter the cards by flow, orchestration, port, schema or map name, and use **Export Inventory** to save a Markdown map of every group with its ports, artifacts, shared and ungrouped artifacts.
+
+Set `logicAppsMigrationAgent.discovery.groupingMode` to `copilot` to let Copilot group the artifacts instead, starting from the same proposal. MuleSoft and TIBCO use Copilot grouping by default.
+
 ### Decision-first planning
 
 Planning resolves important choices before generating workflow definitions. It reuses discovery results and saved answers, asks a short hosting question when no explicit deployment setting exists, then asks only consequential unresolved questions (typically broker choice and/or preserve-code versus native-first modernization). Minor, behavior-preserving mappings are chosen automatically. Canceling pauses planning without inventing answers; already answered choices are saved.
+
+Standard choices also cover where maps run (`map-strategy`: Logic App XSLT, a local function, or a separate Azure Functions project) and how workflows are split (`workflow-topology`: one workflow per orchestration, or receiver, processor, and sender workflows connected through Service Bus topics). To reuse answers across flows, choose **Apply to All Flows** after answering a question, or set `logicAppsMigrationAgent.planning.defaultChoices` (for example `{"messaging": "azure-service-bus", "map-strategy": "azure-function", "workflow-topology": "receiver-processor-sender"}`); matching questions are then answered from settings without prompting, while explicit requests to change choices still ask.
 
 The planner generates **one selected scenario**, not several complete alternatives. It records short option tradeoffs and evidenced modernization opportunities, such as XML parsing with schemas, SQL stored-procedure actions, secret-store adoption, or telemetry modernization. Trigger/broker changes require contract and delivery-semantics checks; a queue behind an HTTP endpoint is not automatically a reason to replace the HTTP trigger. Connector availability and authentication are checked for the selected host.
 
@@ -97,6 +111,19 @@ are likewise evidence-based; the exporter does not infer them or calculate a new
 complexity score. Planning reports, other source-platform reports, and the
 interactive tabs retain their existing formats.
 
+Use **Export requirements.md** in the Planning tab to save the finalized plan as a
+Markdown `requirements.md` for skill-based build pipelines: decisions, target
+architecture and per-workflow Mermaid diagrams, mapping and disposition tables, and
+acceptance criteria derived only from the plan.
+
+### Conversion output
+
+Each converted flow is generated under `out/<flow-name>/` and includes:
+
+- **Re-runnable tests** in `Tests/`: Logic Apps Standard workflow unit tests with mocked triggers and connectors, map regression tests (the converted XSLT stays the reference when maps move to functions), and schema validation tests. They run with `dotnet test` and need no Azure resources.
+- **`TRACEABILITY.md`**, which maps every source artifact to the tasks that implement it and the files they generated. Task cards in the Conversion view also list their source artifacts.
+- **Infrastructure templates** in `infra/` when `logicAppsMigrationAgent.azure.provisioningMode` is `offline`. In that mode conversion never signs in to Azure; it tests locally with Azurite and Docker emulators (including the Service Bus emulator) and mocked unit tests.
+
 ## Requirements
 
 | Requirement                                                                                                                      | Purpose                                               |
@@ -116,9 +143,12 @@ Configure via `Settings > Extensions > Logic Apps Migration Agent`:
 | Setting                                            | Description                                       | Default                              |
 | -------------------------------------------------- | ------------------------------------------------- | ------------------------------------ |
 | `logicAppsMigrationAgent.deploymentModel`      | Target deployment model for Logic Apps Standard   | `workflow-service-plan`              |
+| `logicAppsMigrationAgent.planning.defaultChoices` | Workspace-wide planning answers (question ID → option ID) applied to every flow; hosting still comes from `deploymentModel` | `{}` |
 | `logicAppsMigrationAgent.azure.subscriptionId` | Azure subscription ID for deployment              | (empty)                              |
 | `logicAppsMigrationAgent.azure.resourceGroup`  | Azure resource group for provisioning and testing | `integration-migration-tool-test-rg` |
 | `logicAppsMigrationAgent.azure.location`       | Azure region for provisioning resources           | `eastus`                             |
+| `logicAppsMigrationAgent.azure.provisioningMode` | `provision` lets conversion create test resources without a local alternative; `offline` never signs in to Azure and generates Bicep plus local/mocked tests instead | `provision` |
+| `logicAppsMigrationAgent.discovery.groupingMode` | How logical groups are detected: `auto` (deterministic for BizTalk), `deterministic`, or `copilot` | `auto` |
 
 ## Command Palette
 
@@ -127,6 +157,8 @@ Configure via `Settings > Extensions > Logic Apps Migration Agent`:
 | `Logic Apps Migration Agent: Select Source Folder` | Start migration by selecting a source project folder |
 | `Logic Apps Migration Agent: Reset Migration`      | Reset all migration state and start over             |
 | `Logic Apps Migration Agent: Show Extension Logs`  | Open the extension output channel for debugging      |
+| `Logic Apps Migration Agent: Re-detect Logical Groups` | Re-group the current inventory, keeping progress of flows whose ID is unchanged |
+| `Logic Apps Migration Agent: Export Logical Group Inventory` | Save a Markdown map of every logical group with its ports and artifacts |
 
 ## Architecture
 
@@ -164,9 +196,19 @@ The extension provisions three GitHub Copilot agents into your workspace:
 | `@migration-planner`   | Creates per-flow migration plans with action mappings and gap analysis                    |
 | `@migration-converter` | Executes conversion tasks to generate Logic Apps workflows and connections                |
 
+### Team standards and skill customization
+
+The agents follow skills provisioned into `.github/skills/<skill>/SKILL.md`. The extension owns those files and updates them with new versions. To add your team's rules without losing them on updates:
+
+- Put rules for one skill in `.github/skills/<skill>/CUSTOM.md`. They are appended to that skill as a **Customer Overrides** section, which wins when it conflicts with the rest of the skill.
+- Put cross-cutting standards (target architecture, naming, broker topics, test conventions) in `.github/skills/customer-standards/SKILL.md`. The agents read it before every other skill.
+- If you edited a provisioned `SKILL.md` directly, the next update saves your version as `SKILL.md.bak` and tells you which skills to move into `CUSTOM.md`.
+
+To keep prompts small, the agents look up component mappings with the `migration_lookupMapping` tool instead of loading the whole `source-to-logic-apps-mapping` skill. Small flows without custom code also skip decompilation and broad reference-doc searches.
+
 ### LM Tools
 
-The extension registers **25 Language Model tools** with VS Code that the AI agents use to read artifacts, store results, and manage the migration workflow.
+The extension registers **34 Language Model tools** with VS Code that the AI agents use to read artifacts, look up mappings, store results, and manage the migration workflow.
 
 ## Source Flow Visualization
 
@@ -352,7 +394,9 @@ description: One-to-one mapping of every YourPlatform component to its Azure Log
 
 Create a `<your-platform>/SKILL.md` variant for each platform-specific skill. The
 MSMQ and SOAP built-in connector skills are shared fallbacks and apply whenever a
-platform maps a source component to those connectors.
+platform maps a source component to those connectors. The shared
+`automated-test-generation` skill applies to every platform; add a
+`<your-platform>/SKILL.md` variant only when your platform needs different test rules.
 
 | Skill                                   | Purpose                                                               | Agent                  |
 | --------------------------------------- | --------------------------------------------------------------------- | ---------------------- |
@@ -371,6 +415,7 @@ platform maps a source component to those connectors.
 | `dotnet-local-functions-logic-apps`     | Rules for generating .NET local functions                             | `@migration-converter` |
 | `no-stubs-code-generation`              | Rules ensuring generated code is complete (no stubs/placeholders)     | `@migration-converter` |
 | `runtime-validation-and-testing`        | Rules for runtime validation and testing                              | `@migration-converter` |
+| `automated-test-generation`             | Shared rules for re-runnable workflow unit, map and schema tests      | `@migration-converter` |
 | `cloud-deployment-and-testing`          | Rules for cloud deployment and testing                                | `@migration-converter` |
 
 **Tip**: Copy an existing platform's skills as a starting point (e.g., `biztalk/SKILL.md`) and adapt the content for your platform.

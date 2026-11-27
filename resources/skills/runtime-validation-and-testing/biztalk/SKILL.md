@@ -71,7 +71,7 @@ If any field is empty, truncated, or contains the wrong value, treat it as a **t
 During testing, NEVER connect to or use original source platform infrastructure (on-premises SQL servers, file shares, message queues, FTP servers, etc.).
 
 - For local-capable connectors (File System, HTTP, Timer) → use LOCAL resources.
-- For cloud-only connectors (Service Bus, Event Hubs, etc.) → use ONLY Azure resources provisioned in the configured resource group.
+- For cloud-only connectors (Event Hubs, Integration Account, etc.) → use ONLY Azure resources provisioned in the configured resource group, and only in provisioning mode `provision` (see §5a).
 - Ensure Azurite is running before `func start` (`AzureWebJobsStorage` uses `UseDevelopmentStorage=true`).
 
 ---
@@ -83,7 +83,16 @@ During testing, NEVER connect to or use original source platform infrastructure 
 - Use `localhost` for HTTP triggers.
 - For SQL Server, Cosmos DB, SFTP, PostgreSQL, MySQL → use Docker containers.
 - Check Docker availability with `docker --version`.
-- Only provision Azure resources for connectors with NO local/Docker alternative (Service Bus, Event Hubs, Integration Account).
+- For Service Bus → use the Azure Service Bus emulator (Docker image `mcr.microsoft.com/azure-messaging/servicebus-emulator` with its SQL Edge dependency and a `Config.json` that declares the flow's queues, topics and subscriptions). Point the connection at it from `local.settings.json` with a connection string ending in `UseDevelopmentEmulator=true;`. The emulator accepts SAS connection strings only, so keep managed identity / Microsoft Entra authentication in the cloud configuration and parameterize the connection per environment. If the built-in connector cannot reach the emulator, cover those paths with the mocked unit tests from `automated-test-generation`.
+- Only provision Azure resources for connectors with NO local, Docker or emulator alternative (Event Hubs, Integration Account), and only in provisioning mode `provision`.
+
+### 5a. Offline Provisioning Mode
+
+When the prompt says `AZURE PROVISIONING: OFFLINE`, never sign in to Azure, run `az`/`azd` deployment commands, or create resources:
+
+- Generate Bicep for every Azure resource the flow needs (for example the Service Bus namespace, topics and subscriptions, managed identity role assignments, Integration Account) under `{outputProjectRoot}/infra/` with per-environment parameter files, and document how to deploy it in `infra/README.md`.
+- Validate and test locally with Azurite and the Docker emulators; cover connectors without a local alternative with the mocked workflow unit tests from `automated-test-generation`.
+- List every live path that could not be exercised, and why, in TEST-REPORT.md instead of failing the task.
 
 ---
 
@@ -99,7 +108,7 @@ After testing, generate `TEST-REPORT.md` in the project root with:
 - Adjustments made during testing.
 - Design deviations from plan (should be none — see plan adherence).
 - Deployment notes.
-- Re-test instructions with exact commands.
+- Re-test instructions with exact commands, including `dotnet test` for the generated test projects and its pass/fail counts (skill `automated-test-generation`).
 
 ---
 

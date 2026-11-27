@@ -1009,6 +1009,8 @@ export class BizTalkBindingsParser extends AbstractParser implements IArtifactPa
                         receivePipeline: sp.receivePipeline,
                         isTwoWay: sp.isTwoWay,
                         filter: sp.filter,
+                        inboundMaps: sp.inboundMaps,
+                        outboundMaps: sp.outboundMaps,
                     },
                 },
             } as unknown as IRSendEndpoint);

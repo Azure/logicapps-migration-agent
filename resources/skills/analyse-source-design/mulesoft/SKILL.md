@@ -21,7 +21,7 @@ description: Rules for analysing a single MuleSoft flow group's architecture. Co
 
 Before classifying any component's Azure equivalent:
 
-1. Read the skill `source-to-logic-apps-mapping` to look up the exact Logic Apps Standard equivalent.
+1. Look up each component with `migration_lookupMapping`, which returns the matching rows of skill `source-to-logic-apps-mapping` (read the full skill only when a lookup finds nothing) to find the exact Logic Apps Standard equivalent.
 2. For EACH connector/processor/technology, use the connector name and operation names from that skill as search terms:
     - Call `migration_readReferenceDoc` with `action="search"` and a TARGETED query.
     - Call `migration_readReferenceDoc` with `action="read"` for the TOP result.

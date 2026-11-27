@@ -13,7 +13,7 @@ description: Rules for generating workflow.json files for Logic Apps Standard. C
 
 BEFORE writing ANY `workflow.json`:
 
-1. Read the skill `source-to-logic-apps-mapping` to get the Logic Apps equivalent connector, service provider ID, and operation names for each source component.
+1. Look up each component with `migration_lookupMapping`, which returns the matching rows of skill `source-to-logic-apps-mapping` (read the full skill only when a lookup finds nothing) to get the Logic Apps equivalent connector, service provider ID, and operation names for each source component.
 2. Use those operation names to call `migration_searchReferenceWorkflows` and `migration_readReferenceWorkflow` to get exact `operationId` and `serviceProviderConfiguration` for each trigger/action.
 3. If the first search returns no relevant results, RETRY 2-4 more times with different word combinations.
 4. Also call `migration_readReferenceDoc` with `action="search"` then `action="read"` to verify connector capabilities.

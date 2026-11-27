@@ -14,6 +14,7 @@ description: Rules for analysing a single flow group's architecture. Covers sour
 - Call `migration_getArtifactDetails` AND `migration_readSourceFile` for EVERY artifact in the group.
 - Extract ALL configuration details — adapter type, paths, polling intervals, pipeline stages, port names, schema fields, orchestration shapes, map field mappings, retry config.
 - ZERO HALLUCINATION — every value in the architecture diagram MUST come from source files.
+- FLOW SCOPE — binding files and shared artifacts (`sharedWithOtherFlows`) also contain ports, schemas or code of other flows. When the group lists `endpointNames`, include ONLY those receive locations/ports and send ports. Artifacts found through full-project lookup are external dependencies of this flow; report them under dependencies, not as flow components.
 
 - Check port bindings, address/transport assignments, and adapter overrides for runtime connection switching. Follow `connections-json-generation-rules` section 2.1 and the Runtime Destination Selection guidance in `source-to-logic-apps-mapping` only where dynamic connections are needed; otherwise preserve the normal connection approach.
 
@@ -23,7 +24,7 @@ description: Rules for analysing a single flow group's architecture. Covers sour
 
 Before classifying any component's Azure equivalent:
 
-1. Read the skill `source-to-logic-apps-mapping` to look up the exact Logic Apps Standard equivalent.
+1. Look up each component with `migration_lookupMapping`, which returns the matching rows of skill `source-to-logic-apps-mapping` (read the full skill only when a lookup finds nothing) to find the exact Logic Apps Standard equivalent.
 2. For EACH protocol/adapter/technology, use the connector name and operation names from that skill as search terms:
     - Call `migration_readReferenceDoc` with `action="search"` and a TARGETED query.
     - Call `migration_readReferenceDoc` with `action="read"` for the TOP result.

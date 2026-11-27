@@ -10,6 +10,7 @@
  */
 
 import { ParsedArtifact } from '../stages/discovery/types';
+import { simpleName } from '../stages/discovery/FlowGroupDetector';
 
 /**
  * Component detail for educational view
@@ -122,7 +123,7 @@ export interface FlowGroup {
     };
     /** Entry point for this flow (if message-flow category) */
     entryPoint?: {
-        type: 'receive-location' | 'receive-port' | 'orchestration';
+        type: 'receive-location' | 'receive-port' | 'orchestration' | 'flow';
         name: string;
         messageType?: string;
     };
@@ -132,6 +133,23 @@ export interface FlowGroup {
         name: string;
         messageType?: string;
     }[];
+    /**
+     * Receive locations/ports, send ports and send port groups that belong to this flow.
+     * Binding files hold the ports of a whole application, so this scopes them per flow.
+     */
+    endpointNames?: string[];
+}
+
+/**
+ * A source project referenced by a scanned project but missing from the scanned folder.
+ */
+export interface MissingProjectReference {
+    /** Referenced project name (file name without extension) */
+    project: string;
+    /** Path recorded in the referencing project */
+    path: string;
+    /** Projects that reference it */
+    referencedBy: string[];
 }
 
 /**
@@ -144,12 +162,21 @@ export interface FlowGroupsResult {
     ungroupedArtifactIds: string[];
     /** Overall explanation of the grouping */
     explanation: string;
+    /**
+     * Artifacts used by more than one flow (e.g. canonical schemas, binding files).
+     * They are listed in every group that uses them instead of forcing those flows to merge.
+     */
+    sharedArtifactIds?: string[];
+    /** Referenced source projects that were not found in the scanned folder */
+    missingProjects?: MissingProjectReference[];
+    /** How the groups were produced */
+    detectionMode?: 'deterministic' | 'copilot';
 }
 
 /**
  * A deterministic connection between two artifacts discovered from IR data
  */
-interface ArtifactConnection {
+export interface ArtifactConnection {
     fromId: string;
     toId: string;
     type:
@@ -512,16 +539,16 @@ export class LLMFlowGenerator {
         for (const a of artifacts) {
             if (a.ir.maps) {
                 for (const map of a.ir.maps) {
-                    const sourceRef = map.source?.schemaRef;
-                    const targetRef = map.target?.schemaRef;
+                    // BizTalk maps record their trees as sourceSchema/targetSchema
+                    const btmMap = map as { sourceSchema?: string; targetSchema?: string };
+                    const sourceRef = map.source?.schemaRef || btmMap.sourceSchema;
+                    const targetRef = map.target?.schemaRef || btmMap.targetSchema;
 
                     if (sourceRef) {
-                        // Find artifacts that define this source schema
+                        // Find artifacts that define this source schema (exact simple name:
+                        // substring matches link "Order" to "PurchaseOrder")
                         for (const [schemaKey, schemaArtifactIds] of artifactsBySchema) {
-                            if (
-                                sourceRef.includes(schemaKey) ||
-                                schemaKey.includes(sourceRef.replace(/.*\//, ''))
-                            ) {
+                            if (simpleName(sourceRef) === simpleName(schemaKey)) {
                                 for (const saId of schemaArtifactIds) {
                                     if (saId !== a.id) {
                                         connections.push({
@@ -538,10 +565,7 @@ export class LLMFlowGenerator {
 
                     if (targetRef) {
                         for (const [schemaKey, schemaArtifactIds] of artifactsBySchema) {
-                            if (
-                                targetRef.includes(schemaKey) ||
-                                schemaKey.includes(targetRef.replace(/.*\//, ''))
-                            ) {
+                            if (simpleName(targetRef) === simpleName(schemaKey)) {
                                 for (const saId of schemaArtifactIds) {
                                     if (saId !== a.id) {
                                         connections.push({
@@ -682,15 +706,14 @@ export class LLMFlowGenerator {
                         if (other.id === a.id || other.type !== 'orchestration') {
                             continue;
                         }
-                        // Match: exact name, or target ends with the artifact name, or artifact name ends with the target
+                        // Match exact or namespace-qualified names only; substring matches
+                        // ("Order" vs "OrderStatus") create false call chains.
                         const otherName = other.name;
                         if (
                             targetOrchName === otherName ||
                             targetOrchName.endsWith('.' + otherName) ||
                             targetOrchName.endsWith('/' + otherName) ||
-                            otherName.endsWith('.' + targetOrchName) ||
-                            targetOrchName.includes(otherName) ||
-                            otherName.includes(targetOrchName)
+                            otherName.endsWith('.' + targetOrchName)
                         ) {
                             connections.push({
                                 fromId: a.id,
@@ -735,9 +758,7 @@ export class LLMFlowGenerator {
                         targetName === other.name ||
                         targetName.endsWith('.' + other.name) ||
                         targetName.endsWith('/' + other.name) ||
-                        other.name.endsWith('.' + targetName) ||
-                        other.name.includes(targetName) ||
-                        targetName.includes(other.name)
+                        other.name.endsWith('.' + targetName)
                     ) {
                         connections.push({
                             fromId: a.id,
